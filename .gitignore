@@ -1,0 +1,33 @@
+# Build directories
+build/
+build-*/
+cmake-build-*/
+out/
+
+# CMake / CTest output
+CMakeCache.txt
+CMakeFiles/
+CTestTestfile.cmake
+cmake_install.cmake
+compile_commands.json
+Makefile
+Testing/
+
+# Compiler / linker output
+*.o
+*.obj
+*.a
+*.la
+*.lo
+*.so
+*.so.*
+*.dylib
+*.dll
+*.lib
+*.exp
+*.pdb
+*.ilk
+*.iobj
+*.ipdb
+*.out
+*.exe

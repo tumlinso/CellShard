@@ -54,9 +54,11 @@ src/
 │       ├── csx.cuh
 │       └── dia.cuh
 ├── convert/
+│   ├── csc_to_coo.cuh
 │   ├── coo_to_csc.cuh
 │   ├── coo_to_csr.cuh
 │   ├── coo_to_csx.cuh
+│   ├── csr_to_coo.cuh
 │   ├── csx_to_coo.cuh
 │   └── kernels/
 │       ├── cs_expand.cuh
@@ -74,5 +76,6 @@ src/
 
 - `src/sparse/csx.cuh` uses the shared policy from `src/types.cuh` and `src/real.cuh`.
 - `src/convert/coo_to_csr.cuh` and `src/convert/coo_to_csc.cuh` are thin wrappers in `cellshard::convert` over the shared csX conversion path.
+- `src/convert/csr_to_coo.cuh` and `src/convert/csc_to_coo.cuh` are the matching thin wrappers over the shared csX-to-COO path.
 - The moved format, conversion, I/O, and device headers are now the real homes for that code.
 - The larger scaffold directories still exist in the repo, but they are not the active design target for this library.

@@ -5,8 +5,7 @@
 #include <cstdio>
 #include <cstring>
 
-namespace matrix {
-namespace sparse {
+namespace cellshard {
 namespace convert {
 
 static inline int cs_to_coo_cuda_check(cudaError_t err, const char *label) {
@@ -240,5 +239,4 @@ __host__ __forceinline__ int coo_conversion_buffer_build_from_cs(
 }
 
 } // namespace convert
-} // namespace sparse
-} // namespace matrix
+} // namespace cellshard

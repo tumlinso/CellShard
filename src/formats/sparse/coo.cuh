@@ -9,7 +9,6 @@ struct alignas(16) coo {
     unsigned int rows;
     unsigned int cols;
     unsigned int nnz;
-    unsigned char format;
 
     unsigned int *rowIdx;
     unsigned int *colIdx;
@@ -24,7 +23,6 @@ __host__ __device__ __forceinline__ void init(
     m->rows = rows;
     m->cols = cols;
     m->nnz = nnz;
-    m->format = format_coo;
     m->rowIdx = 0;
     m->colIdx = 0;
     m->val = 0;
@@ -47,7 +45,6 @@ __host__ __forceinline__ void clear(coo * __restrict__ m) {
     m->rows = 0;
     m->cols = 0;
     m->nnz = 0;
-    m->format = format_coo;
 }
 
 __host__ __forceinline__ int allocate(coo * __restrict__ m) {
@@ -97,7 +94,6 @@ __host__ __forceinline__ int concatenate_rows(coo * __restrict__ dst, const coo 
     dst->rows = top->rows + bottom->rows;
     dst->cols = top->cols != 0 ? top->cols : bottom->cols;
     dst->nnz = top->nnz + bottom->nnz;
-    dst->format = format_coo;
     dst->rowIdx = 0;
     dst->colIdx = 0;
     dst->val = 0;
@@ -132,7 +128,6 @@ __host__ __forceinline__ int append_rows(coo * __restrict__ dst, const coo * __r
     dst->rows += src->rows;
     if (dst->cols == 0) dst->cols = src->cols;
     dst->nnz = newNnz;
-    dst->format = format_coo;
     if (newNnz != 0) {
         rowIdx = (unsigned int *) std::malloc((std::size_t) newNnz * sizeof(unsigned int));
         colIdx = (unsigned int *) std::malloc((std::size_t) newNnz * sizeof(unsigned int));

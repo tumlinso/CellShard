@@ -9,7 +9,6 @@ struct alignas(16) dia {
     unsigned int rows;
     unsigned int cols;
     unsigned int nnz;
-    unsigned char format;
 
     int *offsets;
     __half *val;
@@ -20,7 +19,6 @@ __host__ __device__ __forceinline__ void init(dia * __restrict__ m, unsigned int
     m->rows = rows;
     m->cols = cols;
     m->nnz = nnz;
-    m->format = format_dia;
     m->offsets = 0;
     m->val = 0;
     m->num_diagonals = 0;
@@ -41,7 +39,6 @@ __host__ __forceinline__ void clear(dia * __restrict__ m) {
     m->rows = 0;
     m->cols = 0;
     m->nnz = 0;
-    m->format = format_dia;
 }
 
 __host__ __forceinline__ int allocate(dia * __restrict__ m) {

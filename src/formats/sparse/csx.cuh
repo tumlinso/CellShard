@@ -12,7 +12,6 @@ struct alignas(16) csx {
     types::dim_t cDim;
     types::dim_t uDim;
     types::nnz_t nnz;
-    unsigned char format;
 
     types::ptr_t *cAxPtr;
     types::idx_t *uAxIdx;
@@ -22,13 +21,11 @@ struct alignas(16) csx {
 __host__ __device__ __forceinline__ void init(
     csx * __restrict__ m,
     types::dim_t cDim = 0,
-    types::dim_t uDim = 0,
-    unsigned char format = format_csr
+    types::dim_t uDim = 0
 ) {
     m->cDim = cDim;
     m->uDim = uDim;
     m->nnz = 0;
-    m->format = format;
     m->cAxPtr = 0;
     m->uAxIdx = 0;
     m->val = 0;
@@ -51,7 +48,6 @@ __host__ __forceinline__ void clear(csx * __restrict__ m) {
     m->cDim = 0;
     m->uDim = 0;
     m->nnz = 0;
-    m->format = format_csr;
 }
 
 __host__ __forceinline__ int allocate(csx * __restrict__ m) {

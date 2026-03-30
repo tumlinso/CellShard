@@ -9,7 +9,6 @@ struct csc {
     unsigned int rows;
     unsigned int cols;
     unsigned int nnz;
-    unsigned char format;
 
     unsigned int *colPtr;
     unsigned int *rowIdx;
@@ -20,7 +19,6 @@ inline void init(csc *m, unsigned int rows = 0, unsigned int cols = 0, unsigned 
     m->rows = rows;
     m->cols = cols;
     m->nnz = nnz;
-    m->format = format_csc;
     m->colPtr = 0;
     m->rowIdx = 0;
     m->val = 0;
@@ -43,7 +41,6 @@ inline void clear(csc *m) {
     m->rows = 0;
     m->cols = 0;
     m->nnz = 0;
-    m->format = format_csc;
 }
 
 inline int allocate(csc *m) {

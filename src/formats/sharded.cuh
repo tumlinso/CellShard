@@ -9,7 +9,6 @@ struct alignas(16) sharded {
     unsigned long rows;
     unsigned long cols;
     unsigned long nnz;
-    unsigned char format;
 
     unsigned long num_parts;
     unsigned long part_capacity;
@@ -37,7 +36,6 @@ __host__ __device__ __forceinline__ void init(sharded<MatrixT> * __restrict__ m)
     m->rows = 0;
     m->cols = 0;
     m->nnz = 0;
-    m->format = format_none;
     m->num_parts = 0;
     m->part_capacity = 0;
     m->parts = 0;
@@ -192,11 +190,10 @@ __host__ __forceinline__ int append_part(sharded<MatrixT> * __restrict__ m, Matr
     m->parts[m->num_parts] = part;
     m->part_rows[m->num_parts] = part != 0 ? part->rows : 0;
     m->part_nnz[m->num_parts] = part != 0 ? part->nnz : 0;
-    m->part_aux[m->num_parts] = part != 0 ? ::matrix::part_aux(part) : 0;
+    m->part_aux[m->num_parts] = part != 0 ? ::cellshard::part_aux(part) : 0;
     ++m->num_parts;
     if (part != 0) {
         if (m->cols == 0) m->cols = part->cols;
-        m->format = part->format;
     }
     rebuild_part_offsets(m);
     return set_shards_to_parts(m);
@@ -221,7 +218,6 @@ __host__ __forceinline__ int concatenate(sharded<MatrixT> * __restrict__ dst, sh
     dst->num_parts += src->num_parts;
     src->num_parts = 0;
     if (dst->cols == 0) dst->cols = src->cols;
-    if (dst->format == format_none) dst->format = src->format;
     rebuild_part_offsets(dst);
     set_shards_to_parts(dst);
     rebuild_part_offsets(src);

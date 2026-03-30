@@ -27,7 +27,7 @@ inline int write_header(std::FILE *fp, unsigned char format, unsigned int rows, 
     return 1;
 }
 
-inline int read_header(std::FILE *fp, header *out) {
+inline int read_header(std::FILE *fp, disk_header *out) {
     if (!read_block(fp, &out->format, sizeof(out->format), 1)) return 0;
     if (!read_block(fp, &out->rows, sizeof(out->rows), 1)) return 0;
     if (!read_block(fp, &out->cols, sizeof(out->cols), 1)) return 0;
@@ -132,10 +132,10 @@ int bind_sequential(shard_storage *s, unsigned int count, const char *prefix) {
     char path[1024];
     unsigned int i = 0;
 
-    if (!::matrix::detail::reserve(s, count)) return 0;
+    if (!::cellshard::detail::reserve(s, count)) return 0;
     for (i = 0; i < count; ++i) {
         if (std::snprintf(path, sizeof(path), "%s.%u", prefix, (unsigned int) i) <= 0) return 0;
-        if (!::matrix::detail::bind(s, i, path)) return 0;
+        if (!::cellshard::detail::bind(s, i, path)) return 0;
     }
     return 1;
 }
@@ -146,7 +146,7 @@ int store_dense_raw(const char *filename, unsigned int rows, unsigned int cols, 
 
     fp = std::fopen(filename, "wb");
     if (fp == 0) return 0;
-    if (!write_header(fp, format_dense, rows, cols, nnz)) goto done;
+    if (!write_header(fp, disk_format_dense, rows, cols, nnz)) goto done;
     if (!write_block(fp, val, value_size, nnz)) goto done;
     ok = 1;
 
@@ -163,7 +163,7 @@ int load_dense_raw(const char *filename, std::size_t value_size, dense_load_resu
     fp = std::fopen(filename, "rb");
     if (fp == 0) return 0;
     if (!read_header(fp, &out->h)) goto done;
-    if (!checkformat(format_dense, out->h.format, "dense matrix")) goto done;
+    if (!check_disk_format(disk_format_dense, out->h.format, "dense matrix")) goto done;
     out->val = alloc_bytes((std::size_t) out->h.nnz * value_size);
     if (out->h.nnz != 0 && out->val == 0) goto done;
     if (!read_block(fp, out->val, value_size, out->h.nnz)) goto done;
@@ -184,7 +184,7 @@ int store_csr_raw(const char *filename, unsigned int rows, unsigned int cols, un
 
     fp = std::fopen(filename, "wb");
     if (fp == 0) return 0;
-    if (!write_header(fp, format_csr, rows, cols, nnz)) goto done;
+    if (!write_header(fp, disk_format_csr, rows, cols, nnz)) goto done;
     if (!write_block(fp, val, value_size, nnz)) goto done;
     if (rows != 0 && !write_block(fp, rowPtr, sizeof(unsigned int), (std::size_t) rows + 1)) goto done;
     if (!write_block(fp, colIdx, sizeof(unsigned int), nnz)) goto done;
@@ -205,7 +205,7 @@ int load_csr_raw(const char *filename, std::size_t value_size, csr_load_result *
     fp = std::fopen(filename, "rb");
     if (fp == 0) return 0;
     if (!read_header(fp, &out->h)) goto done;
-    if (!checkformat(format_csr, out->h.format, "csr matrix")) goto done;
+    if (!check_disk_format(disk_format_csr, out->h.format, "csr matrix")) goto done;
     if (out->h.rows != 0) out->rowPtr = (unsigned int *) alloc_bytes((std::size_t) (out->h.rows + 1) * sizeof(unsigned int));
     out->colIdx = (unsigned int *) alloc_bytes((std::size_t) out->h.nnz * sizeof(unsigned int));
     out->val = alloc_bytes((std::size_t) out->h.nnz * value_size);
@@ -228,7 +228,7 @@ int store_coo_raw(const char *filename, unsigned int rows, unsigned int cols, un
 
     fp = std::fopen(filename, "wb");
     if (fp == 0) return 0;
-    if (!write_header(fp, format_coo, rows, cols, nnz)) goto done;
+    if (!write_header(fp, disk_format_coo, rows, cols, nnz)) goto done;
     if (!write_block(fp, val, value_size, nnz)) goto done;
     if (!write_block(fp, rowIdx, sizeof(unsigned int), nnz)) goto done;
     if (!write_block(fp, colIdx, sizeof(unsigned int), nnz)) goto done;
@@ -249,7 +249,7 @@ int load_coo_raw(const char *filename, std::size_t value_size, coo_load_result *
     fp = std::fopen(filename, "rb");
     if (fp == 0) return 0;
     if (!read_header(fp, &out->h)) goto done;
-    if (!checkformat(format_coo, out->h.format, "coo matrix")) goto done;
+    if (!check_disk_format(disk_format_coo, out->h.format, "coo matrix")) goto done;
     out->rowIdx = (unsigned int *) alloc_bytes((std::size_t) out->h.nnz * sizeof(unsigned int));
     out->colIdx = (unsigned int *) alloc_bytes((std::size_t) out->h.nnz * sizeof(unsigned int));
     out->val = alloc_bytes((std::size_t) out->h.nnz * value_size);
@@ -271,7 +271,7 @@ int store_dia_raw(const char *filename, unsigned int rows, unsigned int cols, un
 
     fp = std::fopen(filename, "wb");
     if (fp == 0) return 0;
-    if (!write_header(fp, format_dia, rows, cols, nnz)) goto done;
+    if (!write_header(fp, disk_format_dia, rows, cols, nnz)) goto done;
     if (!write_block(fp, &num_diagonals, sizeof(unsigned int), 1)) goto done;
     if (!write_block(fp, offsets, sizeof(int), num_diagonals)) goto done;
     if (!write_block(fp, val, value_size, nnz)) goto done;
@@ -292,7 +292,7 @@ int load_dia_raw(const char *filename, std::size_t value_size, dia_load_result *
     fp = std::fopen(filename, "rb");
     if (fp == 0) return 0;
     if (!read_header(fp, &out->h)) goto done;
-    if (!checkformat(format_dia, out->h.format, "dia matrix")) goto done;
+    if (!check_disk_format(disk_format_dia, out->h.format, "dia matrix")) goto done;
     if (!read_block(fp, &out->num_diagonals, sizeof(unsigned int), 1)) goto done;
     out->offsets = (int *) alloc_bytes((std::size_t) out->num_diagonals * sizeof(int));
     out->val = alloc_bytes((std::size_t) out->h.nnz * value_size);

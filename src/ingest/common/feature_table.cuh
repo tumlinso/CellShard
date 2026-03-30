@@ -1,1 +1,97 @@
 #pragma once
+
+#include "../../io/source/file_reader.cuh"
+#include "text_column.cuh"
+
+namespace cellshard {
+namespace ingest {
+namespace common {
+
+struct feature_table {
+    text_column ids;
+    text_column names;
+    text_column types;
+};
+
+static inline void init(feature_table *t) {
+    init(&t->ids);
+    init(&t->names);
+    init(&t->types);
+}
+
+static inline void clear(feature_table *t) {
+    clear(&t->ids);
+    clear(&t->names);
+    clear(&t->types);
+}
+
+static inline unsigned int count(const feature_table *t) {
+    return t->ids.count;
+}
+
+static inline const char *id(const feature_table *t, unsigned int idx) {
+    return common::get(&t->ids, idx);
+}
+
+static inline const char *name(const feature_table *t, unsigned int idx) {
+    return common::get(&t->names, idx);
+}
+
+static inline const char *type(const feature_table *t, unsigned int idx) {
+    return common::get(&t->types, idx);
+}
+
+static inline int append(feature_table *t,
+                         const char *id_ptr,
+                         std::size_t id_len,
+                         const char *name_ptr,
+                         std::size_t name_len,
+                         const char *type_ptr,
+                         std::size_t type_len) {
+    if (!common::append(&t->ids, id_ptr, id_len)) return 0;
+    if (!common::append(&t->names, name_ptr, name_len)) return 0;
+    if (!common::append(&t->types, type_ptr, type_len)) return 0;
+    return 1;
+}
+
+static inline int load_tsv(const char *path, feature_table *t, int skip_header = 0) {
+    io::source::buffered_file_reader reader;
+    int rc = 0;
+    char *line = 0;
+    std::size_t line_len = 0;
+    char *fields[4];
+    unsigned int nfields = 0;
+
+    io::source::init(&reader);
+    clear(t);
+    init(t);
+
+    if (!io::source::open(&reader, path)) goto fail;
+
+    for (;;) {
+        rc = io::source::next_line(&reader, &line, &line_len);
+        if (rc < 0) goto fail;
+        if (rc == 0) break;
+        if (reader.line_number == 1u) io::source::strip_utf8_bom(line, &line_len);
+        if (line_len == 0) continue;
+        if (skip_header && reader.line_number == 1u) continue;
+        nfields = io::source::split_tabs(line, fields, 4u);
+        if (nfields == 0) continue;
+        if (!append(t,
+                    io::source::field_or_empty(fields, nfields, 0u), std::strlen(io::source::field_or_empty(fields, nfields, 0u)),
+                    io::source::field_or_empty(fields, nfields, 1u), std::strlen(io::source::field_or_empty(fields, nfields, 1u)),
+                    io::source::field_or_empty(fields, nfields, 2u), std::strlen(io::source::field_or_empty(fields, nfields, 2u)))) goto fail;
+    }
+
+    io::source::clear(&reader);
+    return 1;
+
+fail:
+    io::source::clear(&reader);
+    clear(t);
+    return 0;
+}
+
+} // namespace common
+} // namespace ingest
+} // namespace cellshard

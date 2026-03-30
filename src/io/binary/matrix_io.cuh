@@ -18,6 +18,60 @@ struct shard_storage {
 
 namespace detail {
 
+enum {
+    disk_format_none  = 0,
+    disk_format_dense = 1,
+    disk_format_csr   = 2,
+    disk_format_csc   = 3,
+    disk_format_coo   = 4,
+    disk_format_dia   = 5,
+    disk_format_ell   = 6
+};
+
+struct disk_header {
+    unsigned char format;
+    types::dim_t rows;
+    types::dim_t cols;
+    types::nnz_t nnz;
+};
+
+inline int check_disk_format(unsigned char expected, unsigned char actual, const char *name) {
+    if (expected == actual) return 1;
+    std::fprintf(stderr,
+                 "Error: expected format %u, got %u for %s\n",
+                 (unsigned int) expected,
+                 (unsigned int) actual,
+                 name);
+    return 0;
+}
+
+template<typename MatrixT>
+struct disk_format_code;
+
+template<>
+struct disk_format_code<dense> {
+    enum { value = disk_format_dense };
+    static inline const char *name() { return "dense matrix"; }
+};
+
+template<>
+struct disk_format_code<sparse::csr> {
+    enum { value = disk_format_csr };
+    static inline const char *name() { return "csr matrix"; }
+};
+
+template<>
+struct disk_format_code<sparse::coo> {
+    enum { value = disk_format_coo };
+    static inline const char *name() { return "coo matrix"; }
+};
+
+template<>
+struct disk_format_code<sparse::dia> {
+    enum { value = disk_format_dia };
+    static inline const char *name() { return "dia matrix"; }
+};
+
 inline int sharded_write_block(std::FILE *fp, const void *ptr, std::size_t elem_size, std::size_t count) {
     if (count == 0) return 1;
     return std::fwrite(ptr, elem_size, count, fp) == count;
@@ -72,6 +126,7 @@ template<typename MatrixT>
 inline int store_sharded_header_typed(const char *filename, const sharded<MatrixT> *m) {
     static const unsigned char magic[8] = { 'C', 'S', 'H', 'R', 'D', '0', '1', '\0' };
     std::FILE *fp = 0;
+    const unsigned char format = (unsigned char) disk_format_code<MatrixT>::value;
     std::uint64_t rows = 0;
     std::uint64_t cols = 0;
     std::uint64_t nnz = 0;
@@ -87,7 +142,7 @@ inline int store_sharded_header_typed(const char *filename, const sharded<Matrix
     if (!sharded_to_u64(m->num_parts, &num_parts, "num_parts", filename)) goto done;
     if (!sharded_to_u64(m->num_shards, &num_shards, "num_shards", filename)) goto done;
     if (!sharded_write_block(fp, magic, sizeof(magic), 1)) goto done;
-    if (!sharded_write_block(fp, &m->format, sizeof(m->format), 1)) goto done;
+    if (!sharded_write_block(fp, &format, sizeof(format), 1)) goto done;
     if (!sharded_write_block(fp, &rows, sizeof(rows), 1)) goto done;
     if (!sharded_write_block(fp, &cols, sizeof(cols), 1)) goto done;
     if (!sharded_write_block(fp, &nnz, sizeof(nnz), 1)) goto done;
@@ -109,6 +164,7 @@ inline int load_sharded_header_typed(const char *filename, sharded<MatrixT> *m) 
     static const unsigned char magic[8] = { 'C', 'S', 'H', 'R', 'D', '0', '1', '\0' };
     unsigned char got_magic[8];
     std::FILE *fp = 0;
+    unsigned char format = 0;
     std::uint64_t rows = 0;
     std::uint64_t cols = 0;
     std::uint64_t nnz = 0;
@@ -122,7 +178,8 @@ inline int load_sharded_header_typed(const char *filename, sharded<MatrixT> *m) 
     if (std::memcmp(got_magic, magic, sizeof(magic)) != 0) goto done;
     clear(m);
     init(m);
-    if (!sharded_read_block(fp, &m->format, sizeof(m->format), 1)) goto done;
+    if (!sharded_read_block(fp, &format, sizeof(format), 1)) goto done;
+    if (!check_disk_format((unsigned char) disk_format_code<MatrixT>::value, format, disk_format_code<MatrixT>::name())) goto done;
     if (!sharded_read_block(fp, &rows, sizeof(rows), 1)) goto done;
     if (!sharded_read_block(fp, &cols, sizeof(cols), 1)) goto done;
     if (!sharded_read_block(fp, &nnz, sizeof(nnz), 1)) goto done;
@@ -169,33 +226,33 @@ done:
 }
 
 struct dense_load_result {
-    header h;
+    disk_header h;
     void *val;
 };
 
 struct csr_load_result {
-    header h;
+    disk_header h;
     unsigned int *rowPtr;
     unsigned int *colIdx;
     void *val;
 };
 
 struct coo_load_result {
-    header h;
+    disk_header h;
     unsigned int *rowIdx;
     unsigned int *colIdx;
     void *val;
 };
 
 struct dia_load_result {
-    header h;
+    disk_header h;
     unsigned int num_diagonals;
     int *offsets;
     void *val;
 };
 
 struct sharded_header_load_result {
-    header h;
+    disk_header h;
     unsigned int num_parts;
     unsigned int num_shards;
     unsigned int *part_rows;
@@ -373,8 +430,7 @@ inline int fetch_part(sharded<MatrixT> *m, const shard_storage *s, unsigned long
     if (part->rows != m->part_rows[partId]) goto fail;
     if (part->nnz != m->part_nnz[partId]) goto fail;
     if (m->cols != 0 && part->cols != m->cols) goto fail;
-    if (part->format != m->format) goto fail;
-    if (::matrix::part_aux(part) != m->part_aux[partId]) goto fail;
+    if (::cellshard::part_aux(part) != m->part_aux[partId]) goto fail;
     m->parts[partId] = part;
     ok = 1;
 

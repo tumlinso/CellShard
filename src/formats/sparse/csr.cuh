@@ -9,7 +9,6 @@ struct alignas(16) csr {
     unsigned int rows;
     unsigned int cols;
     unsigned int nnz;
-    unsigned char format;
 
     unsigned int *rowPtr;
     unsigned int *colIdx;
@@ -25,7 +24,6 @@ __host__ __device__ __forceinline__ void init(
     m->rows = rows;
     m->cols = cols;
     m->nnz = nnz;
-    m->format = format_csr;
     m->rowPtr = 0;
     m->colIdx = 0;
     m->val = 0;
@@ -48,7 +46,6 @@ __host__ __forceinline__ void clear(csr * __restrict__ m) {
     m->rows = 0;
     m->cols = 0;
     m->nnz = 0;
-    m->format = format_csr;
 }
 
 __host__ __forceinline__ int allocate(csr * __restrict__ m) {

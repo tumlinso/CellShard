@@ -11,33 +11,6 @@
 
 namespace cellshard {
 
-enum {
-    format_none  = 0,
-    format_dense = 1,
-    format_csr   = 2,
-    format_csc   = 3,
-    format_coo   = 4,
-    format_dia   = 5,
-    format_ell   = 6
-};
-
-inline int checkformat(unsigned char expected, unsigned char actual, const char *name) {
-    if (expected == actual) return 1;
-    std::fprintf(stderr,
-                 "Error: expected format %u, got %u for %s\n",
-                 (unsigned int) expected,
-                 (unsigned int) actual,
-                 name);
-    return 0;
-}
-
-struct header {
-    unsigned char format;
-    types::dim_t rows;
-    types::dim_t cols;
-    types::nnz_t nnz;
-};
-
 template<typename OffsetT>
 __host__ __device__ __forceinline__ OffsetT find_offset_span(OffsetT row, const OffsetT *offsets, OffsetT count) {
     OffsetT lo = 0;
@@ -60,7 +33,6 @@ struct csr_base {
     IndexT rows;
     IndexT cols;
     IndexT nnz;
-    unsigned char format;
     RowPtrT rowPtr;
     ColIdxT colIdx;
 };

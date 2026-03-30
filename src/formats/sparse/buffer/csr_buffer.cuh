@@ -6,7 +6,7 @@
 #include <cstdio>
 #include <cstring>
 
-namespace matrix {
+namespace cellshard {
 namespace sparse {
 
 static inline int csr_gpu_buffer_cuda_check(cudaError_t err, const char *label) {
@@ -196,4 +196,4 @@ __host__ __forceinline__ int csr_gpu_buffer_build_from_coo(
 }
 
 } // namespace sparse
-} // namespace matrix
+} // namespace cellshard

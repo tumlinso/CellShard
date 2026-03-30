@@ -9,7 +9,7 @@
 
 #include "types.cuh"
 
-namespace matrix {
+namespace cellshard {
 
 enum {
     format_none  = 0,
@@ -67,7 +67,7 @@ struct csr_base {
 
 } // namespace sparse
 
-} // namespace matrix
+} // namespace cellshard
 
 #include "dense.cuh"
 #include "sparse/csr.cuh"
@@ -76,7 +76,7 @@ struct csr_base {
 #include "sparse/dia.cuh"
 #include "sharded.cuh"
 
-namespace matrix {
+namespace cellshard {
 
 template<typename MatrixT>
 __host__ __device__ __forceinline__ unsigned int part_aux(const MatrixT *) {
@@ -143,4 +143,4 @@ __host__ __forceinline__ void destroy(sparse::dia *m) {
     delete m;
 }
 
-} // namespace matrix
+} // namespace cellshard

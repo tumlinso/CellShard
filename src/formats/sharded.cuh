@@ -2,7 +2,7 @@
 
 #include "../matrix.cuh"
 
-namespace matrix {
+namespace cellshard {
 
 template<typename MatrixT>
 struct alignas(16) sharded {
@@ -354,4 +354,4 @@ __host__ __forceinline__ int set_shards_by_part_bytes(sharded<MatrixT> * __restr
     return 1;
 }
 
-} // namespace matrix
+} // namespace cellshard

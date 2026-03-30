@@ -4,7 +4,7 @@
 
 #include "../../io/binary/matrix_io.cuh"
 
-namespace matrix {
+namespace cellshard {
 namespace device {
 
 template<typename MatrixT>
@@ -510,4 +510,4 @@ __host__ __forceinline__ cudaError_t swap_shard(shard_cache<MatrixT> *cache,
 }
 
 } // namespace device
-} // namespace matrix
+} // namespace cellshard

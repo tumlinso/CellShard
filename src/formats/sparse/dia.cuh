@@ -2,7 +2,7 @@
 
 #include "../../matrix.cuh"
 
-namespace matrix {
+namespace cellshard {
 namespace sparse {
 
 struct alignas(16) dia {
@@ -77,4 +77,4 @@ __host__ __device__ __forceinline__ __half *at(dia * __restrict__ m, unsigned in
 }
 
 } // namespace sparse
-} // namespace matrix
+} // namespace cellshard

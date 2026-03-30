@@ -4,7 +4,7 @@
 #include <cstdlib>
 #include <cstring>
 
-namespace matrix {
+namespace cellshard {
 namespace detail {
 
 namespace {
@@ -374,4 +374,4 @@ done:
 }
 
 } // namespace detail
-} // namespace matrix
+} // namespace cellshard

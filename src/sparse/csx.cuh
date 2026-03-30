@@ -5,7 +5,7 @@
 #include <cstddef>
 #include <cstdlib>
 
-namespace matrix {
+namespace cellshard {
 namespace sparse {
 
 struct alignas(16) csx {
@@ -78,4 +78,4 @@ __host__ __forceinline__ int allocate(csx * __restrict__ m) {
 }
 
 } // namespace sparse
-} // namespace matrix
+} // namespace cellshard

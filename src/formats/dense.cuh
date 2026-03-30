@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdlib>
 
-namespace matrix {
+namespace cellshard {
 
 struct alignas(16) dense {
     unsigned int rows;
@@ -56,4 +56,4 @@ __host__ __device__ __forceinline__ __half *at(dense * __restrict__ m, unsigned 
     return m->val + r * m->ld + c;
 }
 
-} // namespace matrix
+} // namespace cellshard

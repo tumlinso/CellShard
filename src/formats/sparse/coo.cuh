@@ -2,7 +2,7 @@
 
 #include "../../matrix.cuh"
 
-namespace matrix {
+namespace cellshard {
 namespace sparse {
 
 struct alignas(16) coo {
@@ -168,4 +168,4 @@ __host__ __forceinline__ int append_rows(coo * __restrict__ dst, const coo * __r
 }
 
 } // namespace sparse
-} // namespace matrix
+} // namespace cellshard

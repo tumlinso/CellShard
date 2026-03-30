@@ -9,7 +9,7 @@
 
 #include "../../matrix.cuh"
 
-namespace matrix {
+namespace cellshard {
 
 struct shard_storage {
     unsigned int capacity;
@@ -431,4 +431,4 @@ inline int drop_shard(sharded<MatrixT> *m, unsigned long shardId) {
     return 1;
 }
 
-} // namespace matrix
+} // namespace cellshard

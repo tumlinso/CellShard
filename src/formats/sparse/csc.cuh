@@ -2,7 +2,7 @@
 
 #include "../../matrix.cuh"
 
-namespace matrix {
+namespace cellshard {
 namespace sparse {
 
 struct csc {
@@ -86,4 +86,4 @@ inline __half *at(csc *m, unsigned int r, unsigned int c) {
 }
 
 } // namespace sparse
-} // namespace matrix
+} // namespace cellshard

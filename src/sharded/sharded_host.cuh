@@ -1,6 +1,8 @@
 #pragma once
 
 #include "sharded.cuh"
+#include "shard_paths.cuh"
+#include "../io/binary/matrix_file.cuh"
 
 #include <cstdlib>
 #include <cstring>
@@ -161,24 +163,39 @@ __host__ __forceinline__ int concatenate(sharded<MatrixT> * __restrict__ dst, sh
 
 template<typename MatrixT>
 __host__ __forceinline__ int set_equal_shards(sharded<MatrixT> * __restrict__ m, unsigned long count) {
-    unsigned long base = 0;
-    unsigned long rem = 0;
-    unsigned long row = 0;
+    unsigned long shardCount = 0;
+    unsigned long rows = 0;
+    unsigned long target = 0;
     unsigned long i = 0;
 
     if (count == 0) {
         m->num_shards = 0;
         return 1;
     }
-    if (!reserve_shards(m, count)) return 0;
-    m->num_shards = count;
-    base = m->rows / count;
-    rem = m->rows % count;
-    for (i = 0; i < count; ++i) {
-        m->shard_offsets[i] = row;
-        row += base + (i < rem ? 1 : 0);
+    if (m->num_parts == 0) {
+        m->num_shards = 0;
+        return 1;
     }
-    m->shard_offsets[count] = m->rows;
+    if (count >= m->num_parts) return set_shards_to_parts(m);
+    if (!reserve_shards(m, count)) return 0;
+    target = (m->rows + count - 1) / count;
+    m->shard_offsets[0] = 0;
+    shardCount = 0;
+    rows = 0;
+    for (i = 0; i < m->num_parts; ++i) {
+        const unsigned long parts_left = m->num_parts - (i + 1);
+        const unsigned long shards_left = count - (shardCount + 1);
+        rows += m->part_rows[i];
+        if (shards_left == 0) continue;
+        if (rows >= target && parts_left >= shards_left) {
+            ++shardCount;
+            m->shard_offsets[shardCount] = m->part_offsets[i + 1];
+            rows = 0;
+        }
+    }
+    ++shardCount;
+    m->shard_offsets[shardCount] = m->rows;
+    m->num_shards = shardCount;
     return 1;
 }
 
@@ -193,10 +210,42 @@ __host__ __forceinline__ int reshard(sharded<MatrixT> * __restrict__ m, unsigned
     if (offsets[0] != 0 || offsets[count] != m->rows) return 0;
     for (i = 0; i < count; ++i) {
         if (offsets[i] > offsets[i + 1]) return 0;
+        if (!row_is_part_boundary(m, offsets[i])) return 0;
     }
+    if (!row_is_part_boundary(m, offsets[count])) return 0;
     if (!reserve_shards(m, count)) return 0;
     m->num_shards = count;
     for (i = 0; i <= count; ++i) m->shard_offsets[i] = offsets[i];
+    return 1;
+}
+
+template<typename MatrixT>
+__host__ __forceinline__ int set_shards_by_nnz(sharded<MatrixT> * __restrict__ m, unsigned long max_nnz) {
+    unsigned long used = 0;
+    unsigned long shardCount = 0;
+    unsigned long i = 0;
+
+    if (max_nnz == 0) return set_shards_to_parts(m);
+    if (!reserve_shards(m, m->num_parts)) return 0;
+
+    m->shard_offsets[0] = 0;
+    shardCount = 0;
+    used = 0;
+    for (i = 0; i < m->num_parts; ++i) {
+        if (m->part_nnz[i] == 0) continue;
+        if (used != 0 && used + m->part_nnz[i] > max_nnz) {
+            ++shardCount;
+            m->shard_offsets[shardCount] = m->part_offsets[i];
+            used = 0;
+        }
+        used += m->part_nnz[i];
+    }
+
+    if (m->num_parts != 0) {
+        ++shardCount;
+        m->shard_offsets[shardCount] = m->rows;
+    }
+    m->num_shards = shardCount;
     return 1;
 }
 
@@ -229,6 +278,90 @@ __host__ __forceinline__ int set_shards_by_part_bytes(sharded<MatrixT> * __restr
         m->shard_offsets[shardCount] = m->rows;
     }
     m->num_shards = shardCount;
+    return 1;
+}
+
+template<typename MatrixT>
+__host__ __forceinline__ int fetch_part(sharded<MatrixT> *m, const shard_storage *s, unsigned long partId) {
+    MatrixT *part = 0;
+    int ok = 0;
+
+    if (partId >= m->num_parts || s == 0 || partId >= s->capacity || s->paths[partId] == 0) return 0;
+    if (m->parts[partId] != 0) destroy(m->parts[partId]);
+    m->parts[partId] = 0;
+
+    part = new MatrixT;
+    init(part);
+    if (!load(s->paths[partId], part)) {
+        destroy(part);
+        return 0;
+    }
+    if (part->rows != m->part_rows[partId]) goto fail;
+    if (::cellshard::part_nnz(part) != m->part_nnz[partId]) goto fail;
+    if (m->cols != 0 && part->cols != m->cols) goto fail;
+    if (::cellshard::part_aux(part) != m->part_aux[partId]) goto fail;
+    m->parts[partId] = part;
+    ok = 1;
+
+fail:
+    if (!ok) destroy(part);
+    return ok;
+}
+
+template<typename MatrixT>
+__host__ __forceinline__ int fetch_all_parts(sharded<MatrixT> *m, const shard_storage *s) {
+    unsigned long i = 0;
+    for (i = 0; i < m->num_parts; ++i) {
+        if (!fetch_part(m, s, i)) return 0;
+    }
+    if (m->num_shards == 0) return set_shards_to_parts(m);
+    return 1;
+}
+
+template<typename MatrixT>
+__host__ __forceinline__ int fetch_shard(sharded<MatrixT> *m, const shard_storage *s, unsigned long shardId) {
+    unsigned long begin = 0;
+    unsigned long end = 0;
+    unsigned long i = 0;
+
+    if (shardId >= m->num_shards) return 0;
+    begin = first_part_in_shard(m, shardId);
+    end = last_part_in_shard(m, shardId);
+    for (i = begin; i < end; ++i) {
+        if (!fetch_part(m, s, i)) return 0;
+    }
+    return 1;
+}
+
+template<typename MatrixT>
+__host__ __forceinline__ int drop_part(sharded<MatrixT> *m, unsigned long partId) {
+    if (partId >= m->num_parts) return 0;
+    destroy(m->parts[partId]);
+    m->parts[partId] = 0;
+    return 1;
+}
+
+template<typename MatrixT>
+__host__ __forceinline__ int drop_all_parts(sharded<MatrixT> *m) {
+    unsigned long i = 0;
+    for (i = 0; i < m->num_parts; ++i) {
+        if (!drop_part(m, i)) return 0;
+    }
+    return 1;
+}
+
+template<typename MatrixT>
+__host__ __forceinline__ int drop_shard(sharded<MatrixT> *m, unsigned long shardId) {
+    unsigned long begin = 0;
+    unsigned long end = 0;
+    unsigned long i = 0;
+
+    if (shardId >= m->num_shards) return 0;
+    begin = first_part_in_shard(m, shardId);
+    end = last_part_in_shard(m, shardId);
+    for (i = begin; i < end; ++i) {
+        if (!drop_part(m, i)) return 0;
+    }
     return 1;
 }
 

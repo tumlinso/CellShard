@@ -7,24 +7,19 @@
 #include <cstring>
 
 #include "../../formats/compressed.cuh"
-#include "../../formats/compressed_host.cuh"
 #include "../../formats/dense.cuh"
-#include "../../formats/dense_host.cuh"
 #include "../../formats/diagonal.cuh"
-#include "../../formats/diagonal_host.cuh"
 #include "../../formats/triplet.cuh"
-#include "../../formats/triplet_host.cuh"
 
 namespace cellshard {
 
 enum {
-    disk_format_none  = 0,
-    disk_format_dense = 1,
-    disk_format_csr   = 2,
-    disk_format_csc   = 3,
-    disk_format_coo   = 4,
-    disk_format_dia   = 5,
-    disk_format_ell   = 6
+    disk_format_none       = 0,
+    disk_format_dense      = 1,
+    disk_format_compressed = 2,
+    disk_format_coo        = 3,
+    disk_format_dia        = 4,
+    disk_format_ell        = 5
 };
 
 struct disk_header {
@@ -54,9 +49,9 @@ struct disk_format_code<dense> {
 };
 
 template<>
-struct disk_format_code<sparse::csr> {
-    enum { value = disk_format_csr };
-    static inline const char *name() { return "csr matrix"; }
+struct disk_format_code<sparse::compressed> {
+    enum { value = disk_format_compressed };
+    static inline const char *name() { return "compressed matrix"; }
 };
 
 template<>
@@ -76,10 +71,11 @@ struct dense_load_result {
     void *val;
 };
 
-struct csr_load_result {
+struct compressed_load_result {
     disk_header h;
-    types::ptr_t *rowPtr;
-    types::idx_t *colIdx;
+    types::u32 axis;
+    types::ptr_t *majorPtr;
+    types::idx_t *minorIdx;
     void *val;
 };
 
@@ -100,8 +96,8 @@ struct dia_load_result {
 int store_dense_raw(const char *filename, types::dim_t rows, types::dim_t cols, types::nnz_t nnz, const void *val, std::size_t value_size);
 int load_dense_raw(const char *filename, std::size_t value_size, dense_load_result *out);
 
-int store_csr_raw(const char *filename, types::dim_t rows, types::dim_t cols, types::nnz_t nnz, const types::ptr_t *rowPtr, const types::idx_t *colIdx, const void *val, std::size_t value_size);
-int load_csr_raw(const char *filename, std::size_t value_size, csr_load_result *out);
+int store_compressed_raw(const char *filename, types::dim_t rows, types::dim_t cols, types::nnz_t nnz, types::u32 axis, types::dim_t major_dim, const types::ptr_t *majorPtr, const types::idx_t *minorIdx, const void *val, std::size_t value_size);
+int load_compressed_raw(const char *filename, std::size_t value_size, compressed_load_result *out);
 
 int store_coo_raw(const char *filename, types::dim_t rows, types::dim_t cols, types::nnz_t nnz, const types::idx_t *rowIdx, const types::idx_t *colIdx, const void *val, std::size_t value_size);
 int load_coo_raw(const char *filename, std::size_t value_size, coo_load_result *out);
@@ -131,21 +127,33 @@ inline int load(const char *filename, dense *m) {
     return 1;
 }
 
-inline int store(const char *filename, const sparse::csr *m) {
-    return store_csr_raw(filename, m->rows, m->cols, m->nnz, m->rowPtr, m->colIdx, m->val, sizeof(real::storage_t));
+inline int store(const char *filename, const sparse::compressed *m) {
+    return store_compressed_raw(
+        filename,
+        m->rows,
+        m->cols,
+        m->nnz,
+        m->axis,
+        sparse::major_dim(m),
+        m->majorPtr,
+        m->minorIdx,
+        m->val,
+        sizeof(real::storage_t)
+    );
 }
 
-inline int load(const char *filename, sparse::csr *m) {
-    csr_load_result tmp;
+inline int load(const char *filename, sparse::compressed *m) {
+    compressed_load_result tmp;
 
-    tmp.rowPtr = 0;
-    tmp.colIdx = 0;
+    tmp.axis = sparse::compressed_by_row;
+    tmp.majorPtr = 0;
+    tmp.minorIdx = 0;
     tmp.val = 0;
-    if (!load_csr_raw(filename, sizeof(real::storage_t), &tmp)) return 0;
+    if (!load_compressed_raw(filename, sizeof(real::storage_t), &tmp)) return 0;
     sparse::clear(m);
-    sparse::init(m, tmp.h.rows, tmp.h.cols, tmp.h.nnz);
-    m->rowPtr = tmp.rowPtr;
-    m->colIdx = tmp.colIdx;
+    sparse::init(m, tmp.h.rows, tmp.h.cols, tmp.h.nnz, tmp.axis);
+    m->majorPtr = tmp.majorPtr;
+    m->minorIdx = tmp.minorIdx;
     m->val = (real::storage_t *) tmp.val;
     return 1;
 }

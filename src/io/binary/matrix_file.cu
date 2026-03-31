@@ -38,12 +38,12 @@ inline void *alloc_bytes(std::size_t bytes) {
     return std::malloc(bytes);
 }
 
-inline void free_csr_result(csr_load_result *out) {
-    std::free(out->rowPtr);
-    std::free(out->colIdx);
+inline void free_compressed_result(compressed_load_result *out) {
+    std::free(out->majorPtr);
+    std::free(out->minorIdx);
     std::free(out->val);
-    out->rowPtr = 0;
-    out->colIdx = 0;
+    out->majorPtr = 0;
+    out->minorIdx = 0;
     out->val = 0;
 }
 
@@ -104,16 +104,17 @@ done:
     return ok;
 }
 
-int store_csr_raw(const char *filename, types::dim_t rows, types::dim_t cols, types::nnz_t nnz, const types::ptr_t *rowPtr, const types::idx_t *colIdx, const void *val, std::size_t value_size) {
+int store_compressed_raw(const char *filename, types::dim_t rows, types::dim_t cols, types::nnz_t nnz, types::u32 axis, types::dim_t major_dim, const types::ptr_t *majorPtr, const types::idx_t *minorIdx, const void *val, std::size_t value_size) {
     std::FILE *fp = 0;
     int ok = 0;
 
     fp = std::fopen(filename, "wb");
     if (fp == 0) return 0;
-    if (!write_header(fp, disk_format_csr, rows, cols, nnz)) goto done;
+    if (!write_header(fp, disk_format_compressed, rows, cols, nnz)) goto done;
+    if (!write_block(fp, &axis, sizeof(axis), 1)) goto done;
     if (!write_block(fp, val, value_size, nnz)) goto done;
-    if (rows != 0 && !write_block(fp, rowPtr, sizeof(types::ptr_t), (std::size_t) rows + 1)) goto done;
-    if (!write_block(fp, colIdx, sizeof(types::idx_t), nnz)) goto done;
+    if (major_dim != 0 && !write_block(fp, majorPtr, sizeof(types::ptr_t), (std::size_t) major_dim + 1)) goto done;
+    if (!write_block(fp, minorIdx, sizeof(types::idx_t), nnz)) goto done;
     ok = 1;
 
 done:
@@ -121,29 +122,33 @@ done:
     return ok;
 }
 
-int load_csr_raw(const char *filename, std::size_t value_size, csr_load_result *out) {
+int load_compressed_raw(const char *filename, std::size_t value_size, compressed_load_result *out) {
     std::FILE *fp = 0;
     int ok = 0;
+    types::dim_t major_dim = 0;
 
-    out->rowPtr = 0;
-    out->colIdx = 0;
+    out->axis = sparse::compressed_by_row;
+    out->majorPtr = 0;
+    out->minorIdx = 0;
     out->val = 0;
     fp = std::fopen(filename, "rb");
     if (fp == 0) return 0;
     if (!read_header(fp, &out->h)) goto done;
-    if (!check_disk_format(disk_format_csr, out->h.format, "csr matrix")) goto done;
-    if (out->h.rows != 0) out->rowPtr = (types::ptr_t *) alloc_bytes((std::size_t) (out->h.rows + 1) * sizeof(types::ptr_t));
-    out->colIdx = (types::idx_t *) alloc_bytes((std::size_t) out->h.nnz * sizeof(types::idx_t));
+    if (!check_disk_format(disk_format_compressed, out->h.format, "compressed matrix")) goto done;
+    if (!read_block(fp, &out->axis, sizeof(out->axis), 1)) goto done;
+    major_dim = out->axis == sparse::compressed_by_col ? out->h.cols : out->h.rows;
+    if (major_dim != 0) out->majorPtr = (types::ptr_t *) alloc_bytes((std::size_t) (major_dim + 1) * sizeof(types::ptr_t));
+    out->minorIdx = (types::idx_t *) alloc_bytes((std::size_t) out->h.nnz * sizeof(types::idx_t));
     out->val = alloc_bytes((std::size_t) out->h.nnz * value_size);
-    if (out->h.rows != 0 && out->rowPtr == 0) goto done;
-    if (out->h.nnz != 0 && (out->colIdx == 0 || out->val == 0)) goto done;
+    if (major_dim != 0 && out->majorPtr == 0) goto done;
+    if (out->h.nnz != 0 && (out->minorIdx == 0 || out->val == 0)) goto done;
     if (!read_block(fp, out->val, value_size, out->h.nnz)) goto done;
-    if (out->h.rows != 0 && !read_block(fp, out->rowPtr, sizeof(types::ptr_t), (std::size_t) out->h.rows + 1)) goto done;
-    if (!read_block(fp, out->colIdx, sizeof(types::idx_t), out->h.nnz)) goto done;
+    if (major_dim != 0 && !read_block(fp, out->majorPtr, sizeof(types::ptr_t), (std::size_t) major_dim + 1)) goto done;
+    if (!read_block(fp, out->minorIdx, sizeof(types::idx_t), out->h.nnz)) goto done;
     ok = 1;
 
 done:
-    if (!ok) free_csr_result(out);
+    if (!ok) free_compressed_result(out);
     std::fclose(fp);
     return ok;
 }

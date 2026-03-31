@@ -65,6 +65,10 @@ __host__ __device__ __forceinline__ unsigned int part_aux(const sparse::dia *m) 
     return m->num_diagonals;
 }
 
+__host__ __device__ __forceinline__ unsigned int part_aux(const sparse::compressed *m) {
+    return m->axis;
+}
+
 template<typename MatrixT>
 __host__ __device__ __forceinline__ unsigned long find_part(const sharded<MatrixT> * __restrict__ m, unsigned long row) {
     if (m->part_offsets == 0 || m->num_parts == 0) return m->num_parts;
@@ -75,6 +79,27 @@ template<typename MatrixT>
 __host__ __device__ __forceinline__ unsigned long find_shard(const sharded<MatrixT> * __restrict__ m, unsigned long row) {
     if (m->shard_offsets == 0 || m->num_shards == 0) return m->num_shards;
     return find_offset_span(row, m->shard_offsets, m->num_shards);
+}
+
+template<typename MatrixT>
+__host__ __device__ __forceinline__ unsigned long first_row_in_part(const sharded<MatrixT> * __restrict__ m, unsigned long partId) {
+    if (partId >= m->num_parts || m->part_offsets == 0) return m->rows;
+    return m->part_offsets[partId];
+}
+
+template<typename MatrixT>
+__host__ __device__ __forceinline__ unsigned long last_row_in_part(const sharded<MatrixT> * __restrict__ m, unsigned long partId) {
+    if (partId >= m->num_parts || m->part_offsets == 0) return m->rows;
+    return m->part_offsets[partId + 1];
+}
+
+template<typename MatrixT>
+__host__ __device__ __forceinline__ int row_is_part_boundary(const sharded<MatrixT> * __restrict__ m, unsigned long row) {
+    if (row == 0 || row == m->rows) return 1;
+    if (m->part_offsets == 0 || m->num_parts == 0) return 0;
+    const unsigned long hit = find_part(m, row);
+    if (hit >= m->num_parts) return 0;
+    return m->part_offsets[hit] == row;
 }
 
 template<typename MatrixT>
@@ -113,6 +138,34 @@ __host__ __device__ __forceinline__ unsigned long last_part_in_shard(const shard
 }
 
 template<typename MatrixT>
+__host__ __device__ __forceinline__ unsigned long first_row_in_shard(const sharded<MatrixT> * __restrict__ m, unsigned long shardId) {
+    if (shardId >= m->num_shards || m->shard_offsets == 0) return m->rows;
+    return m->shard_offsets[shardId];
+}
+
+template<typename MatrixT>
+__host__ __device__ __forceinline__ unsigned long last_row_in_shard(const sharded<MatrixT> * __restrict__ m, unsigned long shardId) {
+    if (shardId >= m->num_shards || m->shard_offsets == 0) return m->rows;
+    return m->shard_offsets[shardId + 1];
+}
+
+template<typename MatrixT>
+__host__ __device__ __forceinline__ unsigned long part_count_in_shard(const sharded<MatrixT> * __restrict__ m, unsigned long shardId) {
+    const unsigned long begin = first_part_in_shard(m, shardId);
+    const unsigned long end = last_part_in_shard(m, shardId);
+    if (begin >= end) return 0;
+    return end - begin;
+}
+
+template<typename MatrixT>
+__host__ __device__ __forceinline__ unsigned long rows_in_shard(const sharded<MatrixT> * __restrict__ m, unsigned long shardId) {
+    const unsigned long rowBegin = first_row_in_shard(m, shardId);
+    const unsigned long rowEnd = last_row_in_shard(m, shardId);
+    if (rowBegin >= rowEnd) return 0;
+    return rowEnd - rowBegin;
+}
+
+template<typename MatrixT>
 __host__ __device__ __forceinline__ int part_loaded(const sharded<MatrixT> * __restrict__ m, unsigned long partId) {
     if (partId >= m->num_parts) return 0;
     return m->parts[partId] != 0;
@@ -133,35 +186,32 @@ __host__ __device__ __forceinline__ int shard_loaded(const sharded<MatrixT> * __
     return 1;
 }
 
+template<typename MatrixT>
+__host__ __device__ __forceinline__ unsigned long nnz_in_shard(const sharded<MatrixT> * __restrict__ m, unsigned long shardId) {
+    unsigned long begin = 0;
+    unsigned long end = 0;
+    unsigned long i = 0;
+    unsigned long total = 0;
+
+    if (shardId >= m->num_shards) return 0;
+    begin = first_part_in_shard(m, shardId);
+    end = last_part_in_shard(m, shardId);
+    for (i = begin; i < end; ++i) total += m->part_nnz[i];
+    return total;
+}
+
 __host__ __device__ __forceinline__ std::size_t part_bytes(const sharded<dense> *m, unsigned long partId) {
     if (partId >= m->num_parts) return 0;
     if (m->parts[partId] != 0) return bytes(m->parts[partId]);
     return sizeof(dense) + (std::size_t) m->part_nnz[partId] * sizeof(real::storage_t);
 }
 
-__host__ __device__ __forceinline__ std::size_t part_bytes(const sharded<sparse::csr> *m, unsigned long partId) {
+__host__ __device__ __forceinline__ std::size_t part_bytes(const sharded<sparse::compressed> *m, unsigned long partId) {
+    const unsigned long ptr_dim = m->part_aux[partId] == sparse::compressed_by_col ? m->cols : m->part_rows[partId];
     if (partId >= m->num_parts) return 0;
     if (m->parts[partId] != 0) return bytes(m->parts[partId]);
-    return sizeof(sparse::csr)
-        + (std::size_t) (m->part_rows[partId] + 1) * sizeof(types::ptr_t)
-        + (std::size_t) m->part_nnz[partId] * sizeof(types::idx_t)
-        + (std::size_t) m->part_nnz[partId] * sizeof(real::storage_t);
-}
-
-__host__ __device__ __forceinline__ std::size_t part_bytes(const sharded<sparse::csc> *m, unsigned long partId) {
-    if (partId >= m->num_parts) return 0;
-    if (m->parts[partId] != 0) return bytes(m->parts[partId]);
-    return sizeof(sparse::csc)
-        + (std::size_t) (m->cols + 1) * sizeof(types::ptr_t)
-        + (std::size_t) m->part_nnz[partId] * sizeof(types::idx_t)
-        + (std::size_t) m->part_nnz[partId] * sizeof(real::storage_t);
-}
-
-__host__ __device__ __forceinline__ std::size_t part_bytes(const sharded<sparse::csx> *m, unsigned long partId) {
-    if (partId >= m->num_parts) return 0;
-    if (m->parts[partId] != 0) return bytes(m->parts[partId]);
-    return sizeof(sparse::csx)
-        + (std::size_t) (m->part_rows[partId] + 1) * sizeof(types::ptr_t)
+    return sizeof(sparse::compressed)
+        + (std::size_t) (ptr_dim + 1) * sizeof(types::ptr_t)
         + (std::size_t) m->part_nnz[partId] * sizeof(types::idx_t)
         + (std::size_t) m->part_nnz[partId] * sizeof(real::storage_t);
 }
@@ -194,6 +244,20 @@ __host__ __device__ __forceinline__ std::size_t bytes(const sharded<MatrixT> * _
     total += (std::size_t) m->part_capacity * sizeof(unsigned long);
     total += (std::size_t) (m->shard_capacity + 1) * sizeof(unsigned long);
     for (i = 0; i < m->num_parts; ++i) total += part_bytes(m, i);
+    return total;
+}
+
+template<typename MatrixT>
+__host__ __device__ __forceinline__ std::size_t shard_bytes(const sharded<MatrixT> * __restrict__ m, unsigned long shardId) {
+    unsigned long begin = 0;
+    unsigned long end = 0;
+    unsigned long i = 0;
+    std::size_t total = 0;
+
+    if (shardId >= m->num_shards) return 0;
+    begin = first_part_in_shard(m, shardId);
+    end = last_part_in_shard(m, shardId);
+    for (i = begin; i < end; ++i) total += part_bytes(m, i);
     return total;
 }
 

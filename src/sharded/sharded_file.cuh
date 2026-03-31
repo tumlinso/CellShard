@@ -7,19 +7,20 @@
 #include <cstring>
 
 #include "../formats/dense.cuh"
-#include "../formats/dense_host.cuh"
 #include "../formats/compressed.cuh"
-#include "../formats/compressed_host.cuh"
 #include "../formats/triplet.cuh"
-#include "../formats/triplet_host.cuh"
 #include "../formats/diagonal.cuh"
-#include "../formats/diagonal_host.cuh"
 #include "sharded.cuh"
 #include "sharded_host.cuh"
 #include "../io/binary/matrix_file.cuh"
 #include "shard_paths.cuh"
 
 namespace cellshard {
+
+template<typename MatrixT>
+inline int check_sharded_disk_format(unsigned char actual) {
+    return check_disk_format((unsigned char) disk_format_code<MatrixT>::value, actual, disk_format_code<MatrixT>::name());
+}
 
 struct sharded_header_load_result {
     disk_header h;
@@ -152,7 +153,7 @@ inline int load_header(const char *filename, sharded<MatrixT> *m) {
     clear(m);
     init(m);
     if (!read_sharded_block(fp, &format, sizeof(format), 1)) goto done;
-    if (!check_disk_format((unsigned char) disk_format_code<MatrixT>::value, format, disk_format_code<MatrixT>::name())) goto done;
+    if (!check_sharded_disk_format<MatrixT>(format)) goto done;
     if (!read_sharded_block(fp, &rows, sizeof(rows), 1)) goto done;
     if (!read_sharded_block(fp, &cols, sizeof(cols), 1)) goto done;
     if (!read_sharded_block(fp, &nnz, sizeof(nnz), 1)) goto done;
@@ -208,81 +209,6 @@ inline int store(const char *filename, const sharded<MatrixT> *m, const shard_st
     for (i = 0; i < m->num_parts; ++i) {
         if (m->parts[i] == 0 || s->paths[i] == 0) return 0;
         if (!store(s->paths[i], m->parts[i])) return 0;
-    }
-    return 1;
-}
-
-template<typename MatrixT>
-inline int fetch_part(sharded<MatrixT> *m, const shard_storage *s, unsigned long partId) {
-    MatrixT *part = 0;
-    int ok = 0;
-
-    if (partId >= m->num_parts || s == 0 || partId >= s->capacity || s->paths[partId] == 0) return 0;
-    if (m->parts[partId] != 0) destroy(m->parts[partId]);
-    m->parts[partId] = 0;
-
-    part = new MatrixT;
-    init(part);
-    if (!load(s->paths[partId], part)) {
-        destroy(part);
-        return 0;
-    }
-    if (part->rows != m->part_rows[partId]) goto fail;
-    if (::cellshard::part_nnz(part) != m->part_nnz[partId]) goto fail;
-    if (m->cols != 0 && part->cols != m->cols) goto fail;
-    if (::cellshard::part_aux(part) != m->part_aux[partId]) goto fail;
-    m->parts[partId] = part;
-    ok = 1;
-
-fail:
-    if (!ok) destroy(part);
-    return ok;
-}
-
-template<typename MatrixT>
-inline int fetch_all_parts(sharded<MatrixT> *m, const shard_storage *s) {
-    unsigned long i = 0;
-    for (i = 0; i < m->num_parts; ++i) {
-        if (!fetch_part(m, s, i)) return 0;
-    }
-    if (m->num_shards == 0) return set_shards_to_parts(m);
-    return 1;
-}
-
-template<typename MatrixT>
-inline int fetch_shard(sharded<MatrixT> *m, const shard_storage *s, unsigned long shardId) {
-    unsigned long begin = 0;
-    unsigned long end = 0;
-    unsigned long i = 0;
-
-    if (shardId >= m->num_shards) return 0;
-    begin = first_part_in_shard(m, shardId);
-    end = last_part_in_shard(m, shardId);
-    for (i = begin; i < end; ++i) {
-        if (!fetch_part(m, s, i)) return 0;
-    }
-    return 1;
-}
-
-template<typename MatrixT>
-inline int drop_part(sharded<MatrixT> *m, unsigned long partId) {
-    if (partId >= m->num_parts) return 0;
-    destroy(m->parts[partId]);
-    m->parts[partId] = 0;
-    return 1;
-}
-
-template<typename MatrixT>
-inline int drop_shard(sharded<MatrixT> *m, unsigned long shardId) {
-    unsigned long begin = 0;
-    unsigned long end = 0;
-    unsigned long i = 0;
-
-    if (shardId >= m->num_shards) return 0;
-    begin = first_part_in_shard(m, shardId);
-    end = last_part_in_shard(m, shardId);
-    for (i = begin; i < end; ++i) {
-        if (!drop_part(m, i)) return 0;
     }
     return 1;
 }

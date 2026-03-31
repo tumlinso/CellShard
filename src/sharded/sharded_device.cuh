@@ -5,7 +5,7 @@
 
 #include <cuda_runtime.h>
 
-#include "sharded_file.cuh"
+#include "sharded_host.cuh"
 
 namespace cellshard {
 namespace device {
@@ -37,12 +37,13 @@ struct alignas(16) dense_view {
     __half *val;
 };
 
-struct alignas(16) csr_view {
+struct alignas(16) compressed_view {
     unsigned int rows;
     unsigned int cols;
     unsigned int nnz;
-    unsigned int *rowPtr;
-    unsigned int *colIdx;
+    unsigned int axis;
+    unsigned int *majorPtr;
+    unsigned int *minorIdx;
     __half *val;
 };
 
@@ -143,30 +144,31 @@ fail:
     return err;
 }
 
-__host__ __forceinline__ cudaError_t upload(const ::cellshard::sparse::csr *src, part_record< ::cellshard::sparse::csr > *record) {
-    csr_view host;
-    csr_view *deviceView = 0;
+__host__ __forceinline__ cudaError_t upload(const ::cellshard::sparse::compressed *src, part_record< ::cellshard::sparse::compressed > *record) {
+    compressed_view host;
+    compressed_view *deviceView = 0;
     cudaError_t err = cudaSuccess;
 
     zero_record(record);
     host.rows = src->rows;
     host.cols = src->cols;
     host.nnz = src->nnz;
-    host.rowPtr = 0;
-    host.colIdx = 0;
+    host.axis = src->axis;
+    host.majorPtr = 0;
+    host.minorIdx = 0;
     host.val = 0;
 
-    if (src->rows != 0) {
-        err = cudaMalloc((void **) &host.rowPtr, (src->rows + 1) * sizeof(unsigned int));
+    if (sparse::major_dim(src) != 0) {
+        err = cudaMalloc((void **) &host.majorPtr, ((std::size_t) sparse::major_dim(src) + 1) * sizeof(unsigned int));
         if (err != cudaSuccess) goto fail;
-        err = cudaMemcpy(host.rowPtr, src->rowPtr, (src->rows + 1) * sizeof(unsigned int), cudaMemcpyHostToDevice);
+        err = cudaMemcpy(host.majorPtr, src->majorPtr, ((std::size_t) sparse::major_dim(src) + 1) * sizeof(unsigned int), cudaMemcpyHostToDevice);
         if (err != cudaSuccess) goto fail;
     }
 
     if (src->nnz != 0) {
-        err = cudaMalloc((void **) &host.colIdx, src->nnz * sizeof(unsigned int));
+        err = cudaMalloc((void **) &host.minorIdx, src->nnz * sizeof(unsigned int));
         if (err != cudaSuccess) goto fail;
-        err = cudaMemcpy(host.colIdx, src->colIdx, src->nnz * sizeof(unsigned int), cudaMemcpyHostToDevice);
+        err = cudaMemcpy(host.minorIdx, src->minorIdx, src->nnz * sizeof(unsigned int), cudaMemcpyHostToDevice);
         if (err != cudaSuccess) goto fail;
         err = cudaMalloc((void **) &host.val, src->nnz * sizeof(__half));
         if (err != cudaSuccess) goto fail;
@@ -180,16 +182,16 @@ __host__ __forceinline__ cudaError_t upload(const ::cellshard::sparse::csr *src,
     if (err != cudaSuccess) goto fail;
 
     record->view = deviceView;
-    record->a0 = host.rowPtr;
-    record->a1 = host.colIdx;
+    record->a0 = host.majorPtr;
+    record->a1 = host.minorIdx;
     record->a2 = host.val;
     return cudaSuccess;
 
 fail:
     if (deviceView != 0) cudaFree(deviceView);
     if (host.val != 0) cudaFree(host.val);
-    if (host.colIdx != 0) cudaFree(host.colIdx);
-    if (host.rowPtr != 0) cudaFree(host.rowPtr);
+    if (host.minorIdx != 0) cudaFree(host.minorIdx);
+    if (host.majorPtr != 0) cudaFree(host.majorPtr);
     zero_record(record);
     return err;
 }
@@ -314,9 +316,10 @@ __host__ __forceinline__ std::size_t device_part_bytes(const ::cellshard::sharde
     return sizeof(dense_view) + (std::size_t) view->part_nnz[partId] * sizeof(__half);
 }
 
-__host__ __forceinline__ std::size_t device_part_bytes(const ::cellshard::sharded< ::cellshard::sparse::csr > *view, unsigned long partId) {
-    return sizeof(csr_view)
-        + (std::size_t) (view->part_rows[partId] + 1) * sizeof(unsigned int)
+__host__ __forceinline__ std::size_t device_part_bytes(const ::cellshard::sharded< ::cellshard::sparse::compressed > *view, unsigned long partId) {
+    const unsigned long ptr_dim = view->part_aux[partId] == sparse::compressed_by_col ? view->cols : view->part_rows[partId];
+    return sizeof(compressed_view)
+        + (std::size_t) (ptr_dim + 1) * sizeof(unsigned int)
         + (std::size_t) view->part_nnz[partId] * sizeof(unsigned int)
         + (std::size_t) view->part_nnz[partId] * sizeof(__half);
 }

@@ -42,13 +42,9 @@ src/
 ├── types.cuh
 ├── formats/
 │   ├── compressed.cuh
-│   ├── compressed_host.cuh
 │   ├── dense.cuh
-│   ├── dense_host.cuh
 │   ├── diagonal.cuh
-│   ├── diagonal_host.cuh
-│   ├── triplet.cuh
-│   └── triplet_host.cuh
+│   └── triplet.cuh
 ├── sharded/
 │   ├── shard_paths.cu
 │   ├── shard_paths.cuh
@@ -78,8 +74,9 @@ src/
 ## Notes
 
 - `src/formats/` is now organized by real per-part storage family only: dense, compressed sparse, triplet sparse, and diagonal.
-- Each family exposes the low-level layout file directly next to its host-only mutation file; there is no generic helper layer in the active tree.
+- Each simple format now lives in one file; pure metadata/indexing helpers are `__host__ __device__`, while allocation and cleanup stay explicit host-only functions in the same header.
 - `src/sharded/` is the center of the library now: sharded metadata, resharding, file headers, shard path lists, and GPU residency are all in one subsystem.
+- Shard boundaries are now part-aligned, because fetch, drop, upload, and release all operate on whole parts.
 - `src/io/binary/` now only carries single-matrix disk I/O.
 - `src/CellShard.hh` now includes the real format and binary headers directly instead of routing through umbrella headers.
 - `src/convert/` is now organized around the three real device-resident conversion engines: COO -> compressed, compressed -> COO, and compressed transpose.

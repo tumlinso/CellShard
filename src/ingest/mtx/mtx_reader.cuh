@@ -7,7 +7,11 @@
 #include <cstdlib>
 #include <cstring>
 
-#include "../../matrix.cuh"
+#include "../../offset_span.cuh"
+#include "../../formats/triplet.cuh"
+#include "../../formats/triplet_host.cuh"
+#include "../../sharded/sharded.cuh"
+#include "../../sharded/sharded_host.cuh"
 #include "../../io/source/file_reader.cuh"
 
 namespace cellshard {

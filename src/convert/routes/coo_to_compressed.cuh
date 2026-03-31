@@ -1,6 +1,6 @@
 #pragma once
 
-#include "coo_to_csx.cuh"
+#include "../compressed_from_coo_raw.cuh"
 
 namespace cellshard {
 namespace convert {
@@ -19,7 +19,7 @@ static inline int build_csr_from_coo_raw(
     std::size_t scan_bytes,
     cudaStream_t stream
 ) {
-    return build_cs_from_coo_raw(
+    return build_compressed_from_coo_raw(
         rows,
         nnz,
         d_rowIdx,
@@ -35,21 +35,33 @@ static inline int build_csr_from_coo_raw(
     );
 }
 
-static inline int csr_conversion_buffer_build_from_coo(
-    csConversion_buffer *buf,
-    unsigned int rows,
-    unsigned int nnz,
-    const unsigned int *host_rowIdx,
-    const unsigned int *host_colIdx,
-    const __half *host_val
+static inline int build_csc_from_coo_raw(
+    const unsigned int cols,
+    const unsigned int nnz,
+    const unsigned int *d_colIdx,
+    const unsigned int *d_rowIdx,
+    const __half *d_val,
+    unsigned int *d_colPtr,
+    unsigned int *d_heads,
+    unsigned int *d_out_rowIdx,
+    __half *d_out_val,
+    void *d_scan_tmp,
+    std::size_t scan_bytes,
+    cudaStream_t stream
 ) {
-    return cs_conversion_buffer_build_from_coo(
-        buf,
-        rows,
+    return build_compressed_from_coo_raw(
+        cols,
         nnz,
-        host_rowIdx,
-        host_colIdx,
-        host_val
+        d_colIdx,
+        d_rowIdx,
+        d_val,
+        d_colPtr,
+        d_heads,
+        d_out_rowIdx,
+        d_out_val,
+        d_scan_tmp,
+        scan_bytes,
+        stream
     );
 }
 

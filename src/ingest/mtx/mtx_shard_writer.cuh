@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../io/binary/matrix_io.cuh"
+#include "../../sharded/sharded_file.cuh"
 
 namespace cellshard {
 namespace ingest {
@@ -79,17 +79,17 @@ static inline int store_coo_header(const char *header_path,
         }
     }
 
-    ok = detail::store_sharded_header_raw(header_path,
-                                          detail::disk_format_coo,
-                                          (unsigned int) rows,
-                                          (unsigned int) cols,
-                                          (unsigned int) total_nnz,
-                                          (unsigned int) num_parts,
-                                          (unsigned int) num_shards,
-                                          part_rows_u32,
-                                          part_nnz_u32,
-                                          part_aux_u32,
-                                          shard_offsets_u32);
+    ok = store_sharded_header_raw(header_path,
+                                  disk_format_coo,
+                                  (unsigned int) rows,
+                                  (unsigned int) cols,
+                                  (unsigned int) total_nnz,
+                                  (unsigned int) num_parts,
+                                  (unsigned int) num_shards,
+                                  part_rows_u32,
+                                  part_nnz_u32,
+                                  part_aux_u32,
+                                  shard_offsets_u32);
 
 done:
     std::free(part_rows_u32);

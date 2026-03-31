@@ -76,7 +76,12 @@ int store_sharded_header_raw(const char *filename,
     if (!write_block(fp, part_rows, sizeof(std::uint64_t), (std::size_t) num_parts)) goto done;
     if (!write_block(fp, part_nnz, sizeof(std::uint64_t), (std::size_t) num_parts)) goto done;
     if (!write_block(fp, part_aux, sizeof(std::uint64_t), (std::size_t) num_parts)) goto done;
-    if (!write_block(fp, shard_offsets, sizeof(std::uint64_t), (std::size_t) num_shards + 1)) goto done;
+    if (num_shards != 0) {
+        if (!write_block(fp, shard_offsets, sizeof(std::uint64_t), (std::size_t) num_shards + 1)) goto done;
+    } else {
+        const std::uint64_t zero = 0;
+        if (!write_block(fp, &zero, sizeof(zero), 1)) goto done;
+    }
     if (!write_block(fp, part_offsets, sizeof(std::uint64_t), (std::size_t) num_parts)) goto done;
     if (!write_block(fp, part_bytes, sizeof(std::uint64_t), (std::size_t) num_parts)) goto done;
     ok = 1;
@@ -126,10 +131,10 @@ int load_sharded_header_raw(const char *filename, sharded_header_load_result *ou
     out->part_aux = (std::uint64_t *) alloc_bytes((std::size_t) out->num_parts * sizeof(std::uint64_t));
     out->part_offsets = (std::uint64_t *) alloc_bytes((std::size_t) out->num_parts * sizeof(std::uint64_t));
     out->part_bytes = (std::uint64_t *) alloc_bytes((std::size_t) out->num_parts * sizeof(std::uint64_t));
-    if (out->num_shards != 0) out->shard_offsets = (std::uint64_t *) alloc_bytes((std::size_t) (out->num_shards + 1) * sizeof(std::uint64_t));
+    out->shard_offsets = (std::uint64_t *) alloc_bytes((std::size_t) (out->num_shards + 1) * sizeof(std::uint64_t));
     if (out->num_parts != 0 && (out->part_rows == 0 || out->part_nnz == 0 || out->part_aux == 0)) goto done;
     if (out->num_parts != 0 && (out->part_offsets == 0 || out->part_bytes == 0)) goto done;
-    if (out->num_shards != 0 && out->shard_offsets == 0) goto done;
+    if (out->shard_offsets == 0) goto done;
 
     if (!read_block(fp, out->part_rows, sizeof(std::uint64_t), (std::size_t) out->num_parts)) goto done;
     if (!read_block(fp, out->part_nnz, sizeof(std::uint64_t), (std::size_t) out->num_parts)) goto done;

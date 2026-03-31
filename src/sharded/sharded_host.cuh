@@ -4,6 +4,7 @@
 #include "shard_paths.cuh"
 #include "../disk/matrix.cuh"
 
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 

@@ -106,9 +106,60 @@ inline int load_sharded_index_array(std::FILE *fp, unsigned long *dst, std::size
 
 template<typename MatrixT>
 inline int store_header(const char *filename, const sharded<MatrixT> *m) {
-    (void) filename;
-    (void) m;
-    return 0;
+    std::uint64_t *part_rows = 0;
+    std::uint64_t *part_nnz = 0;
+    std::uint64_t *part_aux = 0;
+    std::uint64_t *part_offsets = 0;
+    std::uint64_t *part_bytes = 0;
+    std::uint64_t *shard_offsets = 0;
+    unsigned long i = 0;
+    int ok = 0;
+
+    if (m == 0) return 0;
+    if (m->num_parts != 0) {
+        part_rows = (std::uint64_t *) std::calloc((std::size_t) m->num_parts, sizeof(std::uint64_t));
+        part_nnz = (std::uint64_t *) std::calloc((std::size_t) m->num_parts, sizeof(std::uint64_t));
+        part_aux = (std::uint64_t *) std::calloc((std::size_t) m->num_parts, sizeof(std::uint64_t));
+        part_offsets = (std::uint64_t *) std::calloc((std::size_t) m->num_parts, sizeof(std::uint64_t));
+        part_bytes = (std::uint64_t *) std::calloc((std::size_t) m->num_parts, sizeof(std::uint64_t));
+        if (part_rows == 0 || part_nnz == 0 || part_aux == 0 || part_offsets == 0 || part_bytes == 0) goto done;
+        for (i = 0; i < m->num_parts; ++i) {
+            part_rows[i] = (std::uint64_t) m->part_rows[i];
+            part_nnz[i] = (std::uint64_t) m->part_nnz[i];
+            part_aux[i] = (std::uint64_t) m->part_aux[i];
+        }
+    }
+
+    shard_offsets = (std::uint64_t *) std::calloc((std::size_t) (m->num_shards + 1), sizeof(std::uint64_t));
+    if (shard_offsets == 0 && m->num_shards != 0) goto done;
+    for (i = 0; i <= m->num_shards; ++i) {
+        shard_offsets[i] = m->shard_offsets != 0 ? (std::uint64_t) m->shard_offsets[i] : 0;
+    }
+
+    ok = store_sharded_header_raw(filename,
+                                  (unsigned char) disk_format_code<MatrixT>::value,
+                                  (std::uint64_t) m->rows,
+                                  (std::uint64_t) m->cols,
+                                  (std::uint64_t) m->nnz,
+                                  (std::uint64_t) m->num_parts,
+                                  (std::uint64_t) m->num_shards,
+                                  4096,
+                                  0,
+                                  part_rows,
+                                  part_nnz,
+                                  part_aux,
+                                  shard_offsets,
+                                  part_offsets,
+                                  part_bytes);
+
+done:
+    std::free(part_rows);
+    std::free(part_nnz);
+    std::free(part_aux);
+    std::free(part_offsets);
+    std::free(part_bytes);
+    std::free(shard_offsets);
+    return ok;
 }
 
 template<typename MatrixT>
@@ -163,9 +214,10 @@ inline int load_header(const char *filename, sharded<MatrixT> *m, shard_storage 
         if (!sharded_from_u64(tmp.part_nnz[i], &m->part_nnz[i], "part_nnz", filename)) goto done;
         if (!sharded_from_u64(tmp.part_aux[i], &m->part_aux[i], "part_aux", filename)) goto done;
     }
-    for (i = 0; i <= m->num_shards; ++i) {
+    for (i = 0; i < m->num_shards; ++i) {
         if (!sharded_from_u64(tmp.shard_offsets[i], &m->shard_offsets[i], "shard_offsets", filename)) goto done;
     }
+    if (m->num_shards != 0 && !sharded_from_u64(tmp.shard_offsets[m->num_shards], &m->shard_offsets[m->num_shards], "shard_offsets", filename)) goto done;
     rebuild_part_offsets(m);
     if (s != 0) {
         init(s);
@@ -263,7 +315,12 @@ inline int store(const char *filename, const sharded<MatrixT> *m, shard_storage 
         if (!store_sharded_index_array(fp, m->part_rows, (std::size_t) m->num_parts, "part_rows", filename)) goto done;
         if (!store_sharded_index_array(fp, m->part_nnz, (std::size_t) m->num_parts, "part_nnz", filename)) goto done;
         if (!store_sharded_index_array(fp, m->part_aux, (std::size_t) m->num_parts, "part_aux", filename)) goto done;
-        if (!store_sharded_index_array(fp, m->shard_offsets, (std::size_t) (m->num_shards + 1), "shard_offsets", filename)) goto done;
+        if (m->num_shards != 0) {
+            if (!store_sharded_index_array(fp, m->shard_offsets, (std::size_t) (m->num_shards + 1), "shard_offsets", filename)) goto done;
+        } else {
+            const std::uint64_t zero = 0;
+            if (!write_sharded_block(fp, &zero, sizeof(zero), 1)) goto done;
+        }
         if (!write_sharded_block(fp, part_offsets, sizeof(std::uint64_t), (std::size_t) m->num_parts)) goto done;
         if (!write_sharded_block(fp, part_sizes, sizeof(std::uint64_t), (std::size_t) m->num_parts)) goto done;
     }

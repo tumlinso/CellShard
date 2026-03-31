@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../matrix.cuh"
+#include "../../matrix.cuh"
 
 #include <cstddef>
 #include <cstdlib>

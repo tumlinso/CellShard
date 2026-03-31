@@ -41,12 +41,12 @@ struct csr_base {
 
 } // namespace cellshard
 
-#include "dense.cuh"
-#include "sparse/csr.cuh"
-#include "sparse/conversion/csX_to_coo.cuh"
-#include "sparse/coo.cuh"
-#include "sparse/dia.cuh"
-#include "sharded.cuh"
+#include "formats/dense.cuh"
+#include "formats/sparse/csr.cuh"
+#include "convert/csx_to_coo.cuh"
+#include "formats/sparse/coo.cuh"
+#include "formats/sparse/dia.cuh"
+#include "formats/sharded.cuh"
 
 namespace cellshard {
 

@@ -13,7 +13,7 @@ The active code layout is intentionally small:
 - `src/io/binary/`: binary matrix and sharded-header I/O
 - `src/device/cache/`: GPU staging/cache path
 
-The old flat paths under `src/` and `src/sparse/` are now compatibility shims where practical. The live implementations have been copied into the smaller target homes above.
+The live implementations are in the smaller target homes above. The old flat compatibility paths have been removed.
 
 ## Header Use
 
@@ -61,8 +61,8 @@ src/
 │   ├── csr_to_coo.cuh
 │   ├── csx_to_coo.cuh
 │   └── kernels/
-│       ├── cs_expand.cuh
-│       └── cs_scatter.cuh
+│       ├── csExpand.cuh
+│       └── csScatter.cuh
 ├── io/
 │   └── binary/
 │       ├── matrix_io.cu
@@ -74,11 +74,11 @@ src/
 
 ## Notes
 
-- `src/sparse/csx.cuh` uses the shared policy from `src/types.cuh` and `src/real.cuh`.
+- `src/formats/sparse/csx.cuh` uses the shared policy from `src/types.cuh` and `src/real.cuh`.
 - `src/convert/coo_to_csr.cuh` and `src/convert/coo_to_csc.cuh` are thin wrappers in `cellshard::convert` over the shared csX conversion path.
 - `src/convert/csr_to_coo.cuh` and `src/convert/csc_to_coo.cuh` are the matching thin wrappers over the shared csX-to-COO path.
-- `src/convert/kernels/_transpose.cuh` now contains the direct compressed-sparse transpose path for CSR<->CSC style transforms: count, scan, and scatter without materializing COO.
-- `src/convert/_csr_to_csc.cuh` and `src/convert/_csc_to_csr.cuh` are the raw wrappers over that direct transpose path.
+- `src/convert/kernels/transpose.cuh` contains the direct compressed-sparse transpose path for CSR<->CSC style transforms: count, scan, and scatter without materializing COO.
+- `src/convert/csr_to_csc.cuh` and `src/convert/csc_to_csr.cuh` are the raw wrappers over that direct transpose path.
 - The transpose path reuses the existing scatter-head initialization kernel from `src/convert/kernels/csScatter.cuh`; the actual transpose count/scatter kernels remain separate.
 - The moved format, conversion, I/O, and device headers are now the real homes for that code.
 - The larger scaffold directories still exist in the repo, but they are not the active design target for this library.

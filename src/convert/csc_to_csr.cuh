@@ -1,6 +1,6 @@
 #pragma once
 
-#include "kernels/_transpose.cuh"
+#include "kernels/transpose.cuh"
 
 namespace cellshard {
 namespace convert {

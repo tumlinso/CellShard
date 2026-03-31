@@ -263,6 +263,80 @@ static inline int cast_dim(unsigned long v, unsigned int *out) {
     return 1;
 }
 
+static inline std::size_t estimate_coo_part_bytes(unsigned long rows, unsigned long nnz) {
+    return sizeof(sparse::coo)
+         + (std::size_t) nnz * sizeof(unsigned int)
+         + (std::size_t) nnz * sizeof(unsigned int)
+         + (std::size_t) nnz * sizeof(__half);
+}
+
+static inline int count_all_part_nnz(const char *path,
+                                     const header *h,
+                                     const unsigned long *row_offsets,
+                                     unsigned long num_parts,
+                                     unsigned long **part_nnz_out) {
+    io::source::buffered_file_reader reader;
+    unsigned long *part_nnz = 0;
+    header local;
+    int ok = 0;
+
+    *part_nnz_out = 0;
+    init(&local);
+    io::source::init(&reader);
+    if (!io::source::open(&reader, path)) return 0;
+    if (!read_header(&reader, &local)) goto done;
+    if (h != 0) {
+        if (local.rows != h->rows || local.cols != h->cols || local.nnz_file != h->nnz_file) goto done;
+    }
+    part_nnz = (unsigned long *) std::calloc((std::size_t) num_parts, sizeof(unsigned long));
+    if (num_parts != 0 && part_nnz == 0) goto done;
+    if (!count_part_nnz(&reader, &local, row_offsets, num_parts, part_nnz)) goto done;
+    ok = 1;
+
+done:
+    io::source::clear(&reader);
+    if (!ok) {
+        std::free(part_nnz);
+        return 0;
+    }
+    *part_nnz_out = part_nnz;
+    return 1;
+}
+
+static inline void build_part_rows(const unsigned long *row_offsets,
+                                   unsigned long num_parts,
+                                   unsigned long *part_rows) {
+    unsigned long i = 0;
+    for (i = 0; i < num_parts; ++i) part_rows[i] = row_offsets[i + 1] - row_offsets[i];
+}
+
+static inline void build_part_bytes_from_nnz(const unsigned long *row_offsets,
+                                             const unsigned long *part_nnz,
+                                             unsigned long num_parts,
+                                             unsigned long *part_bytes) {
+    unsigned long i = 0;
+    for (i = 0; i < num_parts; ++i) {
+        part_bytes[i] = (unsigned long) estimate_coo_part_bytes(row_offsets[i + 1] - row_offsets[i], part_nnz[i]);
+    }
+}
+
+static inline unsigned long sum_part_nnz(const unsigned long *part_nnz,
+                                         unsigned long part_begin,
+                                         unsigned long part_end) {
+    unsigned long i = 0;
+    unsigned long total = 0;
+
+    for (i = part_begin; i < part_end; ++i) total += part_nnz[i];
+    return total;
+}
+
+static inline unsigned long sum_part_rows(const unsigned long *row_offsets,
+                                          unsigned long part_begin,
+                                          unsigned long part_end) {
+    if (part_end <= part_begin) return 0;
+    return row_offsets[part_end] - row_offsets[part_begin];
+}
+
 static inline int allocate_sharded_coo(const header *h,
                                        const unsigned long *row_offsets,
                                        unsigned long num_parts,
@@ -410,6 +484,130 @@ static inline int load_coo(const char *path, sparse::coo *out) {
 
 done:
     clear(&tmp);
+    return ok;
+}
+
+static inline int allocate_part_window_coo(const header *h,
+                                           const unsigned long *row_offsets,
+                                           const unsigned long *part_nnz,
+                                           unsigned long num_parts,
+                                           unsigned long part_begin,
+                                           unsigned long part_end,
+                                           sharded<sparse::coo> *out) {
+    unsigned long i = 0;
+    unsigned long local = 0;
+    unsigned int rows_u32 = 0;
+    unsigned int cols_u32 = 0;
+    unsigned int nnz_u32 = 0;
+    sparse::coo *part = 0;
+
+    clear(out);
+    init(out);
+    if (part_begin >= part_end || part_end > num_parts) return 0;
+    if (!cast_dim(h->cols, &cols_u32)) return 0;
+    if (!reserve_parts(out, part_end - part_begin)) return 0;
+
+    out->num_parts = part_end - part_begin;
+    out->cols = h->cols;
+    for (i = part_begin; i < part_end; ++i) {
+        local = i - part_begin;
+        if (!cast_dim(row_offsets[i + 1] - row_offsets[i], &rows_u32)) return 0;
+        if (!cast_dim(part_nnz[i], &nnz_u32)) return 0;
+        part = new sparse::coo;
+        sparse::init(part, rows_u32, cols_u32, nnz_u32);
+        if (!sparse::allocate(part)) {
+            delete part;
+            clear(out);
+            return 0;
+        }
+        out->parts[local] = part;
+        out->part_rows[local] = row_offsets[i + 1] - row_offsets[i];
+        out->part_nnz[local] = part_nnz[i];
+        out->part_aux[local] = 0;
+    }
+    rebuild_part_offsets(out);
+    return set_shards_to_parts(out);
+}
+
+static inline int fill_part_window_coo(io::source::buffered_file_reader *reader,
+                                       const header *h,
+                                       const unsigned long *row_offsets,
+                                       unsigned long num_parts,
+                                       unsigned long part_begin,
+                                       unsigned long part_end,
+                                       sharded<sparse::coo> *out) {
+    int rc = 0;
+    char *line = 0;
+    std::size_t line_len = 0;
+    unsigned long row = 0;
+    unsigned long col = 0;
+    unsigned long global_part = 0;
+    unsigned long local_part = 0;
+    unsigned long idx = 0;
+    unsigned long *write_ptr = 0;
+    float value = 0.0f;
+
+    write_ptr = (unsigned long *) std::calloc((std::size_t) out->num_parts, sizeof(unsigned long));
+    if (out->num_parts != 0 && write_ptr == 0) return 0;
+
+    while ((rc = io::source::next_line(reader, &line, &line_len)) > 0) {
+        if (line_len == 0 || line[0] == '%') continue;
+        if (!read_triplet(line, h, &row, &col, &value)) goto fail;
+
+        global_part = find_offset_span(row, row_offsets, num_parts);
+        if (global_part >= part_begin && global_part < part_end) {
+            local_part = global_part - part_begin;
+            idx = write_ptr[local_part]++;
+            out->parts[local_part]->rowIdx[idx] = (unsigned int) (row - row_offsets[global_part]);
+            out->parts[local_part]->colIdx[idx] = (unsigned int) col;
+            out->parts[local_part]->val[idx] = __float2half(value);
+        }
+
+        if (h->symmetric && row != col) {
+            global_part = find_offset_span(col, row_offsets, num_parts);
+            if (global_part >= part_begin && global_part < part_end) {
+                local_part = global_part - part_begin;
+                idx = write_ptr[local_part]++;
+                out->parts[local_part]->rowIdx[idx] = (unsigned int) (col - row_offsets[global_part]);
+                out->parts[local_part]->colIdx[idx] = (unsigned int) row;
+                out->parts[local_part]->val[idx] = __float2half(value);
+            }
+        }
+    }
+    if (rc < 0) goto fail;
+    std::free(write_ptr);
+    return 1;
+
+fail:
+    std::free(write_ptr);
+    return 0;
+}
+
+static inline int load_part_window_coo(const char *path,
+                                       const header *h,
+                                       const unsigned long *row_offsets,
+                                       const unsigned long *part_nnz,
+                                       unsigned long num_parts,
+                                       unsigned long part_begin,
+                                       unsigned long part_end,
+                                       sharded<sparse::coo> *out) {
+    io::source::buffered_file_reader reader;
+    header local;
+    int ok = 0;
+
+    init(&local);
+    io::source::init(&reader);
+
+    if (!allocate_part_window_coo(h, row_offsets, part_nnz, num_parts, part_begin, part_end, out)) goto done;
+    if (!io::source::open(&reader, path)) goto done;
+    if (!read_header(&reader, &local)) goto done;
+    if (local.rows != h->rows || local.cols != h->cols || local.nnz_file != h->nnz_file) goto done;
+    if (!fill_part_window_coo(&reader, &local, row_offsets, num_parts, part_begin, part_end, out)) goto done;
+    ok = 1;
+
+done:
+    io::source::clear(&reader);
+    if (!ok) clear(out);
     return ok;
 }
 

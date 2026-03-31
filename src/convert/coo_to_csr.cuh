@@ -5,8 +5,6 @@
 namespace cellshard {
 namespace convert {
 
-using matrix::sparse::convert::csConversion_buffer;
-
 static inline int build_csr_from_coo_raw(
     const unsigned int rows,
     const unsigned int nnz,
@@ -21,7 +19,7 @@ static inline int build_csr_from_coo_raw(
     std::size_t scan_bytes,
     cudaStream_t stream
 ) {
-    return matrix::sparse::convert::build_cs_from_coo_raw(
+    return build_cs_from_coo_raw(
         rows,
         nnz,
         d_rowIdx,
@@ -45,7 +43,7 @@ static inline int csr_conversion_buffer_build_from_coo(
     const unsigned int *host_colIdx,
     const __half *host_val
 ) {
-    return matrix::sparse::convert::cs_conversion_buffer_build_from_coo(
+    return cs_conversion_buffer_build_from_coo(
         buf,
         rows,
         nnz,

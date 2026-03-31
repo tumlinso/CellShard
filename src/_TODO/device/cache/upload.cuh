@@ -1,3 +1,3 @@
 #pragma once
 
-#include "../../sharded_gpu.cuh"
+#include "../../device/cache/shard_cache.cuh"

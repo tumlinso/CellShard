@@ -354,56 +354,58 @@ static inline int store_compressed_header(const char *header_path,
                                           const unsigned long *part_nnz,
                                           unsigned int axis,
                                           const unsigned long *shard_offsets) {
-    unsigned int *part_rows_u32 = 0;
-    unsigned int *part_nnz_u32 = 0;
-    unsigned int *part_aux_u32 = 0;
-    unsigned int *shard_offsets_u32 = 0;
+    std::uint64_t *part_rows_u64 = 0;
+    std::uint64_t *part_nnz_u64 = 0;
+    std::uint64_t *part_aux_u64 = 0;
+    std::uint64_t *shard_offsets_u64 = 0;
+    std::uint64_t *part_offsets_u64 = 0;
+    std::uint64_t *part_bytes_u64 = 0;
     unsigned long i = 0;
     int ok = 0;
 
-    if (rows > (unsigned long) UINT_MAX || cols > (unsigned long) UINT_MAX || total_nnz > (unsigned long) UINT_MAX) return 0;
-    if (num_parts > (unsigned long) UINT_MAX || num_shards > (unsigned long) UINT_MAX) return 0;
-
     if (num_parts != 0) {
-        part_rows_u32 = (unsigned int *) std::malloc((std::size_t) num_parts * sizeof(unsigned int));
-        part_nnz_u32 = (unsigned int *) std::malloc((std::size_t) num_parts * sizeof(unsigned int));
-        part_aux_u32 = (unsigned int *) std::malloc((std::size_t) num_parts * sizeof(unsigned int));
-        if (part_rows_u32 == 0 || part_nnz_u32 == 0 || part_aux_u32 == 0) goto done;
+        part_rows_u64 = (std::uint64_t *) std::malloc((std::size_t) num_parts * sizeof(std::uint64_t));
+        part_nnz_u64 = (std::uint64_t *) std::malloc((std::size_t) num_parts * sizeof(std::uint64_t));
+        part_aux_u64 = (std::uint64_t *) std::malloc((std::size_t) num_parts * sizeof(std::uint64_t));
+        part_offsets_u64 = (std::uint64_t *) std::calloc((std::size_t) num_parts, sizeof(std::uint64_t));
+        part_bytes_u64 = (std::uint64_t *) std::calloc((std::size_t) num_parts, sizeof(std::uint64_t));
+        if (part_rows_u64 == 0 || part_nnz_u64 == 0 || part_aux_u64 == 0 || part_offsets_u64 == 0 || part_bytes_u64 == 0) goto done;
         for (i = 0; i < num_parts; ++i) {
-            if (part_rows[i] > (unsigned long) UINT_MAX) goto done;
-            if (part_nnz[i] > (unsigned long) UINT_MAX) goto done;
-            part_rows_u32[i] = (unsigned int) part_rows[i];
-            part_nnz_u32[i] = (unsigned int) part_nnz[i];
-            part_aux_u32[i] = axis;
+            part_rows_u64[i] = (std::uint64_t) part_rows[i];
+            part_nnz_u64[i] = (std::uint64_t) part_nnz[i];
+            part_aux_u64[i] = (std::uint64_t) axis;
         }
     }
 
-    if (num_shards != 0) {
-        shard_offsets_u32 = (unsigned int *) std::malloc((std::size_t) (num_shards + 1ul) * sizeof(unsigned int));
-        if (shard_offsets_u32 == 0) goto done;
-        for (i = 0; i <= num_shards; ++i) {
-            if (shard_offsets[i] > (unsigned long) UINT_MAX) goto done;
-            shard_offsets_u32[i] = (unsigned int) shard_offsets[i];
-        }
+    shard_offsets_u64 = (std::uint64_t *) std::malloc((std::size_t) (num_shards + 1ul) * sizeof(std::uint64_t));
+    if (shard_offsets_u64 == 0) goto done;
+    for (i = 0; i <= num_shards; ++i) {
+        shard_offsets_u64[i] = (std::uint64_t) shard_offsets[i];
     }
 
     ok = store_sharded_header_raw(header_path,
                                   disk_format_compressed,
-                                  (unsigned int) rows,
-                                  (unsigned int) cols,
-                                  (unsigned int) total_nnz,
-                                  (unsigned int) num_parts,
-                                  (unsigned int) num_shards,
-                                  part_rows_u32,
-                                  part_nnz_u32,
-                                  part_aux_u32,
-                                  shard_offsets_u32);
+                                  (std::uint64_t) rows,
+                                  (std::uint64_t) cols,
+                                  (std::uint64_t) total_nnz,
+                                  (std::uint64_t) num_parts,
+                                  (std::uint64_t) num_shards,
+                                  4096,
+                                  0,
+                                  part_rows_u64,
+                                  part_nnz_u64,
+                                  part_aux_u64,
+                                  shard_offsets_u64,
+                                  part_offsets_u64,
+                                  part_bytes_u64);
 
 done:
-    std::free(part_rows_u32);
-    std::free(part_nnz_u32);
-    std::free(part_aux_u32);
-    std::free(shard_offsets_u32);
+    std::free(part_rows_u64);
+    std::free(part_nnz_u64);
+    std::free(part_aux_u64);
+    std::free(shard_offsets_u64);
+    std::free(part_offsets_u64);
+    std::free(part_bytes_u64);
     return ok;
 }
 

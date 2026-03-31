@@ -352,18 +352,31 @@ __host__ __forceinline__ int set_shards_by_part_bytes(sharded<MatrixT> * __restr
 template<typename MatrixT>
 __host__ __forceinline__ int fetch_part(sharded<MatrixT> *m, const shard_storage *s, unsigned long partId) {
     MatrixT *part = 0;
+    std::FILE *fp = 0;
     int ok = 0;
 
-    if (partId >= m->num_parts || s == 0 || partId >= s->capacity || s->paths[partId] == 0) return 0;
+    if (partId >= m->num_parts || s == 0 || partId >= s->capacity || s->packfile_path == 0 || s->locators == 0) return 0;
     if (m->parts[partId] != 0) destroy(m->parts[partId]);
     m->parts[partId] = 0;
 
     part = new MatrixT;
     init(part);
-    if (!load(s->paths[partId], part)) {
+    fp = std::fopen(s->packfile_path, "rb");
+    if (fp == 0) {
         destroy(part);
         return 0;
     }
+    if (std::fseek(fp, (long) s->locators[partId].offset, SEEK_SET) != 0) {
+        std::fclose(fp);
+        destroy(part);
+        return 0;
+    }
+    if (!load(fp, part)) {
+        std::fclose(fp);
+        destroy(part);
+        return 0;
+    }
+    std::fclose(fp);
     if (part->rows != m->part_rows[partId]) goto fail;
     if (::cellshard::part_nnz(part) != m->part_nnz[partId]) goto fail;
     if (m->cols != 0 && part->cols != m->cols) goto fail;

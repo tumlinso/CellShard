@@ -93,17 +93,55 @@ struct dia_load_result {
     void *val;
 };
 
+std::size_t packed_dense_bytes(types::nnz_t nnz, std::size_t value_size);
+std::size_t packed_compressed_bytes(types::dim_t rows, types::dim_t cols, types::nnz_t nnz, types::u32 axis, std::size_t value_size);
+std::size_t packed_coo_bytes(types::nnz_t nnz, std::size_t value_size);
+std::size_t packed_dia_bytes(types::nnz_t nnz, types::idx_t num_diagonals, std::size_t value_size);
+
 int store_dense_raw(const char *filename, types::dim_t rows, types::dim_t cols, types::nnz_t nnz, const void *val, std::size_t value_size);
 int load_dense_raw(const char *filename, std::size_t value_size, dense_load_result *out);
+int store_dense_raw(std::FILE *fp, types::dim_t rows, types::dim_t cols, types::nnz_t nnz, const void *val, std::size_t value_size);
+int load_dense_raw(std::FILE *fp, std::size_t value_size, dense_load_result *out);
 
 int store_compressed_raw(const char *filename, types::dim_t rows, types::dim_t cols, types::nnz_t nnz, types::u32 axis, types::dim_t major_dim, const types::ptr_t *majorPtr, const types::idx_t *minorIdx, const void *val, std::size_t value_size);
 int load_compressed_raw(const char *filename, std::size_t value_size, compressed_load_result *out);
+int store_compressed_raw(std::FILE *fp, types::dim_t rows, types::dim_t cols, types::nnz_t nnz, types::u32 axis, types::dim_t major_dim, const types::ptr_t *majorPtr, const types::idx_t *minorIdx, const void *val, std::size_t value_size);
+int load_compressed_raw(std::FILE *fp, std::size_t value_size, compressed_load_result *out);
 
 int store_coo_raw(const char *filename, types::dim_t rows, types::dim_t cols, types::nnz_t nnz, const types::idx_t *rowIdx, const types::idx_t *colIdx, const void *val, std::size_t value_size);
 int load_coo_raw(const char *filename, std::size_t value_size, coo_load_result *out);
+int store_coo_raw(std::FILE *fp, types::dim_t rows, types::dim_t cols, types::nnz_t nnz, const types::idx_t *rowIdx, const types::idx_t *colIdx, const void *val, std::size_t value_size);
+int load_coo_raw(std::FILE *fp, std::size_t value_size, coo_load_result *out);
 
 int store_dia_raw(const char *filename, types::dim_t rows, types::dim_t cols, types::nnz_t nnz, types::idx_t num_diagonals, const int *offsets, const void *val, std::size_t value_size);
 int load_dia_raw(const char *filename, std::size_t value_size, dia_load_result *out);
+int store_dia_raw(std::FILE *fp, types::dim_t rows, types::dim_t cols, types::nnz_t nnz, types::idx_t num_diagonals, const int *offsets, const void *val, std::size_t value_size);
+int load_dia_raw(std::FILE *fp, std::size_t value_size, dia_load_result *out);
+
+inline std::size_t packed_bytes(const dense *, types::dim_t, types::dim_t, types::nnz_t nnz, unsigned long, std::size_t value_size) {
+    return packed_dense_bytes(nnz, value_size);
+}
+
+inline std::size_t packed_bytes(const sparse::compressed *, types::dim_t rows, types::dim_t cols, types::nnz_t nnz, unsigned long axis, std::size_t value_size) {
+    return packed_compressed_bytes(rows, cols, nnz, (types::u32) axis, value_size);
+}
+
+inline std::size_t packed_bytes(const sparse::coo *, types::dim_t, types::dim_t, types::nnz_t nnz, unsigned long, std::size_t value_size) {
+    return packed_coo_bytes(nnz, value_size);
+}
+
+inline std::size_t packed_bytes(const sparse::dia *, types::dim_t, types::dim_t, types::nnz_t nnz, unsigned long num_diagonals, std::size_t value_size) {
+    return packed_dia_bytes(nnz, (types::idx_t) num_diagonals, value_size);
+}
+
+int store(std::FILE *fp, const dense *m);
+int load(std::FILE *fp, dense *m);
+int store(std::FILE *fp, const sparse::compressed *m);
+int load(std::FILE *fp, sparse::compressed *m);
+int store(std::FILE *fp, const sparse::coo *m);
+int load(std::FILE *fp, sparse::coo *m);
+int store(std::FILE *fp, const sparse::dia *m);
+int load(std::FILE *fp, sparse::dia *m);
 
 inline int store(const char *filename, const dense *m) {
     return store_dense_raw(

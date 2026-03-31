@@ -2,7 +2,7 @@
 
 #include "sharded.cuh"
 #include "shard_paths.cuh"
-#include "../io/binary/matrix_file.cuh"
+#include "../disk/matrix.cuh"
 
 #include <cstdlib>
 #include <cstring>
@@ -107,6 +107,31 @@ __host__ __forceinline__ void rebuild_part_offsets(sharded<MatrixT> * __restrict
 }
 
 template<typename MatrixT>
+__host__ __forceinline__ int define_parts(sharded<MatrixT> * __restrict__ m,
+                                          unsigned long cols,
+                                          unsigned long num_parts,
+                                          const unsigned long * __restrict__ part_rows,
+                                          const unsigned long * __restrict__ part_nnz,
+                                          const unsigned long * __restrict__ part_aux_in) {
+    unsigned long i = 0;
+
+    clear(m);
+    init(m);
+    if (!reserve_parts(m, num_parts)) return 0;
+
+    m->cols = cols;
+    m->num_parts = num_parts;
+    for (i = 0; i < num_parts; ++i) {
+        m->parts[i] = 0;
+        m->part_rows[i] = part_rows != 0 ? part_rows[i] : 0;
+        m->part_nnz[i] = part_nnz != 0 ? part_nnz[i] : 0;
+        m->part_aux[i] = part_aux_in != 0 ? part_aux_in[i] : 0;
+    }
+    rebuild_part_offsets(m);
+    return set_shards_to_parts(m);
+}
+
+template<typename MatrixT>
 __host__ __forceinline__ int set_shards_to_parts(sharded<MatrixT> * __restrict__ m) {
     unsigned long i = 0;
     if (!reserve_shards(m, m->num_parts)) return 0;
@@ -196,6 +221,49 @@ __host__ __forceinline__ int set_equal_shards(sharded<MatrixT> * __restrict__ m,
     ++shardCount;
     m->shard_offsets[shardCount] = m->rows;
     m->num_shards = shardCount;
+    return 1;
+}
+
+template<typename MatrixT>
+__host__ __forceinline__ int build_shard_offsets_by_rows(const sharded<MatrixT> * __restrict__ m,
+                                                         unsigned long target_rows_per_shard,
+                                                         unsigned long **out_offsets,
+                                                         unsigned long *out_count) {
+    unsigned long *offsets = 0;
+    unsigned long shard_count = 0;
+    unsigned long used = 0;
+    unsigned long rows = 0;
+    unsigned long i = 0;
+
+    if (out_offsets == 0 || out_count == 0) return 0;
+    *out_offsets = 0;
+    *out_count = 0;
+    if (m->num_parts == 0) return 1;
+
+    offsets = (unsigned long *) std::calloc((std::size_t) (m->num_parts + 1), sizeof(unsigned long));
+    if (offsets == 0) return 0;
+    offsets[0] = 0;
+
+    if (target_rows_per_shard == 0) {
+        for (i = 0; i <= m->num_parts; ++i) offsets[i] = m->part_offsets[i];
+        *out_offsets = offsets;
+        *out_count = m->num_parts;
+        return 1;
+    }
+
+    for (i = 0; i < m->num_parts; ++i) {
+        rows = m->part_rows[i];
+        if (used != 0 && used + rows > target_rows_per_shard) {
+            ++shard_count;
+            offsets[shard_count] = m->part_offsets[i];
+            used = 0;
+        }
+        used += rows;
+    }
+    ++shard_count;
+    offsets[shard_count] = m->rows;
+    *out_offsets = offsets;
+    *out_count = shard_count;
     return 1;
 }
 

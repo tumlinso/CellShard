@@ -50,6 +50,152 @@ static inline int build_identity_shards(unsigned long num_parts,
     return 1;
 }
 
+static inline int prepare_part_window(const mtx::header *h,
+                                      const unsigned long *row_offsets,
+                                      const unsigned long *part_nnz,
+                                      unsigned long num_parts,
+                                      unsigned long part_begin,
+                                      unsigned long part_end,
+                                      sharded<sparse::coo> *window_view,
+                                      unsigned long **write_ptr_out) {
+    unsigned long *write_ptr = 0;
+
+    *write_ptr_out = 0;
+    if (!mtx::allocate_part_window_coo(h, row_offsets, part_nnz, num_parts, part_begin, part_end, window_view)) return 0;
+    if (window_view->num_parts != 0) {
+        write_ptr = (unsigned long *) std::calloc((std::size_t) window_view->num_parts, sizeof(unsigned long));
+        if (write_ptr == 0) {
+            clear(window_view);
+            init(window_view);
+            return 0;
+        }
+    }
+    *write_ptr_out = write_ptr;
+    return 1;
+}
+
+static inline int flush_part_window(const char *part_prefix,
+                                    unsigned long global_part_begin,
+                                    sharded<sparse::coo> *window_view,
+                                    const unsigned long *write_ptr) {
+    unsigned long i = 0;
+
+    for (i = 0; i < window_view->num_parts; ++i) {
+        if (write_ptr != 0 && write_ptr[i] != window_view->part_nnz[i]) return 0;
+    }
+    return mtx::store_part_window_coo(part_prefix, global_part_begin, window_view);
+}
+
+static inline int stream_sorted_general_mtx_to_sharded_coo(const char *mtx_path,
+                                                           const char *part_prefix,
+                                                           const mtx::header *h,
+                                                           const partition *windows,
+                                                           const unsigned long *row_offsets,
+                                                           const unsigned long *part_nnz,
+                                                           unsigned long num_parts,
+                                                           std::size_t reader_bytes) {
+    scan::buffered_file_reader reader;
+    mtx::header local;
+    sharded<sparse::coo> window_view;
+    unsigned long *write_ptr = 0;
+    unsigned long w = 0;
+    int rc = 0;
+    int ok = 0;
+    char *line = 0;
+    std::size_t line_len = 0;
+    unsigned long row = 0;
+    unsigned long col = 0;
+    unsigned long global_part = 0;
+    unsigned long local_part = 0;
+    unsigned long idx = 0;
+    float value = 0.0f;
+
+    if (windows->count == 0) return 1;
+
+    mtx::init(&local);
+    scan::init(&reader);
+    init(&window_view);
+
+    if (!scan::open(&reader, mtx_path, reader_bytes)) goto done;
+    if (!mtx::read_header(&reader, &local)) goto done;
+    if (local.rows != h->rows || local.cols != h->cols || local.nnz_file != h->nnz_file) goto done;
+    if (local.symmetric || !local.row_sorted) goto done;
+
+    if (!prepare_part_window(h,
+                             row_offsets,
+                             part_nnz,
+                             num_parts,
+                             windows->ranges[0].part_begin,
+                             windows->ranges[0].part_end,
+                             &window_view,
+                             &write_ptr)) goto done;
+
+    while ((rc = scan::next_line(&reader, &line, &line_len)) > 0) {
+        if (line_len == 0 || line[0] == '%') continue;
+        if (!mtx::read_triplet(line, &local, &row, &col, &value)) goto done;
+
+        global_part = find_offset_span(row, row_offsets, num_parts);
+        if (global_part >= num_parts) goto done;
+
+        while (w < windows->count && global_part >= windows->ranges[w].part_end) {
+            if (!flush_part_window(part_prefix, windows->ranges[w].part_begin, &window_view, write_ptr)) goto done;
+            std::free(write_ptr);
+            write_ptr = 0;
+            clear(&window_view);
+            init(&window_view);
+            ++w;
+            if (w < windows->count) {
+                if (!prepare_part_window(h,
+                                         row_offsets,
+                                         part_nnz,
+                                         num_parts,
+                                         windows->ranges[w].part_begin,
+                                         windows->ranges[w].part_end,
+                                         &window_view,
+                                         &write_ptr)) goto done;
+            }
+        }
+
+        if (w >= windows->count) goto done;
+        if (global_part < windows->ranges[w].part_begin) goto done;
+
+        local_part = global_part - windows->ranges[w].part_begin;
+        idx = write_ptr[local_part]++;
+        if (idx >= window_view.part_nnz[local_part]) goto done;
+        window_view.parts[local_part]->rowIdx[idx] = (unsigned int) (row - row_offsets[global_part]);
+        window_view.parts[local_part]->colIdx[idx] = (unsigned int) col;
+        window_view.parts[local_part]->val[idx] = __float2half(value);
+    }
+    if (rc < 0) goto done;
+
+    while (w < windows->count) {
+        if (!flush_part_window(part_prefix, windows->ranges[w].part_begin, &window_view, write_ptr)) goto done;
+        std::free(write_ptr);
+        write_ptr = 0;
+        clear(&window_view);
+        init(&window_view);
+        ++w;
+        if (w < windows->count) {
+            if (!prepare_part_window(h,
+                                     row_offsets,
+                                     part_nnz,
+                                     num_parts,
+                                     windows->ranges[w].part_begin,
+                                     windows->ranges[w].part_end,
+                                     &window_view,
+                                     &write_ptr)) goto done;
+        }
+    }
+
+    ok = 1;
+
+done:
+    std::free(write_ptr);
+    scan::clear(&reader);
+    clear(&window_view);
+    return ok;
+}
+
 static inline int convert_single_mtx_to_sharded_coo(const char *mtx_path,
                                                     const char *header_path,
                                                     const char *part_prefix,
@@ -72,9 +218,9 @@ static inline int convert_single_mtx_to_sharded_coo(const char *mtx_path,
     init(&windows);
     init(&window_view);
 
-    if (!mtx::scan_row_nnz(mtx_path, &h, &row_nnz)) goto done;
+    if (!mtx::scan_row_nnz(mtx_path, &h, &row_nnz, opts->reader_bytes)) goto done;
     if (!mtx::plan_row_partitions_by_nnz(row_nnz, h.rows, opts->max_part_nnz, &row_offsets, &num_parts)) goto done;
-    if (!mtx::count_all_part_nnz(mtx_path, &h, row_offsets, num_parts, &part_nnz)) goto done;
+    if (!mtx::build_part_nnz_from_row_nnz(row_nnz, row_offsets, num_parts, &part_nnz)) goto done;
 
     part_rows = (unsigned long *) std::malloc((std::size_t) num_parts * sizeof(unsigned long));
     part_bytes = (unsigned long *) std::malloc((std::size_t) num_parts * sizeof(unsigned long));
@@ -97,6 +243,19 @@ static inline int convert_single_mtx_to_sharded_coo(const char *mtx_path,
                                part_aux,
                                shard_offsets)) goto done;
 
+    if (!h.symmetric && h.row_sorted) {
+        if (!stream_sorted_general_mtx_to_sharded_coo(mtx_path,
+                                                      part_prefix,
+                                                      &h,
+                                                      &windows,
+                                                      row_offsets,
+                                                      part_nnz,
+                                                      num_parts,
+                                                      opts->reader_bytes)) goto done;
+        ok = 1;
+        goto done;
+    }
+
     for (w = 0; w < windows.count; ++w) {
         if (!mtx::load_part_window_coo(mtx_path,
                                        &h,
@@ -105,7 +264,8 @@ static inline int convert_single_mtx_to_sharded_coo(const char *mtx_path,
                                        num_parts,
                                        windows.ranges[w].part_begin,
                                        windows.ranges[w].part_end,
-                                       &window_view)) goto done;
+                                       &window_view,
+                                       opts->reader_bytes)) goto done;
         if (!mtx::store_part_window_coo(part_prefix, windows.ranges[w].part_begin, &window_view)) goto done;
         clear(&window_view);
         init(&window_view);

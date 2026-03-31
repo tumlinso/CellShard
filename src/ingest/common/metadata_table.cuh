@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../io/source/file_reader.cuh"
+#include "../scan.cuh"
 #include "text_column.cuh"
 
 namespace cellshard {
@@ -93,26 +93,26 @@ static inline const char *field(const metadata_table *t, unsigned int row, unsig
 }
 
 static inline int load_tsv(const char *path, metadata_table *t, int has_header = 1) {
-    io::source::buffered_file_reader reader;
+    scan::buffered_file_reader reader;
     int rc = 0;
     char *line = 0;
     std::size_t line_len = 0;
     char *fields[1024];
     unsigned int nfields = 0;
 
-    io::source::init(&reader);
+    scan::init(&reader);
     clear(t);
     init(t);
 
-    if (!io::source::open(&reader, path)) goto fail;
+    if (!scan::open(&reader, path)) goto fail;
 
     for (;;) {
-        rc = io::source::next_line(&reader, &line, &line_len);
+        rc = scan::next_line(&reader, &line, &line_len);
         if (rc < 0) goto fail;
         if (rc == 0) break;
-        if (reader.line_number == 1u) io::source::strip_utf8_bom(line, &line_len);
+        if (reader.line_number == 1u) scan::strip_utf8_bom(line, &line_len);
         if (line_len == 0) continue;
-        nfields = io::source::split_tabs(line, fields, 1024u);
+        nfields = scan::split_tabs(line, fields, 1024u);
         if (nfields == 0) continue;
 
         if (has_header && reader.line_number == 1u) {
@@ -122,11 +122,11 @@ static inline int load_tsv(const char *path, metadata_table *t, int has_header =
         if (!append_row(t, fields, nfields)) goto fail;
     }
 
-    io::source::clear(&reader);
+    scan::clear(&reader);
     return 1;
 
 fail:
-    io::source::clear(&reader);
+    scan::clear(&reader);
     clear(t);
     return 0;
 }

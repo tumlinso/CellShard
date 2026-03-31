@@ -10,8 +10,9 @@ The active code layout is intentionally small:
 - `src/real.cuh`, `src/types.cuh`: scalar and index policy
 - `src/formats/`: per-part matrix layouts
 - `src/sharded/`: the sharded matrix mechanism, file layout, and device residency path
+- `src/ingest/`: external dataset scan and conversion paths
 - `src/convert/`: sparse conversion code and kernels
-- `src/io/binary/`: binary per-matrix I/O
+- `src/disk/`: binary per-matrix persistence
 
 The live implementations are in the smaller target homes above. The old flat compatibility paths have been removed.
 
@@ -27,8 +28,8 @@ Lower-level includes:
 
 ```cpp
 #include "src/sharded/sharded.cuh"
-#include "src/io/binary/matrix_file.cuh"
-#include "src/sharded/sharded_file.cuh"
+#include "src/disk/matrix.cuh"
+#include "src/sharded/disk.cuh"
 #include "src/sharded/sharded_device.cuh"
 ```
 
@@ -37,6 +38,14 @@ Lower-level includes:
 ```text
 src/
 ├── CellShard.hh
+├── disk/
+│   ├── matrix.cu
+│   └── matrix.cuh
+├── ingest/
+│   ├── scan.cuh
+│   ├── common/
+│   ├── mtx/
+│   └── series/
 ├── offset_span.cuh
 ├── real.cuh
 ├── types.cuh
@@ -50,8 +59,8 @@ src/
 │   ├── shard_paths.cuh
 │   ├── sharded.cuh
 │   ├── sharded_device.cuh
-│   ├── sharded_file.cu
-│   ├── sharded_file.cuh
+│   ├── disk.cu
+│   ├── disk.cuh
 │   └── sharded_host.cuh
 ├── convert/
 │   ├── compressed_from_coo_raw.cuh
@@ -65,10 +74,6 @@ src/
 │       ├── csExpand.cuh
 │       ├── csScatter.cuh
 │       └── transpose.cuh
-├── io/
-│   └── binary/
-│       ├── matrix_file.cu
-│       └── matrix_file.cuh
 ```
 
 ## Notes
@@ -77,7 +82,8 @@ src/
 - Each simple format now lives in one file; pure metadata/indexing helpers are `__host__ __device__`, while allocation and cleanup stay explicit host-only functions in the same header.
 - `src/sharded/` is the center of the library now: sharded metadata, resharding, file headers, shard path lists, and GPU residency are all in one subsystem.
 - Shard boundaries are now part-aligned, because fetch, drop, upload, and release all operate on whole parts.
-- `src/io/binary/` now only carries single-matrix disk I/O.
+- `src/ingest/scan.cuh` is the active sequential text scanner for HDD-friendly ingest.
+- `src/disk/` now carries single-matrix binary persistence.
 - `src/CellShard.hh` now includes the real format and binary headers directly instead of routing through umbrella headers.
 - `src/convert/` is now organized around the three real device-resident conversion engines: COO -> compressed, compressed -> COO, and compressed transpose.
 - `src/convert/routes/` holds the format-specific CSR/CSC entrypoints; the top-level `src/convert/*.cuh` files are the generic raw engines.

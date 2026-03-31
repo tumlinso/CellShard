@@ -1,4 +1,4 @@
-#include "matrix_file.cuh"
+#include "matrix.cuh"
 
 #include <cstdio>
 #include <cstdlib>

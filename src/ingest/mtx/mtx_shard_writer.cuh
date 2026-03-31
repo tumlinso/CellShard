@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../sharded/sharded_file.cuh"
+#include "../../sharded/disk.cuh"
 
 namespace cellshard {
 namespace ingest {

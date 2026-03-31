@@ -10,8 +10,8 @@
 #include <unistd.h>
 
 namespace cellshard {
-namespace io {
-namespace source {
+namespace ingest {
+namespace scan {
 
 struct buffered_file_reader {
     int fd;
@@ -258,6 +258,6 @@ static inline const char *field_or_empty(char **fields, unsigned int count, unsi
     return fields[idx];
 }
 
-} // namespace source
-} // namespace io
+} // namespace scan
+} // namespace ingest
 } // namespace cellshard

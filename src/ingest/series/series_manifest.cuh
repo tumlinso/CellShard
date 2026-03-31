@@ -5,7 +5,7 @@
 #include <cstring>
 
 #include "../common/text_column.cuh"
-#include "../../io/source/file_reader.cuh"
+#include "../scan.cuh"
 
 namespace cellshard {
 namespace ingest {
@@ -165,7 +165,7 @@ static inline int header_index(char **fields, unsigned int count, const char *na
 }
 
 static inline int load_tsv(const char *path, manifest *m, int has_header = 1) {
-    io::source::buffered_file_reader reader;
+    scan::buffered_file_reader reader;
     int rc = 0;
     char *line = 0;
     std::size_t line_len = 0;
@@ -184,19 +184,19 @@ static inline int load_tsv(const char *path, manifest *m, int has_header = 1) {
     unsigned long cols = 0;
     unsigned long nnz = 0;
 
-    io::source::init(&reader);
+    scan::init(&reader);
     clear(m);
     init(m);
 
-    if (!io::source::open(&reader, path)) goto fail;
+    if (!scan::open(&reader, path)) goto fail;
 
     for (;;) {
-        rc = io::source::next_line(&reader, &line, &line_len);
+        rc = scan::next_line(&reader, &line, &line_len);
         if (rc < 0) goto fail;
         if (rc == 0) break;
-        if (reader.line_number == 1u) io::source::strip_utf8_bom(line, &line_len);
+        if (reader.line_number == 1u) scan::strip_utf8_bom(line, &line_len);
         if (line_len == 0) continue;
-        nfields = io::source::split_tabs(line, fields, 64u);
+        nfields = scan::split_tabs(line, fields, 64u);
         if (nfields == 0) continue;
 
         if (has_header && reader.line_number == 1u) {
@@ -217,26 +217,26 @@ static inline int load_tsv(const char *path, manifest *m, int has_header = 1) {
             continue;
         }
 
-        if (!parse_u64_field(io::source::field_or_empty(fields, nfields, (unsigned int) (idx_rows >= 0 ? idx_rows : 63)), &rows)) goto fail;
-        if (!parse_u64_field(io::source::field_or_empty(fields, nfields, (unsigned int) (idx_cols >= 0 ? idx_cols : 63)), &cols)) goto fail;
-        if (!parse_u64_field(io::source::field_or_empty(fields, nfields, (unsigned int) (idx_nnz >= 0 ? idx_nnz : 63)), &nnz)) goto fail;
+        if (!parse_u64_field(scan::field_or_empty(fields, nfields, (unsigned int) (idx_rows >= 0 ? idx_rows : 63)), &rows)) goto fail;
+        if (!parse_u64_field(scan::field_or_empty(fields, nfields, (unsigned int) (idx_cols >= 0 ? idx_cols : 63)), &cols)) goto fail;
+        if (!parse_u64_field(scan::field_or_empty(fields, nfields, (unsigned int) (idx_nnz >= 0 ? idx_nnz : 63)), &nnz)) goto fail;
         if (!append(m,
-                    io::source::field_or_empty(fields, nfields, (unsigned int) idx_dataset),
-                    io::source::field_or_empty(fields, nfields, (unsigned int) idx_path),
-                    parse_format(io::source::field_or_empty(fields, nfields, (unsigned int) idx_format)),
-                    io::source::field_or_empty(fields, nfields, (unsigned int) (idx_features >= 0 ? idx_features : 63)),
-                    io::source::field_or_empty(fields, nfields, (unsigned int) (idx_barcodes >= 0 ? idx_barcodes : 63)),
-                    io::source::field_or_empty(fields, nfields, (unsigned int) (idx_metadata >= 0 ? idx_metadata : 63)),
+                    scan::field_or_empty(fields, nfields, (unsigned int) idx_dataset),
+                    scan::field_or_empty(fields, nfields, (unsigned int) idx_path),
+                    parse_format(scan::field_or_empty(fields, nfields, (unsigned int) idx_format)),
+                    scan::field_or_empty(fields, nfields, (unsigned int) (idx_features >= 0 ? idx_features : 63)),
+                    scan::field_or_empty(fields, nfields, (unsigned int) (idx_barcodes >= 0 ? idx_barcodes : 63)),
+                    scan::field_or_empty(fields, nfields, (unsigned int) (idx_metadata >= 0 ? idx_metadata : 63)),
                     rows,
                     cols,
                     nnz)) goto fail;
     }
 
-    io::source::clear(&reader);
+    scan::clear(&reader);
     return 1;
 
 fail:
-    io::source::clear(&reader);
+    scan::clear(&reader);
     clear(m);
     return 0;
 }

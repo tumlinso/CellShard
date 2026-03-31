@@ -1,4 +1,4 @@
-#include "sharded_file.cuh"
+#include "disk.cuh"
 
 #include <cstdio>
 #include <cstdlib>

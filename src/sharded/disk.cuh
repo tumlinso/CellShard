@@ -12,7 +12,7 @@
 #include "../formats/diagonal.cuh"
 #include "sharded.cuh"
 #include "sharded_host.cuh"
-#include "../io/binary/matrix_file.cuh"
+#include "../disk/matrix.cuh"
 #include "shard_paths.cuh"
 
 namespace cellshard {

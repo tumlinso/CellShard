@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../io/source/file_reader.cuh"
+#include "../scan.cuh"
 #include "text_column.cuh"
 
 namespace cellshard {
@@ -55,39 +55,39 @@ static inline int append(feature_table *t,
 }
 
 static inline int load_tsv(const char *path, feature_table *t, int skip_header = 0) {
-    io::source::buffered_file_reader reader;
+    scan::buffered_file_reader reader;
     int rc = 0;
     char *line = 0;
     std::size_t line_len = 0;
     char *fields[4];
     unsigned int nfields = 0;
 
-    io::source::init(&reader);
+    scan::init(&reader);
     clear(t);
     init(t);
 
-    if (!io::source::open(&reader, path)) goto fail;
+    if (!scan::open(&reader, path)) goto fail;
 
     for (;;) {
-        rc = io::source::next_line(&reader, &line, &line_len);
+        rc = scan::next_line(&reader, &line, &line_len);
         if (rc < 0) goto fail;
         if (rc == 0) break;
-        if (reader.line_number == 1u) io::source::strip_utf8_bom(line, &line_len);
+        if (reader.line_number == 1u) scan::strip_utf8_bom(line, &line_len);
         if (line_len == 0) continue;
         if (skip_header && reader.line_number == 1u) continue;
-        nfields = io::source::split_tabs(line, fields, 4u);
+        nfields = scan::split_tabs(line, fields, 4u);
         if (nfields == 0) continue;
         if (!append(t,
-                    io::source::field_or_empty(fields, nfields, 0u), std::strlen(io::source::field_or_empty(fields, nfields, 0u)),
-                    io::source::field_or_empty(fields, nfields, 1u), std::strlen(io::source::field_or_empty(fields, nfields, 1u)),
-                    io::source::field_or_empty(fields, nfields, 2u), std::strlen(io::source::field_or_empty(fields, nfields, 2u)))) goto fail;
+                    scan::field_or_empty(fields, nfields, 0u), std::strlen(scan::field_or_empty(fields, nfields, 0u)),
+                    scan::field_or_empty(fields, nfields, 1u), std::strlen(scan::field_or_empty(fields, nfields, 1u)),
+                    scan::field_or_empty(fields, nfields, 2u), std::strlen(scan::field_or_empty(fields, nfields, 2u)))) goto fail;
     }
 
-    io::source::clear(&reader);
+    scan::clear(&reader);
     return 1;
 
 fail:
-    io::source::clear(&reader);
+    scan::clear(&reader);
     clear(t);
     return 0;
 }

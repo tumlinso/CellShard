@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../io/source/file_reader.cuh"
+#include "../scan.cuh"
 #include "text_column.cuh"
 
 namespace cellshard {
@@ -32,31 +32,31 @@ static inline int append(barcode_table *t, const char *barcode, std::size_t len)
 }
 
 static inline int load_lines(const char *path, barcode_table *t) {
-    io::source::buffered_file_reader reader;
+    scan::buffered_file_reader reader;
     int rc = 0;
     char *line = 0;
     std::size_t line_len = 0;
 
-    io::source::init(&reader);
+    scan::init(&reader);
     clear(t);
     init(t);
 
-    if (!io::source::open(&reader, path)) goto fail;
+    if (!scan::open(&reader, path)) goto fail;
 
     for (;;) {
-        rc = io::source::next_line(&reader, &line, &line_len);
+        rc = scan::next_line(&reader, &line, &line_len);
         if (rc < 0) goto fail;
         if (rc == 0) break;
-        if (reader.line_number == 1u) io::source::strip_utf8_bom(line, &line_len);
+        if (reader.line_number == 1u) scan::strip_utf8_bom(line, &line_len);
         if (line_len == 0) continue;
         if (!append(t, line, line_len)) goto fail;
     }
 
-    io::source::clear(&reader);
+    scan::clear(&reader);
     return 1;
 
 fail:
-    io::source::clear(&reader);
+    scan::clear(&reader);
     clear(t);
     return 0;
 }

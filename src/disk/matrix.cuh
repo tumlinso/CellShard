@@ -6,10 +6,10 @@
 #include <cstdlib>
 #include <cstring>
 
-#include "../../formats/compressed.cuh"
-#include "../../formats/dense.cuh"
-#include "../../formats/diagonal.cuh"
-#include "../../formats/triplet.cuh"
+#include "../formats/compressed.cuh"
+#include "../formats/dense.cuh"
+#include "../formats/diagonal.cuh"
+#include "../formats/triplet.cuh"
 
 namespace cellshard {
 

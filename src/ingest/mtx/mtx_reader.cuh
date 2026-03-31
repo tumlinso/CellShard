@@ -11,7 +11,7 @@
 #include "../../formats/triplet.cuh"
 #include "../../sharded/sharded.cuh"
 #include "../../sharded/sharded_host.cuh"
-#include "../../io/source/file_reader.cuh"
+#include "../scan.cuh"
 
 namespace cellshard {
 namespace ingest {
@@ -26,6 +26,7 @@ struct header {
     int pattern;
     int integer_values;
     int real_values;
+    int row_sorted;
 };
 
 static inline void init(header *h) {
@@ -37,6 +38,7 @@ static inline void init(header *h) {
     h->pattern = 0;
     h->integer_values = 0;
     h->real_values = 0;
+    h->row_sorted = 1;
 }
 
 static inline int parse_u64_token(const char *s, unsigned long *out) {
@@ -65,7 +67,7 @@ static inline int parse_banner(char *line, header *h) {
     unsigned int nfields = 0;
 
     init(h);
-    nfields = io::source::split_ws(line, fields, 8u);
+    nfields = scan::split_ws(line, fields, 8u);
     if (nfields < 5u) return 0;
     if (std::strcmp(fields[0], "%%MatrixMarket") != 0) return 0;
     if (std::strcmp(fields[1], "matrix") != 0) return 0;
@@ -83,7 +85,7 @@ static inline int parse_banner(char *line, header *h) {
     return 1;
 }
 
-static inline int read_header(io::source::buffered_file_reader *reader, header *h) {
+static inline int read_header(scan::buffered_file_reader *reader, header *h) {
     int rc = 0;
     char *line = 0;
     std::size_t line_len = 0;
@@ -92,15 +94,15 @@ static inline int read_header(io::source::buffered_file_reader *reader, header *
 
     init(h);
 
-    rc = io::source::next_line(reader, &line, &line_len);
+    rc = scan::next_line(reader, &line, &line_len);
     if (rc <= 0) return 0;
-    if (reader->line_number == 1u) io::source::strip_utf8_bom(line, &line_len);
+    if (reader->line_number == 1u) scan::strip_utf8_bom(line, &line_len);
     if (!parse_banner(line, h)) return 0;
 
-    rc = io::source::skip_empty_and_comment_lines(reader, &line, &line_len, '%');
+    rc = scan::skip_empty_and_comment_lines(reader, &line, &line_len, '%');
     if (rc <= 0) return 0;
 
-    nfields = io::source::split_ws(line, fields, 4u);
+    nfields = scan::split_ws(line, fields, 4u);
     if (nfields < 3u) return 0;
     if (!parse_u64_token(fields[0], &h->rows)) return 0;
     if (!parse_u64_token(fields[1], &h->cols)) return 0;
@@ -110,13 +112,13 @@ static inline int read_header(io::source::buffered_file_reader *reader, header *
 }
 
 static inline int read_header(const char *path, header *h) {
-    io::source::buffered_file_reader reader;
+    scan::buffered_file_reader reader;
     int ok = 0;
 
-    io::source::init(&reader);
-    if (!io::source::open(&reader, path)) return 0;
+    scan::init(&reader);
+    if (!scan::open(&reader, path)) return 0;
     ok = read_header(&reader, h);
-    io::source::clear(&reader);
+    scan::clear(&reader);
     return ok;
 }
 
@@ -128,7 +130,7 @@ static inline int read_triplet(char *line,
     char *fields[4];
     unsigned int nfields = 0;
 
-    nfields = io::source::split_ws(line, fields, 4u);
+    nfields = scan::split_ws(line, fields, 4u);
     if (nfields < 2u) return 0;
     if (!parse_u64_token(fields[0], row)) return 0;
     if (!parse_u64_token(fields[1], col)) return 0;
@@ -145,31 +147,36 @@ static inline int read_triplet(char *line,
     return parse_f32_token(fields[2], value);
 }
 
-static inline int scan_row_nnz(io::source::buffered_file_reader *reader, const header *h, unsigned long *row_nnz) {
+static inline int scan_row_nnz(scan::buffered_file_reader *reader, const header *h, unsigned long *row_nnz) {
     int rc = 0;
     char *line = 0;
     std::size_t line_len = 0;
     unsigned long row = 0;
     unsigned long col = 0;
+    unsigned long prev_row = 0;
+    int have_prev = 0;
     float value = 0.0f;
 
-    while ((rc = io::source::next_line(reader, &line, &line_len)) > 0) {
+    while ((rc = scan::next_line(reader, &line, &line_len)) > 0) {
         if (line_len == 0 || line[0] == '%') continue;
         if (!read_triplet(line, h, &row, &col, &value)) return 0;
+        if (have_prev && row < prev_row) ((header *) h)->row_sorted = 0;
+        prev_row = row;
+        have_prev = 1;
         ++row_nnz[row];
         if (h->symmetric && row != col) ++row_nnz[col];
     }
     return rc == 0;
 }
 
-static inline int scan_row_nnz(const char *path, header *h, unsigned long **row_nnz_out) {
-    io::source::buffered_file_reader reader;
+static inline int scan_row_nnz(const char *path, header *h, unsigned long **row_nnz_out, std::size_t reader_bytes = (std::size_t) 8u << 20u) {
+    scan::buffered_file_reader reader;
     unsigned long *row_nnz = 0;
     int ok = 0;
 
     *row_nnz_out = 0;
-    io::source::init(&reader);
-    if (!io::source::open(&reader, path)) return 0;
+    scan::init(&reader);
+    if (!scan::open(&reader, path, reader_bytes)) return 0;
     if (!read_header(&reader, h)) goto done;
     row_nnz = (unsigned long *) std::calloc((std::size_t) h->rows, sizeof(unsigned long));
     if (h->rows != 0 && row_nnz == 0) goto done;
@@ -177,12 +184,33 @@ static inline int scan_row_nnz(const char *path, header *h, unsigned long **row_
     ok = 1;
 
 done:
-    io::source::clear(&reader);
+    scan::clear(&reader);
     if (!ok) {
         std::free(row_nnz);
         return 0;
     }
     *row_nnz_out = row_nnz;
+    return 1;
+}
+
+static inline int build_part_nnz_from_row_nnz(const unsigned long *row_nnz,
+                                              const unsigned long *row_offsets,
+                                              unsigned long num_parts,
+                                              unsigned long **part_nnz_out) {
+    unsigned long *part_nnz = 0;
+    unsigned long part = 0;
+    unsigned long row = 0;
+
+    *part_nnz_out = 0;
+    if (num_parts == 0) return 1;
+    part_nnz = (unsigned long *) std::calloc((std::size_t) num_parts, sizeof(unsigned long));
+    if (part_nnz == 0) return 0;
+    for (part = 0; part < num_parts; ++part) {
+        for (row = row_offsets[part]; row < row_offsets[part + 1]; ++row) {
+            part_nnz[part] += row_nnz[row];
+        }
+    }
+    *part_nnz_out = part_nnz;
     return 1;
 }
 
@@ -232,7 +260,7 @@ static inline int validate_row_offsets(const header *h,
     return 1;
 }
 
-static inline int count_part_nnz(io::source::buffered_file_reader *reader,
+static inline int count_part_nnz(scan::buffered_file_reader *reader,
                                  const header *h,
                                  const unsigned long *row_offsets,
                                  unsigned long num_parts,
@@ -245,7 +273,7 @@ static inline int count_part_nnz(io::source::buffered_file_reader *reader,
     unsigned long part = 0;
     float value = 0.0f;
 
-    while ((rc = io::source::next_line(reader, &line, &line_len)) > 0) {
+    while ((rc = scan::next_line(reader, &line, &line_len)) > 0) {
         if (line_len == 0 || line[0] == '%') continue;
         if (!read_triplet(line, h, &row, &col, &value)) return 0;
         part = find_offset_span(row, row_offsets, num_parts);
@@ -278,15 +306,15 @@ static inline int count_all_part_nnz(const char *path,
                                      const unsigned long *row_offsets,
                                      unsigned long num_parts,
                                      unsigned long **part_nnz_out) {
-    io::source::buffered_file_reader reader;
+    scan::buffered_file_reader reader;
     unsigned long *part_nnz = 0;
     header local;
     int ok = 0;
 
     *part_nnz_out = 0;
     init(&local);
-    io::source::init(&reader);
-    if (!io::source::open(&reader, path)) return 0;
+    scan::init(&reader);
+    if (!scan::open(&reader, path)) return 0;
     if (!read_header(&reader, &local)) goto done;
     if (h != 0) {
         if (local.rows != h->rows || local.cols != h->cols || local.nnz_file != h->nnz_file) goto done;
@@ -297,7 +325,7 @@ static inline int count_all_part_nnz(const char *path,
     ok = 1;
 
 done:
-    io::source::clear(&reader);
+    scan::clear(&reader);
     if (!ok) {
         std::free(part_nnz);
         return 0;
@@ -378,7 +406,7 @@ static inline int allocate_sharded_coo(const header *h,
     return set_shards_to_parts(out);
 }
 
-static inline int fill_sharded_coo(io::source::buffered_file_reader *reader,
+static inline int fill_sharded_coo(scan::buffered_file_reader *reader,
                                    const header *h,
                                    const unsigned long *row_offsets,
                                    unsigned long num_parts,
@@ -396,7 +424,7 @@ static inline int fill_sharded_coo(io::source::buffered_file_reader *reader,
     write_ptr = (unsigned long *) std::calloc((std::size_t) num_parts, sizeof(unsigned long));
     if (num_parts != 0 && write_ptr == 0) return 0;
 
-    while ((rc = io::source::next_line(reader, &line, &line_len)) > 0) {
+    while ((rc = scan::next_line(reader, &line, &line_len)) > 0) {
         if (line_len == 0 || line[0] == '%') continue;
         if (!read_triplet(line, h, &row, &col, &value)) goto fail;
 
@@ -430,33 +458,33 @@ static inline int load_row_sharded_coo(const char *path,
                                        const unsigned long *row_offsets,
                                        unsigned long num_parts,
                                        sharded<sparse::coo> *out) {
-    io::source::buffered_file_reader reader;
+    scan::buffered_file_reader reader;
     header h;
     unsigned long *part_nnz = 0;
     int ok = 0;
 
     init(&h);
-    io::source::init(&reader);
+    scan::init(&reader);
 
-    if (!io::source::open(&reader, path)) return 0;
+    if (!scan::open(&reader, path)) return 0;
     if (!read_header(&reader, &h)) goto done;
     if (!validate_row_offsets(&h, row_offsets, num_parts)) goto done;
 
     part_nnz = (unsigned long *) std::calloc((std::size_t) num_parts, sizeof(unsigned long));
     if (num_parts != 0 && part_nnz == 0) goto done;
     if (!count_part_nnz(&reader, &h, row_offsets, num_parts, part_nnz)) goto done;
-    io::source::clear(&reader);
-    io::source::init(&reader);
+    scan::clear(&reader);
+    scan::init(&reader);
 
     if (!allocate_sharded_coo(&h, row_offsets, num_parts, part_nnz, out)) goto done;
 
-    if (!io::source::open(&reader, path)) goto done;
+    if (!scan::open(&reader, path)) goto done;
     if (!read_header(&reader, &h)) goto done;
     if (!fill_sharded_coo(&reader, &h, row_offsets, num_parts, out)) goto done;
     ok = 1;
 
 done:
-    io::source::clear(&reader);
+    scan::clear(&reader);
     std::free(part_nnz);
     if (!ok) clear(out);
     return ok;
@@ -532,7 +560,7 @@ static inline int allocate_part_window_coo(const header *h,
     return set_shards_to_parts(out);
 }
 
-static inline int fill_part_window_coo(io::source::buffered_file_reader *reader,
+static inline int fill_part_window_coo(scan::buffered_file_reader *reader,
                                        const header *h,
                                        const unsigned long *row_offsets,
                                        unsigned long num_parts,
@@ -553,7 +581,7 @@ static inline int fill_part_window_coo(io::source::buffered_file_reader *reader,
     write_ptr = (unsigned long *) std::calloc((std::size_t) out->num_parts, sizeof(unsigned long));
     if (out->num_parts != 0 && write_ptr == 0) return 0;
 
-    while ((rc = io::source::next_line(reader, &line, &line_len)) > 0) {
+    while ((rc = scan::next_line(reader, &line, &line_len)) > 0) {
         if (line_len == 0 || line[0] == '%') continue;
         if (!read_triplet(line, h, &row, &col, &value)) goto fail;
 
@@ -593,23 +621,24 @@ static inline int load_part_window_coo(const char *path,
                                        unsigned long num_parts,
                                        unsigned long part_begin,
                                        unsigned long part_end,
-                                       sharded<sparse::coo> *out) {
-    io::source::buffered_file_reader reader;
+                                       sharded<sparse::coo> *out,
+                                       std::size_t reader_bytes = (std::size_t) 8u << 20u) {
+    scan::buffered_file_reader reader;
     header local;
     int ok = 0;
 
     init(&local);
-    io::source::init(&reader);
+    scan::init(&reader);
 
     if (!allocate_part_window_coo(h, row_offsets, part_nnz, num_parts, part_begin, part_end, out)) goto done;
-    if (!io::source::open(&reader, path)) goto done;
+    if (!scan::open(&reader, path, reader_bytes)) goto done;
     if (!read_header(&reader, &local)) goto done;
     if (local.rows != h->rows || local.cols != h->cols || local.nnz_file != h->nnz_file) goto done;
     if (!fill_part_window_coo(&reader, &local, row_offsets, num_parts, part_begin, part_end, out)) goto done;
     ok = 1;
 
 done:
-    io::source::clear(&reader);
+    scan::clear(&reader);
     if (!ok) clear(out);
     return ok;
 }

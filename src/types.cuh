@@ -8,6 +8,7 @@
 
 #include "real.cuh"
 
+namespace cellshard {
 namespace types {
 
 enum {
@@ -73,3 +74,4 @@ struct value_type<value_i32> {
 };
 
 } // namespace types
+} // namespace cellshard

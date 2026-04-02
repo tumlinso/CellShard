@@ -1,5 +1,18 @@
 #pragma once
 
+// Umbrella include for the active CellShard surface.
+// This intentionally pulls in:
+// - type/layout policy
+// - per-part matrix formats
+// - sharded metadata and packfile persistence
+// - host fetch/drop helpers
+// - device staging helpers
+// - local multi-GPU helpers
+// - MTX ingest helpers
+//
+// Downstream code that wants a smaller compile surface should include only the
+// specific headers it needs instead of this umbrella.
+
 #include "types.cuh"
 #include "offset_span.cuh"
 #include "formats/dense.cuh"

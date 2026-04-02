@@ -85,6 +85,228 @@ The intended flow is:
 
 If NCCL is available, the same local context can also bootstrap one communicator per visible GPU. That support is optional and opportunistic; the core same-machine shard distribution path does not depend on NCCL being present.
 
+## Copy Semantics
+
+CellShard is explicit about ownership, but several convenience paths still do
+real copies and real materialization work. Users need to treat these as data
+movement operations, not cheap view construction.
+
+The important rules are:
+
+- `fetch_part()` opens the packfile, seeks to the stored extent, and materializes a fresh host-side matrix object for that part.
+- `fetch_shard()` is currently a loop over `fetch_part()`. One shard fetch can mean many packfile seeks and many host allocations if a shard contains many parts.
+- `upload_part()` and `upload_part_async()` allocate fresh device memory and perform host-to-device copies of the part payload. They also copy a small descriptor struct to device memory.
+- `upload_shard()` and `upload_shard_async()` are loops over per-part uploads. They do not pack a whole shard into one bulk transfer.
+- `stage_part()` combines host fetch and device upload. If the part is cold on host, it performs packfile I/O and then H2D copies.
+- `stage_part_async()` is only async for the H2D upload path. If the part is absent on host, the packfile fetch still happens synchronously on the calling thread before the async copy is queued.
+- `stage_shard()` and `stage_shard_async()` are loops over `stage_part*()`, so caller-visible shard shape matters a lot for launch count, allocation churn, and copy count.
+- `swap_shard()` and `swap_shard_async()` stage the incoming shard before releasing the outgoing shard. Peak device residency briefly includes both shards.
+- `reserve_parts()` and `reserve_shards()` reallocate and `memcpy` metadata tables on host when capacities grow.
+- `bind_packfile()` copies the path string into owned storage.
+
+What this means in practice:
+
+- keep host parts resident if you will restage them soon
+- keep device shards resident if the next kernel pass will reuse them
+- choose shard boundaries to control part count, not just row count
+- prefer `set_shards_by_device_bytes()` or `assign_shards_by_bytes()` when balancing work across GPUs
+- avoid loops that repeatedly `fetch -> stage -> drop -> fetch -> stage -> drop` the same parts
+- treat the async staging helpers as stream-ordered upload helpers, not as background disk I/O engines
+
+If you want peak throughput, user behavior matters almost as much as the low-level code:
+
+- stable shard reuse beats convenience restaging
+- fewer larger parts usually beat many tiny parts
+- device residency beats host convenience
+- graph capture should happen above CellShard, after shard residency and stream layout are already stable
+
+## Performance Incursion
+
+The APIs below are grouped by how much work they usually incur.
+
+`Very Low`
+
+- boundary/metadata helpers in `src/offset_span.cuh` and `src/sharded/sharded.cuh`
+- device-footprint estimators like `device_part_bytes()` and `device_shard_bytes()` in `src/sharded/sharded_device.cuh`
+- raw conversion launchers in `src/convert/compressed_from_coo_raw.cuh`, `src/convert/coo_from_compressed_raw.cuh`, and `src/convert/compressed_transpose_raw.cuh`
+
+These paths only:
+
+- inspect metadata
+- compute byte estimates
+- choose launch geometry
+- launch kernels over already-device-resident buffers
+
+They do not:
+
+- allocate host memory
+- allocate device memory
+- read from disk
+- copy between host and device
+
+`Low`
+
+- `assign_shards_round_robin()` and `assign_shards_by_bytes()` in `src/sharded/distributed.cuh`
+- `set_shards_to_parts()`, `set_equal_shards()`, `set_shards_by_nnz()`, and `set_shards_by_part_bytes()` in `src/sharded/sharded_host.cuh`
+- `load_header()` in `src/sharded/disk.cuh` when you only need metadata
+
+These paths mainly do:
+
+- host metadata allocation
+- host metadata copies
+- cheap reductions over metadata
+
+They do not move matrix payload.
+
+`Moderate`
+
+- `reserve_parts()` and `reserve_shards()` in `src/sharded/sharded_host.cuh`
+- `reserve()` in `src/sharded/distributed.cuh` and `reserve()` in `src/sharded/sharded_device.cuh`
+- `bind_packfile()` in `src/sharded/shard_paths.cu`
+- packed-text ingest helpers in `src/ingest/common/*.cuh`
+
+These paths do host-side allocation and copy work, but they do not necessarily
+touch matrix payload and they do not move payload between host and device.
+
+Typical costs:
+
+- `memcpy` of metadata arrays
+- path-string ownership copies
+- packed-string blob growth copies
+- temporary workspace growth
+
+`High`
+
+- `store()` / `load()` for standalone part files in `src/disk/matrix.cuh`
+- `store_header()` / `load_header()` in `src/sharded/disk.cuh`
+- `discover_local()` and `enable_peer_access()` in `src/sharded/distributed.cuh`
+- MTX text scanning and parsing helpers in `src/ingest/scan.cuh` and `src/ingest/mtx/mtx_reader.cuh`
+
+These paths do at least one of:
+
+- synchronous file I/O
+- host allocation proportional to metadata or one part
+- file scans over large text sources
+- CUDA runtime setup work per device
+
+They are expensive, but they still usually avoid combining disk I/O and
+host-device copies in the same operation.
+
+`Very High`
+
+- `fetch_part()` and `fetch_shard()` in `src/sharded/sharded_host.cuh`
+- `upload_part()` / `upload_part_async()` and `upload_shard()` / `upload_shard_async()` in `src/sharded/sharded_device.cuh`
+- `stage_part()` / `stage_part_async()` and `stage_shard()` / `stage_shard_async()` in `src/sharded/sharded_device.cuh`
+- `swap_shard()` / `swap_shard_async()` in `src/sharded/sharded_device.cuh`
+- full packfile `store()` in `src/sharded/disk.cuh`
+- MTX conversion entrypoints in `src/ingest/series/series_ingest.cuh`
+- pinned-triplet -> compressed conversion in `src/ingest/mtx/compressed_parts.cuh`
+
+These are the expensive paths because they combine multiple cost domains:
+
+- file I/O
+- host allocation
+- host copies
+- device allocation
+- H2D copies
+- sometimes D2H copies
+- sometimes temporary double residency
+
+The heaviest families are:
+
+- `fetch -> upload -> drop`
+- `stage_*`
+- MTX text ingest
+- pinned-triplet -> compressed conversion
+- any loop that repeatedly rebuilds device buffers for the same shard
+
+## Operation Notes
+
+`fetch_part()`
+
+- opens the packfile
+- seeks to one part extent
+- reads one packed matrix payload
+- allocates fresh host arrays
+
+`fetch_shard()`
+
+- loops over `fetch_part()`
+- one logical shard can mean many seeks and many allocations
+
+`upload_part()`
+
+- assumes the host part is already materialized
+- allocates fresh device buffers
+- performs one or more H2D copies depending on format
+- allocates and copies a device-side descriptor
+
+`upload_shard()`
+
+- loops over `upload_part()`
+- copy count scales with parts per shard
+
+`stage_part()`
+
+- may call `fetch_part()` first
+- then calls `upload_part()`
+- may immediately free the host part
+
+`stage_part_async()`
+
+- only the upload half is stream-ordered
+- if the part is cold, the packfile fetch still happens synchronously on the calling thread
+
+`stage_shard_async()`
+
+- loops over `stage_part_async()`
+- still pays synchronous host fetch for cold parts
+
+`swap_shard()`
+
+- stages the incoming shard before releasing the outgoing one
+- transient device footprint includes both shards
+
+`convert_single_mtx_to_sharded_coo()`
+
+- scans the MTX file
+- partitions rows
+- counts part nnz
+- allocates per-window COO payload
+- parses and copies text entries into host COO buffers
+- stores one packfile window at a time
+
+`build_pinned_triplet_to_compressed()`
+
+- copies pinned host triplets to device
+- runs device scan/scatter conversion
+- copies compressed output back to pinned host buffers
+- synchronizes the stream
+
+## User Rules
+
+CellShard will only be fast if the caller behaves accordingly.
+
+- Do not treat `stage_*` as a cheap accessor.
+- Do not assume `*_async` means asynchronous disk I/O.
+- Keep parts resident on host if you know you will upload them again soon.
+- Keep shards resident on device if another kernel pass will reuse them.
+- Prefer fewer larger parts over many tiny parts when launch count and copy count matter more than fine-grained scheduling.
+- Prefer shard boundaries chosen by resident device bytes, not by aesthetics.
+- Avoid repeated `drop -> fetch -> stage` loops over the same hot region.
+- Use `load_header()` first, decide the schedule, then fetch and stage only what will actually run.
+- Keep graph capture above CellShard after streams, shard ownership, and residency are already stable.
+- Treat ingest as a preprocessing path, not a hot runtime path.
+
+Short version:
+
+- metadata helpers are cheap
+- conversion launchers over existing device buffers are cheap
+- host text ingest is expensive
+- packfile fetch is expensive
+- host-device staging is very expensive
+- mixing disk I/O and staging in one loop is the most expensive behavior in the library
+
 ## Active Layout
 
 The active code layout is intentionally small:

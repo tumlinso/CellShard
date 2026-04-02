@@ -17,6 +17,9 @@ namespace cellshard {
 namespace ingest {
 namespace mtx {
 
+// Parsed Matrix Market header.
+// row_sorted is discovered during scans and controls whether the fast streaming
+// conversion path is legal.
 struct header {
     unsigned long rows;
     unsigned long cols;
@@ -29,6 +32,7 @@ struct header {
     int row_sorted;
 };
 
+// Metadata-only init.
 static inline void init(header *h) {
     h->rows = 0;
     h->cols = 0;
@@ -41,6 +45,7 @@ static inline void init(header *h) {
     h->row_sorted = 1;
 }
 
+// Token parsers stay small and allocation-free.
 static inline int parse_u64_token(const char *s, unsigned long *out) {
     char *end = 0;
     unsigned long long v = 0;
@@ -62,6 +67,7 @@ static inline int parse_f32_token(const char *s, float *out) {
     return 1;
 }
 
+// Parse the MatrixMarket banner line and record type/symmetry flags.
 static inline int parse_banner(char *line, header *h) {
     char *fields[8];
     unsigned int nfields = 0;
@@ -85,6 +91,7 @@ static inline int parse_banner(char *line, header *h) {
     return 1;
 }
 
+// Read the MTX banner + dimension line through the buffered text scanner.
 static inline int read_header(scan::buffered_file_reader *reader, header *h) {
     int rc = 0;
     char *line = 0;
@@ -111,6 +118,7 @@ static inline int read_header(scan::buffered_file_reader *reader, header *h) {
     return 1;
 }
 
+// Convenience wrapper that opens the file and reads only the header.
 static inline int read_header(const char *path, header *h) {
     scan::buffered_file_reader reader;
     int ok = 0;
@@ -122,6 +130,8 @@ static inline int read_header(const char *path, header *h) {
     return ok;
 }
 
+// Parse one MatrixMarket coordinate entry, convert to zero-based indices, and
+// synthesize value=1 for pattern matrices.
 static inline int read_triplet(char *line,
                                const header *h,
                                unsigned long *row,
@@ -147,6 +157,8 @@ static inline int read_triplet(char *line,
     return parse_f32_token(fields[2], value);
 }
 
+// First pass over the source file to count per-row nnz and discover whether the
+// file is already row-sorted.
 static inline int scan_row_nnz(scan::buffered_file_reader *reader, const header *h, unsigned long *row_nnz) {
     int rc = 0;
     char *line = 0;
@@ -169,6 +181,11 @@ static inline int scan_row_nnz(scan::buffered_file_reader *reader, const header 
     return rc == 0;
 }
 
+// Full first pass over the file:
+// - open source
+// - read header
+// - allocate row_nnz
+// - scan every coordinate line
 static inline int scan_row_nnz(const char *path, header *h, unsigned long **row_nnz_out, std::size_t reader_bytes = (std::size_t) 8u << 20u) {
     scan::buffered_file_reader reader;
     unsigned long *row_nnz = 0;
@@ -193,6 +210,7 @@ done:
     return 1;
 }
 
+// Reduce row counts into per-part counts using precomputed row offsets.
 static inline int build_part_nnz_from_row_nnz(const unsigned long *row_nnz,
                                               const unsigned long *row_offsets,
                                               unsigned long num_parts,
@@ -214,6 +232,7 @@ static inline int build_part_nnz_from_row_nnz(const unsigned long *row_nnz,
     return 1;
 }
 
+// Build row partition boundaries by limiting nnz per part.
 static inline int plan_row_partitions_by_nnz(const unsigned long *row_nnz,
                                              unsigned long rows,
                                              unsigned long max_nnz,
@@ -246,6 +265,7 @@ static inline int plan_row_partitions_by_nnz(const unsigned long *row_nnz,
     return 1;
 }
 
+// Validate that row offsets cover the full matrix and stay monotonic.
 static inline int validate_row_offsets(const header *h,
                                        const unsigned long *row_offsets,
                                        unsigned long num_parts) {
@@ -260,6 +280,7 @@ static inline int validate_row_offsets(const header *h,
     return 1;
 }
 
+// Alternative second-pass counter that maps each triplet directly to its part.
 static inline int count_part_nnz(scan::buffered_file_reader *reader,
                                  const header *h,
                                  const unsigned long *row_offsets,
@@ -294,6 +315,7 @@ static inline int cast_dim(unsigned long v, unsigned int *out) {
     return 1;
 }
 
+// Conservative host-byte estimate for one COO part.
 static inline std::size_t estimate_coo_part_bytes(unsigned long rows, unsigned long nnz) {
     return sizeof(sparse::coo)
          + (std::size_t) nnz * sizeof(unsigned int)
@@ -301,6 +323,7 @@ static inline std::size_t estimate_coo_part_bytes(unsigned long rows, unsigned l
          + (std::size_t) nnz * sizeof(__half);
 }
 
+// Full second pass to count part nnz for arbitrary row partitions.
 static inline int count_all_part_nnz(const char *path,
                                      const header *h,
                                      const unsigned long *row_offsets,
@@ -334,6 +357,7 @@ done:
     return 1;
 }
 
+// Build per-part row counts and byte estimates from row offsets.
 static inline void build_part_rows(const unsigned long *row_offsets,
                                    unsigned long num_parts,
                                    unsigned long *part_rows) {
@@ -351,6 +375,7 @@ static inline void build_part_bytes_from_nnz(const unsigned long *row_offsets,
     }
 }
 
+// Small reductions over part metadata.
 static inline unsigned long sum_part_nnz(const unsigned long *part_nnz,
                                          unsigned long part_begin,
                                          unsigned long part_end) {
@@ -368,6 +393,7 @@ static inline unsigned long sum_part_rows(const unsigned long *row_offsets,
     return row_offsets[part_end] - row_offsets[part_begin];
 }
 
+// Allocate a sharded COO view with one host-side COO payload per part.
 static inline int allocate_sharded_coo(const header *h,
                                        const unsigned long *row_offsets,
                                        unsigned long num_parts,
@@ -406,6 +432,8 @@ static inline int allocate_sharded_coo(const header *h,
     return set_shards_to_parts(out);
 }
 
+// Fill the preallocated sharded COO payload by streaming through the source MTX
+// file and scattering entries into their destination part.
 static inline int fill_sharded_coo(scan::buffered_file_reader *reader,
                                    const header *h,
                                    const unsigned long *row_offsets,
@@ -454,6 +482,8 @@ fail:
     return 0;
 }
 
+// Full MTX -> sharded COO load path.
+// This is deliberately multi-pass and host-heavy because MTX is a text format.
 static inline int load_row_sharded_coo(const char *path,
                                        const unsigned long *row_offsets,
                                        unsigned long num_parts,
@@ -490,6 +520,7 @@ done:
     return ok;
 }
 
+// Single-part convenience loader built on the row-sharded loader above.
 static inline int load_coo(const char *path, sparse::coo *out) {
     header h;
     unsigned long row_offsets[2];
@@ -518,6 +549,7 @@ done:
     return ok;
 }
 
+// Allocate only a contiguous window of parts rather than the full sharded view.
 static inline int allocate_part_window_coo(const header *h,
                                            const unsigned long *row_offsets,
                                            const unsigned long *part_nnz,
@@ -560,6 +592,7 @@ static inline int allocate_part_window_coo(const header *h,
     return set_shards_to_parts(out);
 }
 
+// Fill only a contiguous window of parts from the full MTX source.
 static inline int fill_part_window_coo(scan::buffered_file_reader *reader,
                                        const header *h,
                                        const unsigned long *row_offsets,
@@ -614,6 +647,8 @@ fail:
     return 0;
 }
 
+// Windowed MTX -> sharded COO load path. This is useful when the full sharded
+// object is too large to hold at once during ingest.
 static inline int load_part_window_coo(const char *path,
                                        const header *h,
                                        const unsigned long *row_offsets,

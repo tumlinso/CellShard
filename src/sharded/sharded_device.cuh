@@ -10,6 +10,13 @@
 namespace cellshard {
 namespace device {
 
+// Device residency state is deliberately blunt:
+// - one record per logical host part
+// - one device-side descriptor pointer
+// - up to three device payload pointers
+//
+// These records do not alias host memory. Any upload/stage path below allocates
+// fresh device memory and copies payload into it.
 template<typename MatrixT>
 struct alignas(16) part_record {
     void *view;
@@ -93,6 +100,9 @@ __host__ __forceinline__ int reserve(sharded_device<MatrixT> *state, unsigned lo
     unsigned long i = 0;
 
     if (capacity <= state->capacity) return 1;
+    // Grow the per-part residency table on host. This copies metadata only.
+    // Device allocations referenced by the old records remain owned by those
+    // records and are transferred bitwise into the new table below.
     records = (part_record<MatrixT> *) std::malloc((std::size_t) capacity * sizeof(part_record<MatrixT>));
     if (records == 0) return 0;
     std::memset(records, 0, (std::size_t) capacity * sizeof(part_record<MatrixT>));
@@ -113,6 +123,13 @@ __host__ __forceinline__ void zero_record(part_record<MatrixT> *record) {
     record->device_id = -1;
 }
 
+// Upload is not a view conversion. It performs:
+// 1. cudaMalloc for the dense payload
+// 2. one host->device copy of all values
+// 3. cudaMalloc for the device-side descriptor
+// 4. one host->device copy of that descriptor
+//
+// Callers should treat this as a full materialization step.
 __host__ __forceinline__ cudaError_t upload(const ::cellshard::dense *src, part_record< ::cellshard::dense > *record) {
     dense_view host;
     dense_view *deviceView = 0;
@@ -147,6 +164,9 @@ fail:
     return err;
 }
 
+// Async upload only makes the memcpy operations asynchronous relative to the
+// supplied stream. The function still performs host-side allocation work before
+// returning, and the source still lives in host memory.
 __host__ __forceinline__ cudaError_t upload_async(const ::cellshard::dense *src,
                                                   part_record< ::cellshard::dense > *record,
                                                   cudaStream_t stream) {
@@ -183,6 +203,12 @@ fail:
     return err;
 }
 
+// Compressed upload performs three separate H2D payload copies:
+// - major pointer array
+// - minor index array
+// - value array
+//
+// Then it copies a small descriptor struct containing those device pointers.
 __host__ __forceinline__ cudaError_t upload(const ::cellshard::sparse::compressed *src, part_record< ::cellshard::sparse::compressed > *record) {
     compressed_view host;
     compressed_view *deviceView = 0;
@@ -235,6 +261,8 @@ fail:
     return err;
 }
 
+// Async compressed upload still allocates on the host thread. Only the payload
+// transfers and descriptor copy are queued on the supplied stream.
 __host__ __forceinline__ cudaError_t upload_async(const ::cellshard::sparse::compressed *src,
                                                   part_record< ::cellshard::sparse::compressed > *record,
                                                   cudaStream_t stream) {
@@ -289,6 +317,8 @@ fail:
     return err;
 }
 
+// COO upload is another full host->device materialization:
+// row index copy, column index copy, value copy, then descriptor copy.
 __host__ __forceinline__ cudaError_t upload(const ::cellshard::sparse::coo *src, part_record< ::cellshard::sparse::coo > *record) {
     coo_view host;
     coo_view *deviceView = 0;
@@ -337,6 +367,8 @@ fail:
     return err;
 }
 
+// Async COO upload has the same copy volume as upload(); the only difference is
+// stream-ordered memcpy submission.
 __host__ __forceinline__ cudaError_t upload_async(const ::cellshard::sparse::coo *src,
                                                   part_record< ::cellshard::sparse::coo > *record,
                                                   cudaStream_t stream) {
@@ -387,6 +419,8 @@ fail:
     return err;
 }
 
+// DIA upload copies offsets and values separately, then publishes one device
+// descriptor that points at those allocations.
 __host__ __forceinline__ cudaError_t upload(const ::cellshard::sparse::dia *src, part_record< ::cellshard::sparse::dia > *record) {
     dia_view host;
     dia_view *deviceView = 0;
@@ -431,6 +465,8 @@ fail:
     return err;
 }
 
+// Async DIA upload preserves the same allocation/copy structure as the sync
+// path; it only changes when the H2D copies retire.
 __host__ __forceinline__ cudaError_t upload_async(const ::cellshard::sparse::dia *src,
                                                   part_record< ::cellshard::sparse::dia > *record,
                                                   cudaStream_t stream) {
@@ -501,6 +537,9 @@ __host__ __forceinline__ cudaError_t release(part_record<MatrixT> *record) {
     return cudaSuccess;
 }
 
+// Byte estimates below are the resident device footprint after upload. They are
+// not disk bytes and not host bytes. Use them when balancing shard ownership
+// across GPUs.
 __host__ __forceinline__ std::size_t device_part_bytes(const ::cellshard::sharded< ::cellshard::dense > *view, unsigned long partId) {
     return sizeof(dense_view) + (std::size_t) view->part_nnz[partId] * sizeof(__half);
 }
@@ -569,6 +608,8 @@ __host__ __forceinline__ int set_shards_by_device_bytes(::cellshard::sharded<Mat
     return 1;
 }
 
+// upload_part assumes the host part is already materialized. It does not touch
+// disk. The cost here is device allocation plus H2D copy.
 template<typename MatrixT>
 __host__ __forceinline__ cudaError_t upload_part(sharded_device<MatrixT> *state, const ::cellshard::sharded<MatrixT> *view, unsigned long partId, int deviceId) {
     cudaError_t err = cudaSuccess;
@@ -587,6 +628,8 @@ __host__ __forceinline__ cudaError_t upload_part(sharded_device<MatrixT> *state,
     return cudaSuccess;
 }
 
+// Async upload_part still inspects host state synchronously before enqueueing
+// copies. It is not a fire-and-forget data loader.
 template<typename MatrixT>
 __host__ __forceinline__ cudaError_t upload_part_async(sharded_device<MatrixT> *state,
                                                        const ::cellshard::sharded<MatrixT> *view,
@@ -619,6 +662,8 @@ __host__ __forceinline__ cudaError_t release_part(sharded_device<MatrixT> *state
     return release(&state->parts[partId]);
 }
 
+// Shard upload is a loop over per-part uploads. There is no packed multi-part
+// transfer yet, so launch/copy count is proportional to parts per shard.
 template<typename MatrixT>
 __host__ __forceinline__ cudaError_t upload_shard(sharded_device<MatrixT> *state, const ::cellshard::sharded<MatrixT> *view, unsigned long shardId, int deviceId) {
     unsigned long begin = 0;
@@ -636,6 +681,8 @@ __host__ __forceinline__ cudaError_t upload_shard(sharded_device<MatrixT> *state
     return cudaSuccess;
 }
 
+// Async shard upload preserves the same per-part behavior and copy count as the
+// sync path. It simply queues those copies on one stream.
 template<typename MatrixT>
 __host__ __forceinline__ cudaError_t upload_shard_async(sharded_device<MatrixT> *state,
                                                         const ::cellshard::sharded<MatrixT> *view,
@@ -674,6 +721,14 @@ __host__ __forceinline__ cudaError_t release_shard(sharded_device<MatrixT> *stat
     return cudaSuccess;
 }
 
+// stage_part is the highest-risk convenience path in the file:
+// - if the part is absent on host, it performs synchronous packfile I/O
+// - it materializes a host part object
+// - it allocates device memory
+// - it copies host payload to device
+// - it may then free the host part immediately
+//
+// Nothing here is zero-copy and nothing here is hidden from the caller anymore.
 template<typename MatrixT>
 __host__ __forceinline__ cudaError_t stage_part(sharded_device<MatrixT> *state,
                               ::cellshard::sharded<MatrixT> *view,
@@ -701,6 +756,8 @@ __host__ __forceinline__ cudaError_t stage_part(sharded_device<MatrixT> *state,
     return cudaSuccess;
 }
 
+// The async staging path still does synchronous host fetch when the part is not
+// resident in view->parts[]. Only the upload half is stream-ordered.
 template<typename MatrixT>
 __host__ __forceinline__ cudaError_t stage_part_async(sharded_device<MatrixT> *state,
                                                       ::cellshard::sharded<MatrixT> *view,
@@ -729,6 +786,8 @@ __host__ __forceinline__ cudaError_t stage_part_async(sharded_device<MatrixT> *s
     return cudaSuccess;
 }
 
+// Shard staging is a serial loop over stage_part(). If the caller wants good
+// overlap, shard size and part count need to be chosen accordingly.
 template<typename MatrixT>
 __host__ __forceinline__ cudaError_t stage_shard(sharded_device<MatrixT> *state,
                                ::cellshard::sharded<MatrixT> *view,
@@ -751,6 +810,8 @@ __host__ __forceinline__ cudaError_t stage_shard(sharded_device<MatrixT> *state,
     return cudaSuccess;
 }
 
+// Async shard staging still performs synchronous packfile reads for any cold
+// parts before it queues H2D copies on the supplied stream.
 template<typename MatrixT>
 __host__ __forceinline__ cudaError_t stage_shard_async(sharded_device<MatrixT> *state,
                                                        ::cellshard::sharded<MatrixT> *view,
@@ -774,6 +835,8 @@ __host__ __forceinline__ cudaError_t stage_shard_async(sharded_device<MatrixT> *
     return cudaSuccess;
 }
 
+// swap_shard always stages the incoming shard before it releases the outgoing
+// shard. The peak device footprint therefore includes both shards transiently.
 template<typename MatrixT>
 __host__ __forceinline__ cudaError_t swap_shard(sharded_device<MatrixT> *state,
                               ::cellshard::sharded<MatrixT> *view,
@@ -795,6 +858,8 @@ __host__ __forceinline__ cudaError_t swap_shard(sharded_device<MatrixT> *state,
     return cudaSuccess;
 }
 
+// The async swap path preserves the same transient double-residency behavior as
+// the sync path. It is not an in-place exchange.
 template<typename MatrixT>
 __host__ __forceinline__ cudaError_t swap_shard_async(sharded_device<MatrixT> *state,
                                                       ::cellshard::sharded<MatrixT> *view,

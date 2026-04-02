@@ -7,6 +7,7 @@
 namespace cellshard {
 namespace convert {
 
+// Error printing stays direct and cheap.
 static inline int compressed_from_coo_cuda_check(cudaError_t err, const char *label) {
     if (err == cudaSuccess) return 1;
     std::fprintf(stderr, "CUDA error at %s: %s\n", label, cudaGetErrorString(err));
@@ -14,6 +15,7 @@ static inline int compressed_from_coo_cuda_check(cudaError_t err, const char *la
 }
 
 // Choose a 256-thread launch grid and clamp it to a sane range.
+// This keeps launch behavior predictable without another policy layer.
 static inline void setup_compressed_from_coo_launch(
     const unsigned int cDim,
     const unsigned int nnz,
@@ -30,7 +32,12 @@ static inline void setup_compressed_from_coo_launch(
 }
 
 // Raw host-side launcher over already-allocated device buffers.
-// No allocation, no copies, no ownership.
+// No allocation, no host/device copies, no ownership transfer.
+//
+// The caller owns:
+// - all device buffers
+// - scan scratch sizing
+// - stream lifetime
 static inline int build_compressed_from_coo_raw(
     const unsigned int cDim,
     const unsigned int nnz,
@@ -73,6 +80,7 @@ static inline int build_compressed_from_coo_raw(
     return 1;
 }
 
+// Alias kept for shorter call sites in other code.
 static inline int build_cs_from_coo_raw(
     const unsigned int cDim,
     const unsigned int nnz,

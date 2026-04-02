@@ -7,10 +7,12 @@ namespace cellshard {
 namespace ingest {
 namespace common {
 
+// One-column barcode table stored in packed-string form.
 struct barcode_table {
     text_column values;
 };
 
+// Metadata-only init / release.
 static inline void init(barcode_table *t) {
     init(&t->values);
 }
@@ -19,6 +21,7 @@ static inline void clear(barcode_table *t) {
     clear(&t->values);
 }
 
+// Cheap accessors over packed-string storage.
 static inline unsigned int count(const barcode_table *t) {
     return t->values.count;
 }
@@ -27,10 +30,12 @@ static inline const char *get(const barcode_table *t, unsigned int idx) {
     return common::get(&t->values, idx);
 }
 
+// Append one barcode by copying it into the packed byte blob.
 static inline int append(barcode_table *t, const char *barcode, std::size_t len) {
     return common::append(&t->values, barcode, len);
 }
 
+// Full synchronous line-by-line ingest of a barcode file.
 static inline int load_lines(const char *path, barcode_table *t) {
     scan::buffered_file_reader reader;
     int rc = 0;

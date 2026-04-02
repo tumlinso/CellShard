@@ -7,6 +7,7 @@ namespace cellshard {
 
 namespace {
 
+// Metadata-only block I/O helpers for the packfile header.
 inline int write_block(std::FILE *fp, const void *ptr, std::size_t elem_size, std::size_t count) {
     if (count == 0) return 1;
     return std::fwrite(ptr, elem_size, count, fp) == count;
@@ -17,11 +18,14 @@ inline int read_block(std::FILE *fp, void *ptr, std::size_t elem_size, std::size
     return std::fread(ptr, elem_size, count, fp) == count;
 }
 
+// Raw metadata loads allocate owned host arrays before the typed sharded view
+// adopts them.
 inline void *alloc_bytes(std::size_t bytes) {
     if (bytes == 0) return 0;
     return std::malloc(bytes);
 }
 
+// Cleanup helper for partially loaded sharded metadata.
 inline void free_sharded_header_result(sharded_header_load_result *out) {
     std::free(out->part_rows);
     std::free(out->part_nnz);

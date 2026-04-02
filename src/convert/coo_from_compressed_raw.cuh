@@ -7,12 +7,14 @@
 namespace cellshard {
 namespace convert {
 
+// Error printing stays direct and cheap.
 static inline int coo_from_compressed_cuda_check(cudaError_t err, const char *label) {
     if (err == cudaSuccess) return 1;
     std::fprintf(stderr, "CUDA error at %s: %s\n", label, cudaGetErrorString(err));
     return 0;
 }
 
+// Launch setup for the two compressed->COO kernels.
 static inline void setup_coo_from_compressed_launch(
     const unsigned int cDim,
     const unsigned int nnz,
@@ -30,6 +32,7 @@ static inline void setup_coo_from_compressed_launch(
 
 // Raw host-side launcher over already-allocated device buffers.
 // Input is CSR/CSC-style compressed sparse storage, output is COO.
+// No allocation, no host/device copies, no ownership transfer.
 static inline int build_coo_from_compressed_raw(
     const unsigned int cDim,
     const unsigned int nnz,
@@ -71,6 +74,7 @@ static inline int build_coo_from_compressed_raw(
     return cudaGetLastError() == cudaSuccess;
 }
 
+// Alias kept for shorter call sites.
 static inline int build_coo_from_cs_raw(
     const unsigned int cDim,
     const unsigned int nnz,

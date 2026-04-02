@@ -6,6 +6,8 @@ namespace cellshard {
 namespace ingest {
 namespace mtx {
 
+// Thin wrappers kept so ingest code can talk in MTX/COO terms while the real
+// storage implementation lives in sharded/disk.cuh.
 static inline int store_sharded_coo(const char *header_path,
                                     const sharded<sparse::coo> *view) {
     return store(header_path, view, 0);
@@ -17,6 +19,7 @@ static inline int store_part_window_coo(const char *packfile_path,
     return store(packfile_path, view, 0);
 }
 
+// Header-only metadata store for sharded COO outputs.
 static inline int store_coo_header(const char *header_path,
                                    unsigned long rows,
                                    unsigned long cols,

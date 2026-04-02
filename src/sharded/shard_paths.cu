@@ -42,6 +42,7 @@ int bind_packfile(shard_storage *s, const char *path) {
     s->packfile_path = 0;
     if (path == 0) return 1;
 
+    // Keep an owned path copy so runtime code does not depend on caller storage.
     len = std::strlen(path);
     copy = (char *) std::malloc(len + 1);
     if (copy == 0) return 0;

@@ -7,11 +7,14 @@
 namespace cellshard {
 namespace sparse {
 
+// CSR/CSC axis selector.
 enum {
     compressed_by_row = 0,
     compressed_by_col = 1
 };
 
+// CSR/CSC-style sparse layout.
+// axis decides whether majorPtr walks rows or columns.
 struct alignas(16) compressed {
     types::dim_t rows;
     types::dim_t cols;
@@ -23,6 +26,8 @@ struct alignas(16) compressed {
     real::storage_t *val;
 };
 
+// Axis-dependent dimensions are kept explicit so callers can reason about exact
+// memory traffic and indexing.
 __host__ __device__ __forceinline__ types::dim_t major_dim(const compressed * __restrict__ m) {
     return m->axis == compressed_by_col ? m->cols : m->rows;
 }
@@ -31,6 +36,7 @@ __host__ __device__ __forceinline__ types::dim_t minor_dim(const compressed * __
     return m->axis == compressed_by_col ? m->rows : m->cols;
 }
 
+// Metadata-only init.
 __host__ __device__ __forceinline__ void init(
     compressed * __restrict__ m,
     types::dim_t rows = 0,
@@ -47,6 +53,7 @@ __host__ __device__ __forceinline__ void init(
     m->val = 0;
 }
 
+// Total resident host bytes for one materialized compressed part.
 __host__ __device__ __forceinline__ std::size_t bytes(const compressed * __restrict__ m) {
     return sizeof(*m)
         + (std::size_t) (major_dim(m) + 1) * sizeof(types::ptr_t)
@@ -54,6 +61,8 @@ __host__ __device__ __forceinline__ std::size_t bytes(const compressed * __restr
         + (std::size_t) m->nnz * sizeof(real::storage_t);
 }
 
+// Convenience random access by scanning one major segment. This is not meant to
+// be a hot-path sparse lookup primitive.
 __host__ __device__ __forceinline__ const real::storage_t *at(const compressed * __restrict__ m, types::dim_t r, types::idx_t c) {
     const types::dim_t major = m->axis == compressed_by_col ? c : r;
     const types::idx_t minor = m->axis == compressed_by_col ? r : c;
@@ -76,6 +85,7 @@ __host__ __device__ __forceinline__ real::storage_t *at(compressed * __restrict_
     return 0;
 }
 
+// Release all three host arrays and reset metadata.
 __host__ __forceinline__ void clear(compressed * __restrict__ m) {
     std::free(m->majorPtr);
     std::free(m->minorIdx);
@@ -89,6 +99,8 @@ __host__ __forceinline__ void clear(compressed * __restrict__ m) {
     m->axis = compressed_by_row;
 }
 
+// allocate() tears down prior storage and rebuilds all arrays from current
+// rows/cols/nnz/axis metadata.
 __host__ __forceinline__ int allocate(compressed * __restrict__ m) {
     const std::size_t ptr_count = (std::size_t) major_dim(m) + 1;
 

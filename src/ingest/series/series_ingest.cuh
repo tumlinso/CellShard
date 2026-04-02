@@ -13,18 +13,22 @@ namespace cellshard {
 namespace ingest {
 namespace series {
 
+// Conversion knobs for MTX-series ingest.
 struct mtx_convert_options {
     unsigned long max_part_nnz;
     unsigned long max_window_bytes;
     std::size_t reader_bytes;
 };
 
+// Metadata-only init with throughput-oriented defaults.
 static inline void init(mtx_convert_options *opts) {
     opts->max_part_nnz = 1ul << 26ul;
     opts->max_window_bytes = 1ul << 30ul;
     opts->reader_bytes = (std::size_t) 8u << 20u;
 }
 
+// Build trivial auxiliary metadata and shard boundaries for freshly generated
+// COO parts.
 static inline int build_default_part_aux(unsigned long num_parts, unsigned long **part_aux_out) {
     unsigned long *part_aux = 0;
 
@@ -50,6 +54,7 @@ static inline int build_identity_shards(unsigned long num_parts,
     return 1;
 }
 
+// Allocate one in-memory part window plus one write pointer per local part.
 static inline int prepare_part_window(const mtx::header *h,
                                       const unsigned long *row_offsets,
                                       const unsigned long *part_nnz,
@@ -74,6 +79,7 @@ static inline int prepare_part_window(const mtx::header *h,
     return 1;
 }
 
+// Flush one in-memory window to disk after validating all local write counts.
 static inline int flush_part_window(const char *part_prefix,
                                     unsigned long global_part_begin,
                                     sharded<sparse::coo> *window_view,
@@ -86,6 +92,12 @@ static inline int flush_part_window(const char *part_prefix,
     return mtx::store_part_window_coo(part_prefix, global_part_begin, window_view);
 }
 
+// Fast path for general, row-sorted MTX:
+// - stream once through the source
+// - fill only one part window at a time
+// - flush each completed window to disk
+//
+// This avoids materializing the whole source as one giant COO object.
 static inline int stream_sorted_general_mtx_to_sharded_coo(const char *mtx_path,
                                                            const char *part_prefix,
                                                            const mtx::header *h,
@@ -196,6 +208,8 @@ done:
     return ok;
 }
 
+// End-to-end single-dataset MTX -> sharded COO conversion.
+// This is a host-heavy multi-pass ingest path by design because MTX is text.
 static inline int convert_single_mtx_to_sharded_coo(const char *mtx_path,
                                                     const char *header_path,
                                                     const char *part_prefix,
@@ -286,6 +300,7 @@ done:
     return ok;
 }
 
+// Small manifest access helpers.
 static inline const char *dataset_id_at(const manifest *m, unsigned int idx) {
     return common::get(&m->dataset_ids, idx);
 }
@@ -298,6 +313,7 @@ static inline unsigned int format_at(const manifest *m, unsigned int idx) {
     return idx < m->count ? m->formats[idx] : source_unknown;
 }
 
+// Build output file names for one dataset.
 static inline int build_output_paths(const char *out_dir,
                                      const char *dataset_id,
                                      char *header_path,
@@ -309,6 +325,7 @@ static inline int build_output_paths(const char *out_dir,
     return 1;
 }
 
+// Convert every manifest row that points at an MTX-like source.
 static inline int convert_manifest_mtx_series(const manifest *m,
                                               const char *out_dir,
                                               const mtx_convert_options *opts) {

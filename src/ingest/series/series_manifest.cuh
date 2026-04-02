@@ -11,6 +11,7 @@ namespace cellshard {
 namespace ingest {
 namespace series {
 
+// Dataset source kinds understood by the manifest.
 enum {
     source_unknown   = 0,
     source_mtx       = 1,
@@ -21,6 +22,8 @@ enum {
     source_binary    = 6
 };
 
+// Host-side manifest for a dataset series.
+// Paths are stored in packed text columns; numeric metadata sits in flat arrays.
 struct manifest {
     unsigned int count;
     unsigned int capacity;
@@ -37,6 +40,7 @@ struct manifest {
     unsigned long *nnz;
 };
 
+// Metadata-only init / release.
 static inline void init(manifest *m) {
     m->count = 0;
     m->capacity = 0;
@@ -64,6 +68,7 @@ static inline void clear(manifest *m) {
     init(m);
 }
 
+// Grow numeric metadata arrays and copy existing contents.
 static inline int reserve(manifest *m, unsigned int capacity) {
     unsigned int *next_formats = 0;
     unsigned long *next_rows = 0;
@@ -100,6 +105,7 @@ static inline int reserve(manifest *m, unsigned int capacity) {
     return 1;
 }
 
+// Small parsers for manifest text fields.
 static inline int parse_u64_field(const char *s, unsigned long *out) {
     char *end = 0;
     unsigned long long v = 0;
@@ -126,6 +132,8 @@ static inline unsigned int parse_format(const char *s) {
     return source_unknown;
 }
 
+// Append one manifest row by copying all path/id strings and storing numeric
+// metadata beside them.
 static inline int append(manifest *m,
                          const char *dataset_id,
                          const char *matrix_path,
@@ -156,6 +164,7 @@ static inline int append(manifest *m,
     return 1;
 }
 
+// Header lookup helper for TSV manifests.
 static inline int header_index(char **fields, unsigned int count, const char *name) {
     unsigned int i = 0;
     for (i = 0; i < count; ++i) {
@@ -164,6 +173,7 @@ static inline int header_index(char **fields, unsigned int count, const char *na
     return -1;
 }
 
+// Full synchronous TSV manifest ingest into host-owned columns and arrays.
 static inline int load_tsv(const char *path, manifest *m, int has_header = 1) {
     scan::buffered_file_reader reader;
     int rc = 0;

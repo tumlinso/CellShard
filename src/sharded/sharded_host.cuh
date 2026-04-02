@@ -41,6 +41,9 @@ __host__ __forceinline__ int reserve_parts(sharded<MatrixT> * __restrict__ m, un
     unsigned long *newAux = 0;
 
     if (capacity <= m->part_capacity) return 1;
+    // Growth here is host-side metadata churn only. The existing MatrixT*
+    // payloads are not cloned, but the metadata arrays are reallocated and
+    // memcpy'd into fresh storage.
     newParts = (MatrixT **) std::calloc((std::size_t) capacity, sizeof(MatrixT *));
     newOffsets = (unsigned long *) std::calloc((std::size_t) (capacity + 1), sizeof(unsigned long));
     newRows = (unsigned long *) std::calloc((std::size_t) capacity, sizeof(unsigned long));
@@ -81,6 +84,7 @@ __host__ __forceinline__ int reserve_shards(sharded<MatrixT> * __restrict__ m, u
     unsigned long *newOffsets = 0;
 
     if (capacity <= m->shard_capacity) return 1;
+    // Shard growth reallocates only the row-offset table.
     newOffsets = (unsigned long *) std::calloc((std::size_t) (capacity + 1), sizeof(unsigned long));
     if (newOffsets == 0) return 0;
     if (m->shard_offsets != 0 && m->num_shards != 0) {
@@ -146,6 +150,8 @@ __host__ __forceinline__ int append_part(sharded<MatrixT> * __restrict__ m, Matr
     unsigned long next = 0;
 
     if (m->num_parts == m->part_capacity) {
+        // Capacity growth copies metadata arrays. The part payload pointer is
+        // inserted directly; append_part does not clone MatrixT payload.
         next = m->part_capacity == 0 ? 4 : m->part_capacity << 1;
         if (!reserve_parts(m, next)) return 0;
     }
@@ -164,6 +170,8 @@ __host__ __forceinline__ int concatenate(sharded<MatrixT> * __restrict__ dst, sh
     unsigned long i = 0;
 
     if (src->num_parts == 0) return 1;
+    // This is metadata/pointer movement, not deep copy. Ownership of src->parts
+    // transfers into dst one pointer at a time.
     if (!reserve_parts(dst, dst->num_parts + src->num_parts)) return 0;
     for (i = 0; i < src->num_parts; ++i) {
         dst->parts[dst->num_parts + i] = src->parts[i];
@@ -360,6 +368,10 @@ __host__ __forceinline__ int fetch_part(sharded<MatrixT> *m, const shard_storage
     if (m->parts[partId] != 0) destroy(m->parts[partId]);
     m->parts[partId] = 0;
 
+    // fetch_part is a real materialization step:
+    // - open the packfile
+    // - seek to the stored extent
+    // - read and decode one full MatrixT payload into fresh host allocations
     part = new MatrixT;
     init(part);
     fp = std::fopen(s->packfile_path, "rb");
@@ -407,6 +419,8 @@ __host__ __forceinline__ int fetch_shard(sharded<MatrixT> *m, const shard_storag
     unsigned long i = 0;
 
     if (shardId >= m->num_shards) return 0;
+    // This is a loop over fetch_part(). A "shard fetch" currently means one
+    // packfile seek/load per part in the shard, not one monolithic bulk read.
     begin = first_part_in_shard(m, shardId);
     end = last_part_in_shard(m, shardId);
     for (i = begin; i < end; ++i) {
@@ -418,6 +432,8 @@ __host__ __forceinline__ int fetch_shard(sharded<MatrixT> *m, const shard_storag
 template<typename MatrixT>
 __host__ __forceinline__ int drop_part(sharded<MatrixT> *m, unsigned long partId) {
     if (partId >= m->num_parts) return 0;
+    // Drop only releases the host materialization for this part. Packfile bytes
+    // remain on disk, and any device residency is managed separately.
     destroy(m->parts[partId]);
     m->parts[partId] = 0;
     return 1;

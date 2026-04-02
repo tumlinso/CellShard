@@ -8,6 +8,7 @@ namespace cellshard {
 namespace ingest {
 namespace series {
 
+// One shard/window description over a contiguous part range.
 struct shard_range {
     unsigned long part_begin;
     unsigned long part_end;
@@ -17,12 +18,14 @@ struct shard_range {
     unsigned long bytes;
 };
 
+// Dynamic array of shard/window ranges.
 struct partition {
     unsigned long count;
     unsigned long capacity;
     shard_range *ranges;
 };
 
+// Metadata-only init / release.
 static inline void init(partition *p) {
     p->count = 0;
     p->capacity = 0;
@@ -34,6 +37,7 @@ static inline void clear(partition *p) {
     init(p);
 }
 
+// Grow the range table and copy existing ranges.
 static inline int reserve(partition *p, unsigned long capacity) {
     shard_range *next = 0;
 
@@ -47,6 +51,7 @@ static inline int reserve(partition *p, unsigned long capacity) {
     return 1;
 }
 
+// Append one contiguous range.
 static inline int append(partition *p,
                          unsigned long part_begin,
                          unsigned long part_end,
@@ -67,6 +72,7 @@ static inline int append(partition *p,
     return 1;
 }
 
+// Partition parts by nnz and/or byte limits.
 static inline int build_by_limit(partition *p,
                                  const unsigned long *part_rows,
                                  const unsigned long *part_nnz,

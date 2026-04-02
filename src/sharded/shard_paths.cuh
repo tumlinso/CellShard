@@ -10,6 +10,8 @@ struct shard_locator {
     std::uint64_t bytes;
 };
 
+// shard_storage owns a heap copy of the packfile path and one locator per part.
+// It does not own any open file handles or host/device matrix payload.
 struct shard_storage {
     unsigned int capacity;
     char *packfile_path;

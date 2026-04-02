@@ -13,6 +13,14 @@ namespace cellshard {
 namespace ingest {
 namespace scan {
 
+// Buffered sequential file reader for text ingest.
+//
+// The design is intentionally simple:
+// - one file descriptor
+// - one reusable read buffer
+// - one scratch buffer for lines that span refill boundaries
+//
+// This is a host-side ingest utility and therefore copy-heavy by nature.
 struct buffered_file_reader {
     int fd;
     char *buf;
@@ -29,6 +37,7 @@ struct buffered_file_reader {
     unsigned long long line_number;
 };
 
+// Metadata-only init.
 static inline void init(buffered_file_reader *r) {
     r->fd = -1;
     r->buf = 0;
@@ -43,6 +52,7 @@ static inline void init(buffered_file_reader *r) {
     r->line_number = 0;
 }
 
+// Close the fd and release both heap buffers.
 static inline void clear(buffered_file_reader *r) {
     if (r->fd >= 0) ::close(r->fd);
     std::free(r->buf);
@@ -50,6 +60,7 @@ static inline void clear(buffered_file_reader *r) {
     init(r);
 }
 
+// Grow the read buffer. This copies any unread bytes to the new allocation.
 static inline int reserve_buffer(buffered_file_reader *r, std::size_t cap) {
     char *next = 0;
 
@@ -70,6 +81,8 @@ static inline int reserve_buffer(buffered_file_reader *r, std::size_t cap) {
     return 1;
 }
 
+// Grow the scratch buffer used for cross-chunk lines. This copies any existing
+// partial line bytes.
 static inline int reserve_scratch(buffered_file_reader *r, std::size_t cap) {
     char *next = 0;
 
@@ -83,6 +96,7 @@ static inline int reserve_scratch(buffered_file_reader *r, std::size_t cap) {
     return 1;
 }
 
+// Open one source file for sequential buffered scanning.
 static inline int open(buffered_file_reader *r, const char *path, std::size_t cap = (std::size_t) 8u << 20u) {
     clear(r);
     if (!reserve_buffer(r, cap)) return 0;
@@ -97,6 +111,8 @@ static inline int open(buffered_file_reader *r, const char *path, std::size_t ca
     return 1;
 }
 
+// Refill the read buffer from the file descriptor. This is the actual read()
+// path for text ingest.
 static inline int refill(buffered_file_reader *r) {
     ssize_t got = 0;
 
@@ -124,6 +140,8 @@ static inline int refill(buffered_file_reader *r) {
     return 1;
 }
 
+// Return the next line as a mutable zero-terminated buffer.
+// If a line crosses chunk boundaries it is copied through scratch.
 static inline int next_line(buffered_file_reader *r, char **out, std::size_t *len) {
     std::size_t i = 0;
     std::size_t chunk = 0;
@@ -197,6 +215,7 @@ static inline int next_line(buffered_file_reader *r, char **out, std::size_t *le
     }
 }
 
+// Skip blank and comment lines without allocating new strings.
 static inline int skip_empty_and_comment_lines(buffered_file_reader *r, char **out, std::size_t *len, char comment) {
     int rc = 0;
     char *line = 0;
@@ -213,6 +232,7 @@ static inline int skip_empty_and_comment_lines(buffered_file_reader *r, char **o
     }
 }
 
+// In-place tab splitter.
 static inline unsigned int split_tabs(char *line, char **fields, unsigned int max_fields) {
     unsigned int count = 0;
     char *p = line;
@@ -227,6 +247,7 @@ static inline unsigned int split_tabs(char *line, char **fields, unsigned int ma
     }
 }
 
+// In-place whitespace splitter.
 static inline unsigned int split_ws(char *line, char **fields, unsigned int max_fields) {
     unsigned int count = 0;
     char *p = line;

@@ -7,12 +7,14 @@ namespace cellshard {
 namespace ingest {
 namespace common {
 
+// Feature metadata columns loaded from a TSV-like source.
 struct feature_table {
     text_column ids;
     text_column names;
     text_column types;
 };
 
+// Metadata-only init / release.
 static inline void init(feature_table *t) {
     init(&t->ids);
     init(&t->names);
@@ -25,6 +27,7 @@ static inline void clear(feature_table *t) {
     clear(&t->types);
 }
 
+// Cheap column accessors over packed string storage.
 static inline unsigned int count(const feature_table *t) {
     return t->ids.count;
 }
@@ -41,6 +44,7 @@ static inline const char *type(const feature_table *t, unsigned int idx) {
     return common::get(&t->types, idx);
 }
 
+// Append one feature row by copying three strings.
 static inline int append(feature_table *t,
                          const char *id_ptr,
                          std::size_t id_len,
@@ -54,6 +58,7 @@ static inline int append(feature_table *t,
     return 1;
 }
 
+// Full synchronous feature TSV ingest into host-owned columns.
 static inline int load_tsv(const char *path, feature_table *t, int skip_header = 0) {
     scan::buffered_file_reader reader;
     int rc = 0;

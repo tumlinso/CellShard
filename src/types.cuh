@@ -11,6 +11,9 @@
 namespace cellshard {
 namespace types {
 
+// Integer type policy for metadata and indices.
+// Local physical parts stay 32-bit by default. Global stitched coordinates and
+// shard offsets stay unsigned long because they span many parts/files.
 enum {
     value_u32 = 1,
     value_i32 = 2
@@ -47,6 +50,8 @@ using compute_value_t = real::compute_t;
 using accum_value_t = real::accum_t;
 using count_value_t = u32;
 
+// Bridge integer codes into the same code/type machinery used for real-valued
+// storage in real.cuh.
 template<typename T>
 struct value_code : real::code_of<T> {};
 

@@ -8,6 +8,11 @@ namespace cellshard {
 namespace ingest {
 namespace common {
 
+// Packed string column:
+// - offsets[] points into one contiguous byte blob
+// - data[] stores zero-terminated strings back to back
+//
+// Appends can trigger host realloc+copy for offsets or data.
 struct text_column {
     unsigned int count;
     unsigned int capacity;
@@ -17,6 +22,7 @@ struct text_column {
     char *data;
 };
 
+// Metadata-only init.
 static inline void init(text_column *c) {
     c->count = 0;
     c->capacity = 0;
@@ -26,12 +32,14 @@ static inline void init(text_column *c) {
     c->data = 0;
 }
 
+// Release both host arrays.
 static inline void clear(text_column *c) {
     std::free(c->offsets);
     std::free(c->data);
     init(c);
 }
 
+// Grow the offsets table and copy existing offsets.
 static inline int reserve_entries(text_column *c, unsigned int capacity) {
     unsigned int *next = 0;
 
@@ -49,6 +57,7 @@ static inline int reserve_entries(text_column *c, unsigned int capacity) {
     return 1;
 }
 
+// Grow the string-data blob and copy existing bytes.
 static inline int reserve_bytes(text_column *c, unsigned int bytes) {
     char *next = 0;
 
@@ -62,6 +71,7 @@ static inline int reserve_bytes(text_column *c, unsigned int bytes) {
     return 1;
 }
 
+// Append one string by copying it into the packed byte blob.
 static inline int append(text_column *c, const char *src, std::size_t len) {
     unsigned int next_count = 0;
     unsigned int next_bytes = 0;
@@ -94,6 +104,7 @@ static inline int append(text_column *c, const char *src, std::size_t len) {
     return 1;
 }
 
+// Random access through the offsets table.
 static inline const char *get(const text_column *c, unsigned int idx) {
     if (idx >= c->count) return 0;
     return c->data + c->offsets[idx];

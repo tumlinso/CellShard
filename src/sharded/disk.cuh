@@ -17,11 +17,13 @@
 
 namespace cellshard {
 
+// Map a sharded matrix type to its per-part disk tag.
 template<typename MatrixT>
 inline int check_sharded_disk_format(unsigned char actual) {
     return check_disk_format((unsigned char) disk_format_code<MatrixT>::value, actual, disk_format_code<MatrixT>::name());
 }
 
+// Temporary owned result for a packfile metadata load.
 struct sharded_header_load_result {
     disk_header h;
     std::uint64_t num_parts;
@@ -36,6 +38,7 @@ struct sharded_header_load_result {
     std::uint64_t *part_bytes;
 };
 
+// Raw metadata-only header store/load. These do not move part payload bytes.
 int store_sharded_header_raw(const char *filename,
                              unsigned char format,
                              std::uint64_t rows,
@@ -54,6 +57,7 @@ int store_sharded_header_raw(const char *filename,
 
 int load_sharded_header_raw(const char *filename, sharded_header_load_result *out);
 
+// Metadata block I/O wrappers.
 inline int write_sharded_block(std::FILE *fp, const void *ptr, std::size_t elem_size, std::size_t count) {
     if (count == 0) return 1;
     return std::fwrite(ptr, elem_size, count, fp) == count;
@@ -64,6 +68,7 @@ inline int read_sharded_block(std::FILE *fp, void *ptr, std::size_t elem_size, s
     return std::fread(ptr, elem_size, count, fp) == count;
 }
 
+// Host-sized unsigned long metadata is normalized to fixed u64 on disk.
 inline int sharded_to_u64(unsigned long value, std::uint64_t *out, const char *label, const char *filename) {
     *out = (std::uint64_t) value;
     if ((unsigned long) *out != value) {
@@ -104,6 +109,8 @@ inline int load_sharded_index_array(std::FILE *fp, unsigned long *dst, std::size
     return 1;
 }
 
+// Header-only store path. This allocates temporary u64 metadata arrays and
+// writes only the sharded metadata block.
 template<typename MatrixT>
 inline int store_header(const char *filename, const sharded<MatrixT> *m) {
     std::uint64_t *part_rows = 0;
@@ -162,6 +169,8 @@ done:
     return ok;
 }
 
+// Header-only load path. This allocates host metadata tables and optionally
+// binds packfile locators, but does not fetch any part payload.
 template<typename MatrixT>
 inline int load_header(const char *filename, sharded<MatrixT> *m, shard_storage *s) {
     sharded_header_load_result tmp;
@@ -245,6 +254,11 @@ inline int load_header(const char *filename, sharded<MatrixT> *m) {
     return load_header(filename, m, 0);
 }
 
+// Full sharded store path:
+// - requires every part to be materialized on host
+// - computes aligned payload offsets
+// - writes one header block
+// - seeks and stores each part payload into the same packfile
 template<typename MatrixT>
 inline int store(const char *filename, const sharded<MatrixT> *m, shard_storage *s) {
     static const unsigned char magic[8] = { 'C', 'S', 'P', 'A', 'C', 'K', '0', '1' };

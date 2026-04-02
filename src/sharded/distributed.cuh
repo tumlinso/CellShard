@@ -25,6 +25,14 @@
 namespace cellshard {
 namespace distributed {
 
+// local_context is intentionally minimal:
+// - one visible device id per local GPU
+// - one optional stream per device
+// - a dense peer-access capability table
+// - optional NCCL communicators
+//
+// This is not a scheduler and not a hidden runtime. It only holds enough state
+// to make explicit multi-GPU shard placement cheap for the caller.
 struct local_context {
     unsigned int device_count;
     int *device_ids;
@@ -88,6 +96,8 @@ inline cudaError_t discover_local(local_context *ctx, int create_streams, unsign
     cudaError_t err = cudaSuccess;
 
     clear(ctx);
+    // Enumerate only CUDA-visible devices. The caller controls visibility with
+    // CUDA_VISIBLE_DEVICES or equivalent before process launch.
     err = cudaGetDeviceCount(&count);
     if (err != cudaSuccess) return err;
     if (count <= 0) return cudaSuccess;
@@ -117,6 +127,7 @@ inline cudaError_t discover_local(local_context *ctx, int create_streams, unsign
     for (i = 0; i < ctx->device_count; ++i) {
         ctx->device_ids[i] = (int) i;
         if (ctx->streams != 0) {
+            // One stream per device keeps staging explicit and graph-friendly.
             err = cudaSetDevice(ctx->device_ids[i]);
             if (err != cudaSuccess) {
                 clear(ctx);
@@ -168,6 +179,8 @@ inline cudaError_t enable_peer_access(local_context *ctx) {
         for (j = 0; j < ctx->device_count; ++j) {
             if (i == j) continue;
             if (!peer_access_supported(ctx, i, j)) continue;
+            // Peer access only enables direct addressability. It does not move
+            // any bytes by itself.
             err = cudaDeviceEnablePeerAccess(ctx->device_ids[j], 0);
             if (err == cudaErrorPeerAccessAlreadyEnabled) {
                 cudaGetLastError();
@@ -246,6 +259,8 @@ inline int assign_shards_by_bytes(shard_map *map,
     for (i = 0; i < view->num_shards; ++i) {
         unsigned int best = 0;
         unsigned int d = 1;
+        // Balance by eventual resident device footprint, not source bytes on
+        // disk. This is the metric that matters once shards are uploaded.
         const std::size_t shard_bytes = ::cellshard::device::device_shard_bytes(view, i);
         for (d = 1; d < ctx->device_count; ++d) {
             if (map->device_bytes[d] < map->device_bytes[best]) best = d;
@@ -311,6 +326,10 @@ inline cudaError_t stage_shard_on_owner(device_fleet<MatrixT> *fleet,
     if (fleet == 0 || ctx == 0 || view == 0) return cudaErrorInvalidValue;
     if (slot < 0 || (unsigned int) slot >= fleet->count || (unsigned int) slot >= ctx->device_count) return cudaErrorInvalidValue;
     if (ctx->streams != 0) stream = ctx->streams[slot];
+    // This calls directly into stage_shard_async(), so it may trigger:
+    // - synchronous packfile fetch on host for cold parts
+    // - device allocation
+    // - H2D copy on the owner's stream
     return ::cellshard::device::stage_shard_async(fleet->states + slot,
                                                   view,
                                                   storage,
@@ -331,6 +350,8 @@ inline cudaError_t stage_all_shards_on_owners(device_fleet<MatrixT> *fleet,
     cudaError_t err = cudaSuccess;
 
     if (view == 0) return cudaErrorInvalidValue;
+    // This is currently a host loop over shards. It is explicit by design so
+    // the caller can replace it with a more specialized schedule later.
     for (i = 0; i < view->num_shards; ++i) {
         err = stage_shard_on_owner(fleet, ctx, map, view, storage, i, drop_host_after_upload);
         if (err != cudaSuccess) return err;

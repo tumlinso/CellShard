@@ -7,6 +7,12 @@ namespace cellshard {
 namespace ingest {
 namespace common {
 
+// Host-side TSV metadata table:
+// - column names stored in one packed string column
+// - all field values stored in one packed string column
+// - row_offsets maps rows to the flat field-value array
+//
+// This is intentionally ingest-oriented and copy-heavy.
 struct metadata_table {
     unsigned int num_rows;
     unsigned int num_cols;
@@ -16,6 +22,7 @@ struct metadata_table {
     text_column field_values;
 };
 
+// Metadata-only init.
 static inline void init(metadata_table *t) {
     t->num_rows = 0;
     t->num_cols = 0;
@@ -25,6 +32,7 @@ static inline void init(metadata_table *t) {
     init(&t->field_values);
 }
 
+// Release all host-side metadata storage.
 static inline void clear(metadata_table *t) {
     std::free(t->row_offsets);
     t->row_offsets = 0;
@@ -35,6 +43,7 @@ static inline void clear(metadata_table *t) {
     t->num_cols = 0;
 }
 
+// Grow the row-offset table and copy existing offsets.
 static inline int reserve_rows(metadata_table *t, unsigned int capacity) {
     unsigned int *next = 0;
 
@@ -52,6 +61,7 @@ static inline int reserve_rows(metadata_table *t, unsigned int capacity) {
     return 1;
 }
 
+// Replace the current header with a fresh set of column names.
 static inline int append_header(metadata_table *t, char **fields, unsigned int count) {
     unsigned int i = 0;
 
@@ -64,6 +74,7 @@ static inline int append_header(metadata_table *t, char **fields, unsigned int c
     return 1;
 }
 
+// Append one row by copying every field string into field_values.
 static inline int append_row(metadata_table *t, char **fields, unsigned int count) {
     unsigned int i = 0;
 
@@ -80,6 +91,7 @@ static inline int append_row(metadata_table *t, char **fields, unsigned int coun
     return 1;
 }
 
+// Column-name and field lookup helpers.
 static inline const char *column_name(const metadata_table *t, unsigned int col) {
     return common::get(&t->column_names, col);
 }
@@ -92,6 +104,7 @@ static inline const char *field(const metadata_table *t, unsigned int row, unsig
     return common::get(&t->field_values, field_idx);
 }
 
+// Full synchronous TSV ingest into host-owned packed string columns.
 static inline int load_tsv(const char *path, metadata_table *t, int has_header = 1) {
     scan::buffered_file_reader reader;
     int rc = 0;

@@ -7,10 +7,14 @@ namespace cellshard {
 
 namespace {
 
+// Packed part layout is:
+// fixed header
+// followed by raw arrays in format-specific order.
 inline std::size_t header_bytes() {
     return sizeof(unsigned char) + sizeof(types::dim_t) + sizeof(types::dim_t) + sizeof(types::nnz_t);
 }
 
+// Thin fwrite/fread wrappers keep the raw I/O path explicit.
 inline int write_block(std::FILE *fp, const void *ptr, std::size_t elem_size, std::size_t count) {
     if (count == 0) return 1;
     return std::fwrite(ptr, elem_size, count, fp) == count;
@@ -37,11 +41,13 @@ inline int read_header(std::FILE *fp, disk_header *out) {
     return 1;
 }
 
+// Raw load paths allocate host buffers eagerly and then fill them from disk.
 inline void *alloc_bytes(std::size_t bytes) {
     if (bytes == 0) return 0;
     return std::malloc(bytes);
 }
 
+// Cleanup helpers for partially built load results.
 inline void free_compressed_result(compressed_load_result *out) {
     std::free(out->majorPtr);
     std::free(out->minorIdx);
@@ -97,6 +103,7 @@ std::size_t packed_dia_bytes(types::nnz_t nnz, types::idx_t num_diagonals, std::
         + (std::size_t) nnz * value_size;
 }
 
+// Standalone filename helpers are full synchronous host I/O operations.
 int store_dense_raw(const char *filename, types::dim_t rows, types::dim_t cols, types::nnz_t nnz, const void *val, std::size_t value_size) {
     std::FILE *fp = 0;
     int ok = 0;
@@ -110,6 +117,7 @@ done:
     return ok;
 }
 
+// FILE* store writes one packed dense payload at the current file position.
 int store_dense_raw(std::FILE *fp, types::dim_t rows, types::dim_t cols, types::nnz_t nnz, const void *val, std::size_t value_size) {
     if (!write_header(fp, disk_format_dense, rows, cols, nnz)) return 0;
     if (!write_block(fp, val, value_size, nnz)) return 0;
@@ -130,6 +138,7 @@ done:
     return ok;
 }
 
+// FILE* load reads one packed dense payload into a fresh host allocation.
 int load_dense_raw(std::FILE *fp, std::size_t value_size, dense_load_result *out) {
     int ok = 0;
 
@@ -162,6 +171,7 @@ done:
     return ok;
 }
 
+// Compressed layout persists value payload first, then majorPtr, then minorIdx.
 int store_compressed_raw(std::FILE *fp, types::dim_t rows, types::dim_t cols, types::nnz_t nnz, types::u32 axis, types::dim_t major_dim, const types::ptr_t *majorPtr, const types::idx_t *minorIdx, const void *val, std::size_t value_size) {
     if (!write_header(fp, disk_format_compressed, rows, cols, nnz)) return 0;
     if (!write_block(fp, &axis, sizeof(axis), 1)) return 0;
@@ -228,6 +238,7 @@ done:
     return ok;
 }
 
+// COO layout persists values, then row indices, then column indices.
 int store_coo_raw(std::FILE *fp, types::dim_t rows, types::dim_t cols, types::nnz_t nnz, const types::idx_t *rowIdx, const types::idx_t *colIdx, const void *val, std::size_t value_size) {
     if (!write_header(fp, disk_format_coo, rows, cols, nnz)) return 0;
     if (!write_block(fp, val, value_size, nnz)) return 0;
@@ -287,6 +298,7 @@ done:
     return ok;
 }
 
+// DIA layout writes offsets before the diagonal-value payload.
 int store_dia_raw(std::FILE *fp, types::dim_t rows, types::dim_t cols, types::nnz_t nnz, types::idx_t num_diagonals, const int *offsets, const void *val, std::size_t value_size) {
     if (!write_header(fp, disk_format_dia, rows, cols, nnz)) return 0;
     if (!write_block(fp, &num_diagonals, sizeof(types::idx_t), 1)) return 0;

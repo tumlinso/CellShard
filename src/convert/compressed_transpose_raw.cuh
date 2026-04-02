@@ -5,6 +5,11 @@
 namespace cellshard {
 namespace convert {
 
+// Raw compressed-transpose launcher over already-allocated device buffers.
+// This is device-resident only:
+// - no host staging
+// - no host/device copies
+// - caller owns scan scratch and output buffers
 static inline int build_compressed_transpose_raw(
     const types::dim_t cDim,
     const types::dim_t uDim,
@@ -70,6 +75,7 @@ static inline int build_compressed_transpose_raw(
     return 1;
 }
 
+// Alias kept for shorter call sites.
 static inline int build_transpose_cs_from_cs_raw(
     const types::dim_t cDim,
     const types::dim_t uDim,
@@ -102,6 +108,7 @@ static inline int build_transpose_cs_from_cs_raw(
     );
 }
 
+// Entrywise COO transpose for already-device-resident COO buffers.
 static inline int transpose_coo_entries_raw(
     const types::nnz_t nnz,
     const types::idx_t *d_src_rowIdx,

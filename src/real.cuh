@@ -37,6 +37,11 @@
 #endif
 #endif
 
+// Scalar policy for the library.
+//
+// storage_t is the value type persisted on host, moved over I/O paths, and
+// staged to device by default. compute_t and accum_t are the promotion targets
+// for arithmetic and reductions.
 namespace real {
 
 enum {
@@ -51,6 +56,7 @@ enum {
 static constexpr int has_bf16_types = CELLSHARD_ENABLE_BF16_TYPES;
 static constexpr int has_fp8_types = CELLSHARD_ENABLE_FP8_TYPES;
 
+// Default scalar choices for the current codebase.
 using storage_t = __half;
 using compute_t = float;
 using accum_t = float;

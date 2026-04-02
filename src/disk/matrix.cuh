@@ -13,6 +13,7 @@
 
 namespace cellshard {
 
+// Per-part binary format tags used inside the native disk payload.
 enum {
     disk_format_none       = 0,
     disk_format_dense      = 1,
@@ -22,6 +23,7 @@ enum {
     disk_format_ell        = 5
 };
 
+// Minimal fixed header stored at the front of every packed part.
 struct disk_header {
     unsigned char format;
     types::dim_t rows;
@@ -29,6 +31,7 @@ struct disk_header {
     types::nnz_t nnz;
 };
 
+// Fail loudly on disk-format mismatches instead of silently decoding garbage.
 inline int check_disk_format(unsigned char expected, unsigned char actual, const char *name) {
     if (expected == actual) return 1;
     std::fprintf(stderr,
@@ -39,6 +42,7 @@ inline int check_disk_format(unsigned char expected, unsigned char actual, const
     return 0;
 }
 
+// Compile-time map from in-memory matrix type to disk format code.
 template<typename MatrixT>
 struct disk_format_code;
 
@@ -66,6 +70,8 @@ struct disk_format_code<sparse::dia> {
     static inline const char *name() { return "dia matrix"; }
 };
 
+// Temporary raw load results own host allocations until a typed matrix adopts
+// them.
 struct dense_load_result {
     disk_header h;
     void *val;
@@ -93,6 +99,7 @@ struct dia_load_result {
     void *val;
 };
 
+// Disk-byte estimators for one packed part payload.
 std::size_t packed_dense_bytes(types::nnz_t nnz, std::size_t value_size);
 std::size_t packed_compressed_bytes(types::dim_t rows, types::dim_t cols, types::nnz_t nnz, types::u32 axis, std::size_t value_size);
 std::size_t packed_coo_bytes(types::nnz_t nnz, std::size_t value_size);
@@ -134,6 +141,7 @@ inline std::size_t packed_bytes(const sparse::dia *, types::dim_t, types::dim_t,
     return packed_dia_bytes(nnz, (types::idx_t) num_diagonals, value_size);
 }
 
+// FILE* variants let packfile code write/read many parts through one open file.
 int store(std::FILE *fp, const dense *m);
 int load(std::FILE *fp, dense *m);
 int store(std::FILE *fp, const sparse::compressed *m);
@@ -143,6 +151,7 @@ int load(std::FILE *fp, sparse::coo *m);
 int store(std::FILE *fp, const sparse::dia *m);
 int load(std::FILE *fp, sparse::dia *m);
 
+// Filename variants open a file and do a full synchronous host I/O operation.
 inline int store(const char *filename, const dense *m) {
     return store_dense_raw(
         filename,

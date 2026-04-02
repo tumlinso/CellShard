@@ -19,11 +19,19 @@ namespace cellshard {
 namespace ingest {
 namespace mtx {
 
+// Chunk sizes for byte-range MTX scanning during transposed compressed ingest.
 enum {
     mtx_part_source_bytes = 128u << 20u,
     mtx_part_source_tail_bytes = 1u << 20u
 };
 
+// Host/device staging workspace for building compressed parts from MTX triplets.
+//
+// Important behavior:
+// - h_* buffers are pinned host buffers
+// - d_* buffers are device buffers
+// - reserve() may free and rebuild the whole workspace
+// - build_pinned_triplet_to_compressed() performs H2D and D2H copies
 struct compressed_workspace {
     int device;
     cudaStream_t stream;
@@ -52,6 +60,7 @@ struct compressed_workspace {
     std::size_t d_scan_bytes;
 };
 
+// Metadata-only init.
 static inline void init(compressed_workspace *ws) {
     ws->device = -1;
     ws->stream = (cudaStream_t) 0;
@@ -74,6 +83,7 @@ static inline void init(compressed_workspace *ws) {
     ws->d_scan_bytes = 0;
 }
 
+// Release all pinned host buffers, device buffers, and scan scratch.
 static inline void clear(compressed_workspace *ws) {
     if (ws->d_scan_tmp != 0) cudaFree(ws->d_scan_tmp);
     if (ws->d_out_val != 0) cudaFree(ws->d_out_val);
@@ -92,6 +102,7 @@ static inline void clear(compressed_workspace *ws) {
     init(ws);
 }
 
+// Bind the workspace to one device and stream.
 static inline int setup(compressed_workspace *ws, int device, cudaStream_t stream = (cudaStream_t) 0) {
     if (device >= 0 && cudaSetDevice(device) != cudaSuccess) return 0;
     ws->device = device;
@@ -99,6 +110,8 @@ static inline int setup(compressed_workspace *ws, int device, cudaStream_t strea
     return 1;
 }
 
+// Reserve pinned host or device buffers by freeing the old allocation and
+// allocating a fresh one.
 static inline int reserve_pinned_u32(unsigned int **ptr, unsigned int count) {
     if (*ptr != 0) cudaFreeHost(*ptr);
     *ptr = 0;
@@ -127,6 +140,8 @@ static inline int reserve_device_f16(__half **ptr, unsigned int count) {
     return cudaMalloc((void **) ptr, (std::size_t) count * sizeof(__half)) == cudaSuccess;
 }
 
+// Ensure the workspace can hold one compressed-build job of the requested size.
+// This may rebuild the entire workspace and query fresh CUB scan scratch size.
 static inline int reserve(compressed_workspace *ws, unsigned int cdim, unsigned int nnz) {
     std::size_t scan_bytes = 0;
 
@@ -162,6 +177,7 @@ fail:
     return 0;
 }
 
+// Open the MTX source for byte-range reads.
 static inline int open_part_source(const char *path) {
     int fd = ::open(path, O_RDONLY);
     if (fd < 0) {
@@ -174,6 +190,14 @@ static inline int open_part_source(const char *path) {
     return fd;
 }
 
+// Load one byte range from the source MTX file into pinned COO-style triplet
+// buffers, transposing row/column roles on the way in.
+//
+// This is a host-side parsing path with:
+// - pread()
+// - line splitting
+// - triplet parsing
+// - copies into pinned host buffers
 static inline int load_transposed_byte_range_pinned_triplet(const char *path,
                                                             unsigned int cols_out,
                                                             unsigned long row_begin,
@@ -266,6 +290,14 @@ fail:
     return 0;
 }
 
+// Convert the pinned triplet buffers into compressed form on device, then copy
+// the result back into pinned host output buffers.
+//
+// This is one of the heaviest ingest operations in the library:
+// - H2D copies
+// - device scan/scatter work
+// - D2H copies
+// - stream synchronize
 static inline int build_pinned_triplet_to_compressed(compressed_workspace *ws,
                                                      unsigned int rows,
                                                      unsigned int cols,
@@ -301,6 +333,7 @@ static inline int build_pinned_triplet_to_compressed(compressed_workspace *ws,
     return cudaStreamSynchronize(ws->stream) == cudaSuccess;
 }
 
+// Split one large compressed window into per-part compressed files.
 static inline int store_row_compressed_part_window(const char *part_prefix,
                                                    unsigned long global_part_begin,
                                                    unsigned int cols_out,
@@ -344,6 +377,7 @@ static inline int store_row_compressed_part_window(const char *part_prefix,
     return 1;
 }
 
+// Header-only metadata store for compressed-part outputs.
 static inline int store_compressed_header(const char *header_path,
                                           unsigned long rows,
                                           unsigned long cols,
@@ -409,6 +443,11 @@ done:
     return ok;
 }
 
+// End-to-end byte-range conversion:
+// - parse a source range into pinned triplets
+// - build compressed form on device
+// - copy compressed results back to host
+// - split/store one compressed file per part
 static inline int convert_transposed_byte_range_to_row_compressed_parts(const char *path,
                                                                         unsigned int cols_out,
                                                                         const char *part_prefix,

@@ -15,17 +15,21 @@ namespace cellshard {
 namespace convert {
 namespace kernels {
 
+// One warp lane dimension handles entries inside a segment; one warp-count
+// dimension handles many segments per block.
 enum {
     transpose_lanes = 32,
     transpose_warps = 8
 };
 
+// Direct CUDA error reporting helper.
 static inline int transpose_cuda_check(cudaError_t err, const char *label) {
     if (err == cudaSuccess) return 1;
     std::fprintf(stderr, "CUDA error at %s: %s\n", label, cudaGetErrorString(err));
     return 0;
 }
 
+// Launch geometry for compressed transpose.
 static inline void setup_cs_transpose_launch(
     const types::dim_t cDim,
     dim3 *grid,
@@ -41,6 +45,7 @@ static inline void setup_cs_transpose_launch(
     if (grid->x > 4096u) grid->x = 4096u;
 }
 
+// Count target compressed-axis populations for the transposed output.
 __global__ static void count_cs_transpose_targets(
     const types::dim_t cDim,
     const types::ptr_t * __restrict__ cAxPtr,
@@ -62,6 +67,7 @@ __global__ static void count_cs_transpose_targets(
     }
 }
 
+// Scatter transposed entries into the already-scanned output structure.
 __global__ static void scatter_cs_transpose(
     const types::dim_t cDim,
     const types::ptr_t * __restrict__ cAxPtr,
@@ -89,6 +95,7 @@ __global__ static void scatter_cs_transpose(
     }
 }
 
+// Entrywise COO transpose kernel.
 template<typename ValueT>
 __global__ static void transpose_coo_entries(
     const types::nnz_t nnz,

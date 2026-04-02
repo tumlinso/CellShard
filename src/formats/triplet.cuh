@@ -9,6 +9,8 @@
 namespace cellshard {
 namespace sparse {
 
+// COO triplet layout.
+// This is the most natural ingest layout and the worst random-access layout.
 struct alignas(16) coo {
     types::dim_t rows;
     types::dim_t cols;
@@ -19,6 +21,7 @@ struct alignas(16) coo {
     real::storage_t *val;
 };
 
+// Metadata-only init.
 __host__ __device__ __forceinline__ void init(
     coo * __restrict__ m,
     types::dim_t rows = 0,
@@ -33,6 +36,7 @@ __host__ __device__ __forceinline__ void init(
     m->val = 0;
 }
 
+// Total resident host bytes for one materialized COO part.
 __host__ __device__ __forceinline__ std::size_t bytes(const coo * __restrict__ m) {
     return sizeof(*m)
         + (std::size_t) m->nnz * sizeof(types::idx_t)
@@ -40,6 +44,7 @@ __host__ __device__ __forceinline__ std::size_t bytes(const coo * __restrict__ m
         + (std::size_t) m->nnz * sizeof(real::storage_t);
 }
 
+// O(nnz) random access helper. Useful for validation, not throughput.
 __host__ __device__ __forceinline__ const real::storage_t *at(const coo * __restrict__ m, types::idx_t r, types::idx_t c) {
     for (types::nnz_t i = 0; i < m->nnz; ++i) {
         if (m->rowIdx[i] == r && m->colIdx[i] == c) return m->val + i;
@@ -54,6 +59,7 @@ __host__ __device__ __forceinline__ real::storage_t *at(coo * __restrict__ m, ty
     return 0;
 }
 
+// Release all host arrays and reset metadata.
 __host__ __forceinline__ void clear(coo * __restrict__ m) {
     std::free(m->rowIdx);
     std::free(m->colIdx);
@@ -66,6 +72,7 @@ __host__ __forceinline__ void clear(coo * __restrict__ m) {
     m->nnz = 0;
 }
 
+// allocate() discards any previous payload and allocates all three arrays.
 __host__ __forceinline__ int allocate(coo * __restrict__ m) {
     std::free(m->rowIdx);
     std::free(m->colIdx);
@@ -89,6 +96,7 @@ __host__ __forceinline__ int allocate(coo * __restrict__ m) {
     return 1;
 }
 
+// Fresh destination concatenate. This is a full host-side copy of both inputs.
 __host__ __forceinline__ int concatenate_rows(coo * __restrict__ dst, const coo * __restrict__ top, const coo * __restrict__ bottom) {
     if (top->cols != 0 && bottom->cols != 0 && top->cols != bottom->cols) {
         std::fprintf(stderr, "Error: cannot concatenate coo matrices with different column counts\n");
@@ -117,6 +125,8 @@ __host__ __forceinline__ int concatenate_rows(coo * __restrict__ dst, const coo 
     return 1;
 }
 
+// In-place append by allocate-copy-append. This is intentionally explicit
+// because it is expensive.
 __host__ __forceinline__ int append_rows(coo * __restrict__ dst, const coo * __restrict__ src) {
     if (dst->cols != 0 && src->cols != 0 && dst->cols != src->cols) {
         std::fprintf(stderr, "Error: cannot concatenate coo matrices with different column counts\n");

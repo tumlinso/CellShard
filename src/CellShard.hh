@@ -12,4 +12,5 @@
 #include "disk/matrix.cuh"
 #include "sharded/disk.cuh"
 #include "sharded/sharded_device.cuh"
+#include "sharded/distributed.cuh"
 #include "ingest/mtx/compressed_parts.cuh"

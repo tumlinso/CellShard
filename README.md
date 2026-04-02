@@ -1,8 +1,91 @@
 # CellShard
 
-CellShard is a low-level, header-first library for large omics matrices that are split across many files and too large to treat as one host-resident object. The point is to keep the data partitioned, fetch only the pieces you need, and preserve shard boundaries that are useful for GPU staging and distributed work.
+CellShard is a low-level, header-first library for very large sharded sparse omics matrices.
+
+Its job is narrow:
+
+- represent matrices as row-aligned parts and shards
+- persist them in a native on-disk format
+- fetch and drop parts efficiently on host
+- stage shards to GPU
+- provide the sparse conversion machinery needed to support that runtime
+
+CellShard is not the bioinformatics toolkit. It is the storage and staging substrate that supports `Cellerator`.
 
 Build output is ignored in the repo-level `.gitignore`.
+
+## Scope
+
+CellShard owns:
+
+- per-part matrix formats
+- sharded matrix metadata
+- native packfile/container layout
+- host fetch/drop operations
+- GPU residency and staging helpers
+- local multi-GPU shard partitioning and staging helpers
+- sparse format conversion required by the above
+
+CellShard does not own:
+
+- biological file-format ecosystems beyond minimal source conversion support
+- RNA preprocessing and normalization
+- nearest-neighbor search, graph construction, clustering, or embedding
+- state quantization logic
+- model training or inference
+- broader single-cell analysis workflows
+
+Short version:
+
+- `CellShard` stores and stages data
+- `Cellerator` interprets and transforms data
+
+## Role In The Repository
+
+`CellShard` is the assistant library to `Cellerator`.
+
+`Cellerator` should be able to rely on `CellShard` for:
+
+- sharded matrix persistence
+- packfile-backed loading
+- explicit part and shard boundaries
+- predictable host memory footprint
+- direct GPU staging paths
+- local multi-GPU shard distribution
+
+That means the novelty of `CellShard` is not “another sparse matrix library”.
+
+The novel combination is:
+
+- sharded sparse omics matrices
+- native packfile-backed storage
+- part/shard-aware fetch and release
+- GPU-first staging for out-of-core workloads
+- direct same-machine multi-GPU shard execution support
+
+## Local Multi-GPU Runtime
+
+CellShard now includes a small local multi-GPU runtime layer in `src/sharded/distributed.cuh`.
+
+This layer is intentionally narrow. It is meant to make all visible GPUs in one machine easy to use without turning CellShard into a workflow engine.
+
+The key pieces are:
+
+- `distributed::local_context`
+- `distributed::shard_map`
+- `distributed::device_fleet`
+
+The intended flow is:
+
+1. discover visible GPUs and create one stream per device
+2. enable peer access where available
+3. assign shards to devices, preferably by shard byte size
+4. stage shards to their owner GPUs asynchronously
+5. let `Cellerator` launch the biology-facing kernels
+
+If NCCL is available, the same local context can also bootstrap one communicator per visible GPU. That support is optional and opportunistic; the core same-machine shard distribution path does not depend on NCCL being present.
+
+## Active Layout
 
 The active code layout is intentionally small:
 
@@ -10,9 +93,9 @@ The active code layout is intentionally small:
 - `src/real.cuh`, `src/types.cuh`: scalar and index policy
 - `src/formats/`: per-part matrix layouts
 - `src/sharded/`: the sharded matrix mechanism, file layout, and device residency path
-- `src/ingest/`: external dataset scan and conversion paths
+- `src/ingest/`: limited source-to-native conversion support
 - `src/convert/`: sparse conversion code and kernels
-- `src/disk/`: binary per-matrix persistence
+- `src/disk/`: native matrix persistence
 
 The live implementations are in the smaller target homes above. The old flat compatibility paths have been removed.
 
@@ -82,8 +165,8 @@ src/
 - Each simple format now lives in one file; pure metadata/indexing helpers are `__host__ __device__`, while allocation and cleanup stay explicit host-only functions in the same header.
 - `src/sharded/` is the center of the library now: sharded metadata, resharding, file headers, shard path lists, and GPU residency are all in one subsystem.
 - Shard boundaries are now part-aligned, because fetch, drop, upload, and release all operate on whole parts.
-- `src/ingest/scan.cuh` is the active sequential text scanner for HDD-friendly ingest.
-- `src/disk/` now carries single-matrix binary persistence.
+- `src/ingest/scan.cuh` is the active sequential text scanner for source conversion.
+- `src/disk/` now carries native matrix persistence.
 - `src/CellShard.hh` now includes the real format and binary headers directly instead of routing through umbrella headers.
 - `src/convert/` is now organized around the three real device-resident conversion engines: COO -> compressed, compressed -> COO, and compressed transpose.
 - `src/convert/routes/` holds the format-specific CSR/CSC entrypoints; the top-level `src/convert/*.cuh` files are the generic raw engines.
@@ -92,3 +175,17 @@ src/
 - The transpose path reuses the existing scatter-head initialization kernel from `src/convert/kernels/csScatter.cuh`; the actual transpose count/scatter kernels remain separate.
 - The moved format, conversion, I/O, and device headers are now the real homes for that code.
 - The larger scaffold directories still exist in the repo, but they are not the active design target for this library.
+
+## Non-Goals
+
+CellShard should stay narrow.
+
+It should not grow into:
+
+- a full single-cell toolkit
+- a biological data interpretation layer
+- a modeling framework
+- a quantization research playground
+- a general distributed orchestration system
+
+If a feature is mainly about biological meaning, RNA workflow policy, or modeling ideas, it should probably live in `Cellerator` instead.

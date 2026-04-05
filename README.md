@@ -163,7 +163,6 @@ They do not move matrix payload.
 - `reserve_parts()` and `reserve_shards()` in `src/sharded/sharded_host.cuh`
 - `reserve()` in `src/sharded/distributed.cuh` and `reserve()` in `src/sharded/sharded_device.cuh`
 - `bind_packfile()` in `src/sharded/shard_paths.cu`
-- packed-text ingest helpers in `src/ingest/common/*.cuh`
 
 These paths do host-side allocation and copy work, but they do not necessarily
 touch matrix payload and they do not move payload between host and device.
@@ -180,7 +179,6 @@ Typical costs:
 - `store()` / `load()` for standalone part files in `src/disk/matrix.cuh`
 - `store_header()` / `load_header()` in `src/sharded/disk.cuh`
 - `discover_local()` and `enable_peer_access()` in `src/sharded/distributed.cuh`
-- MTX text scanning and parsing helpers in `src/ingest/scan.cuh` and `src/ingest/mtx/mtx_reader.cuh`
 
 These paths do at least one of:
 
@@ -199,8 +197,6 @@ host-device copies in the same operation.
 - `stage_part()` / `stage_part_async()` and `stage_shard()` / `stage_shard_async()` in `src/sharded/sharded_device.cuh`
 - `swap_shard()` / `swap_shard_async()` in `src/sharded/sharded_device.cuh`
 - full packfile `store()` in `src/sharded/disk.cuh`
-- MTX conversion entrypoints in `src/ingest/series/series_ingest.cuh`
-- pinned-triplet -> compressed conversion in `src/ingest/mtx/compressed_parts.cuh`
 
 These are the expensive paths because they combine multiple cost domains:
 
@@ -315,7 +311,7 @@ The active code layout is intentionally small:
 - `src/real.cuh`, `src/types.cuh`: scalar and index policy
 - `src/formats/`: per-part matrix layouts
 - `src/sharded/`: the sharded matrix mechanism, file layout, and device residency path
-- `src/ingest/`: limited source-to-native conversion support
+- source-format ingest now lives in `Cellerator`
 - `src/convert/`: sparse conversion code and kernels
 - `src/disk/`: native matrix persistence
 
@@ -346,11 +342,6 @@ src/
 ├── disk/
 │   ├── matrix.cu
 │   └── matrix.cuh
-├── ingest/
-│   ├── scan.cuh
-│   ├── common/
-│   ├── mtx/
-│   └── series/
 ├── offset_span.cuh
 ├── real.cuh
 ├── types.cuh
@@ -387,7 +378,7 @@ src/
 - Each simple format now lives in one file; pure metadata/indexing helpers are `__host__ __device__`, while allocation and cleanup stay explicit host-only functions in the same header.
 - `src/sharded/` is the center of the library now: sharded metadata, resharding, file headers, shard path lists, and GPU residency are all in one subsystem.
 - Shard boundaries are now part-aligned, because fetch, drop, upload, and release all operate on whole parts.
-- `src/ingest/scan.cuh` is the active sequential text scanner for source conversion.
+- source-format ingest was moved out to `Cellerator`, so `CellShard` stays focused on native formats, packfiles, and residency
 - `src/disk/` now carries native matrix persistence.
 - `src/CellShard.hh` now includes the real format and binary headers directly instead of routing through umbrella headers.
 - `src/convert/` is now organized around the three real device-resident conversion engines: COO -> compressed, compressed -> COO, and compressed transpose.

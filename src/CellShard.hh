@@ -8,7 +8,6 @@
 // - host fetch/drop helpers
 // - device staging helpers
 // - local multi-GPU helpers
-// - MTX ingest helpers
 //
 // Downstream code that wants a smaller compile surface should include only the
 // specific headers it needs instead of this umbrella.
@@ -26,4 +25,3 @@
 #include "sharded/disk.cuh"
 #include "sharded/sharded_device.cuh"
 #include "sharded/distributed.cuh"
-#include "ingest/mtx/compressed_parts.cuh"

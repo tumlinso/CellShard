@@ -1,5 +1,6 @@
 #pragma once
 
+#include "cusparse_utils.cuh"
 #include "kernels/csExpand.cuh"
 
 #include <cstdio>
@@ -46,8 +47,45 @@ static inline int build_coo_from_compressed_raw(
 ) {
     int blocks_expand = 0;
     int blocks_search = 0;
+    cusparseHandle_t handle = 0;
 
     if (nnz == 0) return 1;
+
+    // csr2coo is exactly the operation we need for the compressed axis and it
+    // is generally faster than reconstructing those coordinates ourselves.
+    // The minor axis and values are already laid out in final COO order, so
+    // they only need straight async copies.
+    if (cusparse_utils::acquire(stream, &handle) &&
+        cusparse_utils::check(
+            cusparseXcsr2coo(
+                handle,
+                reinterpret_cast<const int *>(d_cAxPtr),
+                (int) nnz,
+                (int) cDim,
+                reinterpret_cast<int *>(d_out_cAxIdx),
+                CUSPARSE_INDEX_BASE_ZERO),
+            "cusparseXcsr2coo")) {
+        if (d_out_uAxIdx != d_uAxIdx &&
+            !coo_from_compressed_cuda_check(
+                cudaMemcpyAsync(
+                    d_out_uAxIdx,
+                    d_uAxIdx,
+                    (std::size_t) nnz * sizeof(unsigned int),
+                    cudaMemcpyDeviceToDevice,
+                    stream),
+                "cudaMemcpyAsync compressed->coo minor idx")) return 0;
+        if (d_out_val != d_val &&
+            !coo_from_compressed_cuda_check(
+                cudaMemcpyAsync(
+                    d_out_val,
+                    d_val,
+                    (std::size_t) nnz * sizeof(__half),
+                    cudaMemcpyDeviceToDevice,
+                    stream),
+                "cudaMemcpyAsync compressed->coo values")) return 0;
+        return 1;
+    }
+
     setup_coo_from_compressed_launch(cDim, nnz, &blocks_expand, &blocks_search);
 
     if (blocks_expand >= 80 || cDim >= (nnz >> 4)) {

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "cusparse_utils.cuh"
 #include "kernels/transpose.cuh"
 
 namespace cellshard {
@@ -27,12 +28,58 @@ static inline int build_compressed_transpose_raw(
 ) {
     dim3 grid;
     dim3 block;
+    cusparseHandle_t handle = 0;
+    std::size_t lib_bytes = 0;
 
     if (!kernels::transpose_cuda_check(
             cudaMemsetAsync(d_out_uAxPtr, 0, (std::size_t) (uDim + 1) * sizeof(types::ptr_t), stream),
             "cudaMemsetAsync transpose out ptr")) return 0;
 
     if (nnz == 0) return 1;
+
+    // Prefer the vendor transpose path on Volta when the caller has provided
+    // enough temporary storage. csr2cscEx2 is substantially better behaved on
+    // skewed sparse matrices than the older count/scan/scatter kernel chain.
+    if (cusparse_utils::acquire(stream, &handle) &&
+        cusparse_utils::check(
+            cusparseCsr2cscEx2_bufferSize(
+                handle,
+                (int) cDim,
+                (int) uDim,
+                (int) nnz,
+                d_val,
+                reinterpret_cast<const int *>(d_cAxPtr),
+                reinterpret_cast<const int *>(d_uAxIdx),
+                d_out_val,
+                reinterpret_cast<int *>(d_out_uAxPtr),
+                reinterpret_cast<int *>(d_out_cAxIdx),
+                CUDA_R_16F,
+                CUSPARSE_ACTION_NUMERIC,
+                CUSPARSE_INDEX_BASE_ZERO,
+                CUSPARSE_CSR2CSC_ALG1,
+                &lib_bytes),
+            "cusparseCsr2cscEx2_bufferSize")) {
+        if (d_scan_tmp != 0 && scan_bytes >= lib_bytes) {
+            if (cusparse_utils::check(
+                    cusparseCsr2cscEx2(
+                        handle,
+                        (int) cDim,
+                        (int) uDim,
+                        (int) nnz,
+                        d_val,
+                        reinterpret_cast<const int *>(d_cAxPtr),
+                        reinterpret_cast<const int *>(d_uAxIdx),
+                        d_out_val,
+                        reinterpret_cast<int *>(d_out_uAxPtr),
+                        reinterpret_cast<int *>(d_out_cAxIdx),
+                        CUDA_R_16F,
+                        CUSPARSE_ACTION_NUMERIC,
+                        CUSPARSE_INDEX_BASE_ZERO,
+                        CUSPARSE_CSR2CSC_ALG1,
+                        d_scan_tmp),
+                    "cusparseCsr2cscEx2")) return 1;
+        }
+    }
 
     kernels::setup_cs_transpose_launch(cDim, &grid, &block);
 

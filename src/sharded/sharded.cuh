@@ -34,6 +34,10 @@ struct alignas(16) sharded {
     unsigned long num_shards;
     unsigned long shard_capacity;
     unsigned long *shard_offsets;
+    // O(1) shard -> [first_part, last_part) lookup table. This is derived from
+    // shard_offsets/part_offsets and keeps shard-boundary queries off the
+    // binary-search path in the hot runtime code.
+    unsigned long *shard_parts;
 };
 
 // Zero metadata and pointers. No deallocation happens here.
@@ -52,6 +56,7 @@ __host__ __device__ __forceinline__ void init(sharded<MatrixT> * __restrict__ m)
     m->num_shards = 0;
     m->shard_capacity = 0;
     m->shard_offsets = 0;
+    m->shard_parts = 0;
 }
 
 // Default auxiliary metadata for formats that do not need it.
@@ -143,6 +148,7 @@ __host__ __device__ __forceinline__ real::storage_t *at(sharded<MatrixT> * __res
 // to whole parts.
 template<typename MatrixT>
 __host__ __device__ __forceinline__ unsigned long first_part_in_shard(const sharded<MatrixT> * __restrict__ m, unsigned long shardId) {
+    if (m->shard_parts != 0 && shardId < m->num_shards) return m->shard_parts[shardId];
     if (shardId >= m->num_shards || m->num_parts == 0) return m->num_parts;
     return find_part(m, m->shard_offsets[shardId]);
 }
@@ -150,6 +156,7 @@ __host__ __device__ __forceinline__ unsigned long first_part_in_shard(const shar
 template<typename MatrixT>
 __host__ __device__ __forceinline__ unsigned long last_part_in_shard(const sharded<MatrixT> * __restrict__ m, unsigned long shardId) {
     unsigned long rowEnd = 0;
+    if (m->shard_parts != 0 && shardId < m->num_shards) return m->shard_parts[shardId + 1];
     if (shardId >= m->num_shards) return m->num_parts;
     rowEnd = m->shard_offsets[shardId + 1];
     if (rowEnd == 0) return 0;
@@ -265,6 +272,7 @@ __host__ __device__ __forceinline__ std::size_t bytes(const sharded<MatrixT> * _
     total += (std::size_t) m->part_capacity * sizeof(unsigned long);
     total += (std::size_t) m->part_capacity * sizeof(unsigned long);
     total += (std::size_t) m->part_capacity * sizeof(unsigned long);
+    total += (std::size_t) (m->shard_capacity + 1) * sizeof(unsigned long);
     total += (std::size_t) (m->shard_capacity + 1) * sizeof(unsigned long);
     for (i = 0; i < m->num_parts; ++i) total += part_bytes(m, i);
     return total;

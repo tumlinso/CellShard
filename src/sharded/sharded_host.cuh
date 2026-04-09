@@ -2,11 +2,13 @@
 
 #include "sharded.cuh"
 #include "shard_paths.cuh"
+#include "series_h5.cuh"
 #include "../disk/matrix.cuh"
 
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <sys/types.h>
 
 namespace cellshard {
 
@@ -29,6 +31,7 @@ __host__ __forceinline__ void clear(sharded<MatrixT> * __restrict__ m) {
     std::free(m->part_nnz);
     std::free(m->part_aux);
     std::free(m->shard_offsets);
+    std::free(m->shard_parts);
     init(m);
 }
 
@@ -82,18 +85,46 @@ __host__ __forceinline__ int reserve_parts(sharded<MatrixT> * __restrict__ m, un
 template<typename MatrixT>
 __host__ __forceinline__ int reserve_shards(sharded<MatrixT> * __restrict__ m, unsigned long capacity) {
     unsigned long *newOffsets = 0;
+    unsigned long *newParts = 0;
 
     if (capacity <= m->shard_capacity) return 1;
     // Shard growth reallocates only the row-offset table.
     newOffsets = (unsigned long *) std::calloc((std::size_t) (capacity + 1), sizeof(unsigned long));
-    if (newOffsets == 0) return 0;
+    newParts = (unsigned long *) std::calloc((std::size_t) (capacity + 1), sizeof(unsigned long));
+    if (newOffsets == 0 || newParts == 0) {
+        std::free(newOffsets);
+        std::free(newParts);
+        return 0;
+    }
     if (m->shard_offsets != 0 && m->num_shards != 0) {
         std::memcpy(newOffsets, m->shard_offsets, (std::size_t) (m->num_shards + 1) * sizeof(unsigned long));
+        if (m->shard_parts != 0) {
+            std::memcpy(newParts, m->shard_parts, (std::size_t) (m->num_shards + 1) * sizeof(unsigned long));
+        }
     }
     std::free(m->shard_offsets);
+    std::free(m->shard_parts);
     m->shard_offsets = newOffsets;
+    m->shard_parts = newParts;
     m->shard_capacity = capacity;
     return 1;
+}
+
+template<typename MatrixT>
+__host__ __forceinline__ void rebuild_shard_parts(sharded<MatrixT> * __restrict__ m) {
+    unsigned long shard = 0;
+    unsigned long part = 0;
+
+    // Precompute the exact part-span for every shard once, so repeated shard
+    // staging, release, bucket, and byte-estimation calls avoid row->part
+    // binary searches entirely.
+    if (m->shard_parts == 0 || m->shard_offsets == 0 || m->part_offsets == 0) return;
+    for (shard = 0; shard < m->num_shards; ++shard) {
+        const unsigned long row_begin = m->shard_offsets[shard];
+        while (part < m->num_parts && m->part_offsets[part] < row_begin) ++part;
+        m->shard_parts[shard] = part;
+    }
+    m->shard_parts[m->num_shards] = m->num_parts;
 }
 
 template<typename MatrixT>
@@ -142,6 +173,7 @@ __host__ __forceinline__ int set_shards_to_parts(sharded<MatrixT> * __restrict__
     if (!reserve_shards(m, m->num_parts)) return 0;
     m->num_shards = m->num_parts;
     for (i = 0; i <= m->num_parts; ++i) m->shard_offsets[i] = m->part_offsets[i];
+    for (i = 0; i <= m->num_parts; ++i) m->shard_parts[i] = i;
     return 1;
 }
 
@@ -192,6 +224,7 @@ __host__ __forceinline__ int concatenate(sharded<MatrixT> * __restrict__ dst, sh
     src->rows = 0;
     src->nnz = 0;
     src->num_shards = 0;
+    if (src->shard_parts != 0) src->shard_parts[0] = 0;
     return 1;
 }
 
@@ -230,6 +263,7 @@ __host__ __forceinline__ int set_equal_shards(sharded<MatrixT> * __restrict__ m,
     ++shardCount;
     m->shard_offsets[shardCount] = m->rows;
     m->num_shards = shardCount;
+    rebuild_shard_parts(m);
     return 1;
 }
 
@@ -293,6 +327,7 @@ __host__ __forceinline__ int reshard(sharded<MatrixT> * __restrict__ m, unsigned
     if (!reserve_shards(m, count)) return 0;
     m->num_shards = count;
     for (i = 0; i <= count; ++i) m->shard_offsets[i] = offsets[i];
+    rebuild_shard_parts(m);
     return 1;
 }
 
@@ -323,6 +358,7 @@ __host__ __forceinline__ int set_shards_by_nnz(sharded<MatrixT> * __restrict__ m
         m->shard_offsets[shardCount] = m->rows;
     }
     m->num_shards = shardCount;
+    rebuild_shard_parts(m);
     return 1;
 }
 
@@ -355,41 +391,42 @@ __host__ __forceinline__ int set_shards_by_part_bytes(sharded<MatrixT> * __restr
         m->shard_offsets[shardCount] = m->rows;
     }
     m->num_shards = shardCount;
+    rebuild_shard_parts(m);
     return 1;
 }
 
 template<typename MatrixT>
-__host__ __forceinline__ int fetch_part(sharded<MatrixT> *m, const shard_storage *s, unsigned long partId) {
+__host__ __forceinline__ int load_part_from_open_packfile(sharded<MatrixT> *m,
+                                                          shard_storage *s,
+                                                          unsigned long partId,
+                                                          std::uint64_t *cursor) {
     MatrixT *part = 0;
-    std::FILE *fp = 0;
     int ok = 0;
+    const std::uint64_t offset = s->locators[partId].offset;
 
-    if (partId >= m->num_parts || s == 0 || partId >= s->capacity || s->packfile_path == 0 || s->locators == 0) return 0;
+    if (partId >= m->num_parts || s == 0 || partId >= s->capacity || s->packfile_fp == 0 || s->locators == 0) return 0;
     if (m->parts[partId] != 0) destroy(m->parts[partId]);
     m->parts[partId] = 0;
 
-    // fetch_part is a real materialization step:
-    // - open the packfile
-    // - seek to the stored extent
-    // - read and decode one full MatrixT payload into fresh host allocations
+    // This is the host-side fast path for staged reads:
+    // - reuse one open packfile handle
+    // - avoid reopening the packfile per part
+    // - avoid reseeking when shard parts were stored contiguously
+    // - keep the decode path identical once the file cursor is in place
     part = new MatrixT;
     init(part);
-    fp = std::fopen(s->packfile_path, "rb");
-    if (fp == 0) {
+    if (cursor == 0 || *cursor != offset) {
+        if (fseeko(s->packfile_fp, (off_t) offset, SEEK_SET) != 0) {
+            destroy(part);
+            return 0;
+        }
+        if (cursor != 0) *cursor = offset;
+    }
+    if (!load(s->packfile_fp, part)) {
         destroy(part);
         return 0;
     }
-    if (std::fseek(fp, (long) s->locators[partId].offset, SEEK_SET) != 0) {
-        std::fclose(fp);
-        destroy(part);
-        return 0;
-    }
-    if (!load(fp, part)) {
-        std::fclose(fp);
-        destroy(part);
-        return 0;
-    }
-    std::fclose(fp);
+    if (cursor != 0) *cursor = offset + s->locators[partId].bytes;
     if (part->rows != m->part_rows[partId]) goto fail;
     if (::cellshard::part_nnz(part) != m->part_nnz[partId]) goto fail;
     if (m->cols != 0 && part->cols != m->cols) goto fail;
@@ -403,10 +440,61 @@ fail:
 }
 
 template<typename MatrixT>
+__host__ __forceinline__ int fetch_part(sharded<MatrixT> *m, const shard_storage *s, unsigned long partId) {
+    std::uint64_t cursor = 0;
+    shard_storage *storage = const_cast<shard_storage *>(s);
+    if (partId >= m->num_parts || storage == 0 || partId >= storage->capacity || storage->packfile_path == 0 || storage->locators == 0) return 0;
+    if (!ensure_packfile_open(storage)) return 0;
+    return load_part_from_open_packfile(m, storage, partId, &cursor);
+}
+
+__host__ __forceinline__ int fetch_part(sharded<sparse::compressed> *m, const shard_storage *s, unsigned long partId) {
+    std::uint64_t cursor = 0;
+    shard_storage *storage = const_cast<shard_storage *>(s);
+
+    if (partId >= m->num_parts || storage == 0 || storage->packfile_path == 0) return 0;
+    if (storage->backend == shard_storage_backend_series_h5) {
+        return fetch_series_compressed_h5_part(m, s, partId);
+    }
+    if (partId >= storage->capacity || storage->locators == 0) return 0;
+    if (!ensure_packfile_open(storage)) return 0;
+    return load_part_from_open_packfile(m, storage, partId, &cursor);
+}
+
+template<typename MatrixT>
 __host__ __forceinline__ int fetch_all_parts(sharded<MatrixT> *m, const shard_storage *s) {
     unsigned long i = 0;
+    std::uint64_t cursor = 0;
+    shard_storage *storage = const_cast<shard_storage *>(s);
+    if (storage == 0 || storage->packfile_path == 0 || storage->locators == 0) return 0;
+    if (!ensure_packfile_open(storage)) return 0;
     for (i = 0; i < m->num_parts; ++i) {
-        if (!fetch_part(m, s, i)) return 0;
+        if (!load_part_from_open_packfile(m, storage, i, &cursor)) return 0;
+    }
+    if (m->num_shards == 0) return set_shards_to_parts(m);
+    return 1;
+}
+
+__host__ __forceinline__ int fetch_all_parts(sharded<sparse::compressed> *m, const shard_storage *s) {
+    unsigned long i = 0;
+    shard_storage *storage = const_cast<shard_storage *>(s);
+
+    if (storage == 0 || storage->packfile_path == 0) return 0;
+    if (storage->backend == shard_storage_backend_series_h5) {
+        for (i = 0; i < m->num_parts; ++i) {
+            if (!fetch_series_compressed_h5_part(m, s, i)) return 0;
+        }
+        if (m->num_shards == 0) return set_shards_to_parts(m);
+        return 1;
+    }
+
+    {
+        std::uint64_t cursor = 0;
+        if (storage->locators == 0) return 0;
+        if (!ensure_packfile_open(storage)) return 0;
+        for (i = 0; i < m->num_parts; ++i) {
+            if (!load_part_from_open_packfile(m, storage, i, &cursor)) return 0;
+        }
     }
     if (m->num_shards == 0) return set_shards_to_parts(m);
     return 1;
@@ -417,14 +505,36 @@ __host__ __forceinline__ int fetch_shard(sharded<MatrixT> *m, const shard_storag
     unsigned long begin = 0;
     unsigned long end = 0;
     unsigned long i = 0;
+    std::uint64_t cursor = 0;
+    shard_storage *storage = const_cast<shard_storage *>(s);
 
-    if (shardId >= m->num_shards) return 0;
-    // This is a loop over fetch_part(). A "shard fetch" currently means one
-    // packfile seek/load per part in the shard, not one monolithic bulk read.
+    if (shardId >= m->num_shards || storage == 0 || storage->packfile_path == 0 || storage->locators == 0) return 0;
+    if (!ensure_packfile_open(storage)) return 0;
     begin = first_part_in_shard(m, shardId);
     end = last_part_in_shard(m, shardId);
     for (i = begin; i < end; ++i) {
-        if (!fetch_part(m, s, i)) return 0;
+        if (!load_part_from_open_packfile(m, storage, i, &cursor)) return 0;
+    }
+    return 1;
+}
+
+__host__ __forceinline__ int fetch_shard(sharded<sparse::compressed> *m, const shard_storage *s, unsigned long shardId) {
+    unsigned long begin = 0;
+    unsigned long end = 0;
+    unsigned long i = 0;
+    std::uint64_t cursor = 0;
+    shard_storage *storage = const_cast<shard_storage *>(s);
+
+    if (shardId >= m->num_shards || storage == 0 || storage->packfile_path == 0) return 0;
+    if (storage->backend == shard_storage_backend_series_h5) {
+        return fetch_series_compressed_h5_shard(m, s, shardId);
+    }
+    if (storage->locators == 0) return 0;
+    if (!ensure_packfile_open(storage)) return 0;
+    begin = first_part_in_shard(m, shardId);
+    end = last_part_in_shard(m, shardId);
+    for (i = begin; i < end; ++i) {
+        if (!load_part_from_open_packfile(m, storage, i, &cursor)) return 0;
     }
     return 1;
 }

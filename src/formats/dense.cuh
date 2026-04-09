@@ -10,6 +10,9 @@ namespace cellshard {
 struct alignas(16) dense {
     types::dim_t rows;
     types::dim_t cols;
+    // When non-null, this owns the full packed host allocation for the part.
+    // val points inside this block.
+    void *storage;
     real::storage_t *val;
 };
 
@@ -21,6 +24,7 @@ __host__ __device__ __forceinline__ void init(
 ) {
     m->rows = rows;
     m->cols = cols;
+    m->storage = 0;
     m->val = 0;
 }
 
@@ -40,7 +44,9 @@ __host__ __device__ __forceinline__ real::storage_t *at(dense * __restrict__ m, 
 
 // Release host storage and reset metadata.
 __host__ __forceinline__ void clear(dense * __restrict__ m) {
-    std::free(m->val);
+    if (m->storage != 0) std::free(m->storage);
+    else std::free(m->val);
+    m->storage = 0;
     m->val = 0;
     m->rows = 0;
     m->cols = 0;
@@ -50,11 +56,17 @@ __host__ __forceinline__ void clear(dense * __restrict__ m) {
 // sized from rows*cols.
 __host__ __forceinline__ int allocate(dense * __restrict__ m) {
     const std::size_t count = (std::size_t) m->rows * (std::size_t) m->cols;
+    void *storage = 0;
 
-    std::free(m->val);
+    if (m->storage != 0) std::free(m->storage);
+    else std::free(m->val);
+    m->storage = 0;
     m->val = 0;
     if (count == 0) return 1;
-    m->val = (real::storage_t *) std::malloc(count * sizeof(real::storage_t));
+    storage = std::malloc(count * sizeof(real::storage_t));
+    if (storage == 0) return 0;
+    m->storage = storage;
+    m->val = (real::storage_t *) storage;
     return m->val != 0;
 }
 

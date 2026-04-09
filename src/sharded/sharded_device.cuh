@@ -1,7 +1,9 @@
 #pragma once
 
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <vector>
 
 #include <cuda_runtime.h>
 
@@ -19,10 +21,21 @@ namespace device {
 // fresh device memory and copies payload into it.
 template<typename MatrixT>
 struct alignas(16) part_record {
+    void *allocation;
+    std::size_t allocation_bytes;
+    void *storage;
     void *view;
     void *a0;
     void *a1;
     void *a2;
+    unsigned long group_begin;
+    unsigned long group_end;
+    int device_id;
+};
+
+struct cached_allocation {
+    void *ptr;
+    std::size_t bytes;
     int device_id;
 };
 
@@ -30,6 +43,9 @@ template<typename MatrixT>
 struct sharded_device {
     unsigned long capacity;
     part_record<MatrixT> *parts;
+    unsigned long cache_count;
+    unsigned long cache_capacity;
+    cached_allocation *cache;
 };
 
 template<typename MatrixT>
@@ -79,6 +95,9 @@ template<typename MatrixT>
 __host__ __forceinline__ void init(sharded_device<MatrixT> *state) {
     state->capacity = 0;
     state->parts = 0;
+    state->cache_count = 0;
+    state->cache_capacity = 0;
+    state->cache = 0;
 }
 
 template<typename MatrixT>
@@ -89,9 +108,21 @@ __host__ __forceinline__ void clear(sharded_device<MatrixT> *state) {
             if (state->parts[i].view != 0) release_part(state, i);
         }
     }
+    if (state->cache != 0) {
+        for (i = 0; i < state->cache_count; ++i) {
+            if (state->cache[i].ptr != 0) {
+                cudaSetDevice(state->cache[i].device_id >= 0 ? state->cache[i].device_id : 0);
+                cudaFree(state->cache[i].ptr);
+            }
+        }
+    }
     std::free(state->parts);
+    std::free(state->cache);
     state->capacity = 0;
     state->parts = 0;
+    state->cache_count = 0;
+    state->cache_capacity = 0;
+    state->cache = 0;
 }
 
 template<typename MatrixT>
@@ -116,11 +147,74 @@ __host__ __forceinline__ int reserve(sharded_device<MatrixT> *state, unsigned lo
 
 template<typename MatrixT>
 __host__ __forceinline__ void zero_record(part_record<MatrixT> *record) {
+    record->allocation = 0;
+    record->allocation_bytes = 0;
+    record->storage = 0;
     record->view = 0;
     record->a0 = 0;
     record->a1 = 0;
     record->a2 = 0;
+    record->group_begin = 0;
+    record->group_end = 0;
     record->device_id = -1;
+}
+
+// Keep all device-side allocations aligned and packed inside one storage block
+// per uploaded part. This reduces cudaMalloc/cudaFree pressure dramatically on
+// V100-era drivers where allocator churn can dominate small-part staging.
+__host__ __device__ __forceinline__ std::size_t align_up_bytes(std::size_t value, std::size_t alignment) {
+    return (value + alignment - 1u) & ~(alignment - 1u);
+}
+
+// Keep a small per-device free list for packed shard allocations. Repeated
+// stage/release loops often revisit the same shard sizes, and on V100-era
+// drivers the raw cudaMalloc/cudaFree path is expensive enough to show up
+// clearly in Nsight Systems.
+template<typename MatrixT>
+__host__ __forceinline__ void *take_cached_allocation(sharded_device<MatrixT> *state, int deviceId, std::size_t min_bytes, std::size_t *out_bytes) {
+    unsigned long best = (unsigned long) -1;
+    unsigned long i = 0;
+
+    if (out_bytes != 0) *out_bytes = 0;
+    if (state == 0 || state->cache == 0) return 0;
+    for (i = 0; i < state->cache_count; ++i) {
+        if (state->cache[i].ptr == 0) continue;
+        if (state->cache[i].device_id != deviceId) continue;
+        if (state->cache[i].bytes < min_bytes) continue;
+        if (best == (unsigned long) -1 || state->cache[i].bytes < state->cache[best].bytes) best = i;
+    }
+    if (best == (unsigned long) -1) return 0;
+    {
+        void *ptr = state->cache[best].ptr;
+        const std::size_t bytes = state->cache[best].bytes;
+        state->cache[best] = state->cache[state->cache_count - 1ul];
+        --state->cache_count;
+        if (out_bytes != 0) *out_bytes = bytes;
+        return ptr;
+    }
+}
+
+template<typename MatrixT>
+__host__ __forceinline__ cudaError_t cache_allocation(sharded_device<MatrixT> *state, int deviceId, void *ptr, std::size_t bytes) {
+    cached_allocation *grown = 0;
+    unsigned long capacity = 0;
+
+    if (ptr == 0) return cudaSuccess;
+    if (state == 0 || bytes == 0) return cudaFree(ptr);
+    if (state->cache_count >= 16ul) return cudaFree(ptr);
+    if (state->cache_count == state->cache_capacity) {
+        capacity = state->cache_capacity != 0 ? state->cache_capacity * 2ul : 8ul;
+        if (capacity < 16ul) capacity = 16ul;
+        grown = (cached_allocation *) std::realloc(state->cache, (std::size_t) capacity * sizeof(cached_allocation));
+        if (grown == 0) return cudaFree(ptr);
+        state->cache = grown;
+        state->cache_capacity = capacity;
+    }
+    state->cache[state->cache_count].ptr = ptr;
+    state->cache[state->cache_count].bytes = bytes;
+    state->cache[state->cache_count].device_id = deviceId;
+    ++state->cache_count;
+    return cudaSuccess;
 }
 
 // Upload is not a view conversion. It performs:
@@ -132,8 +226,11 @@ __host__ __forceinline__ void zero_record(part_record<MatrixT> *record) {
 // Callers should treat this as a full materialization step.
 __host__ __forceinline__ cudaError_t upload(const ::cellshard::dense *src, part_record< ::cellshard::dense > *record) {
     dense_view host;
-    dense_view *deviceView = 0;
     const std::size_t count = (std::size_t) src->rows * (std::size_t) src->cols;
+    const std::size_t view_offset = 0;
+    const std::size_t val_offset = align_up_bytes(sizeof(dense_view), alignof(__half));
+    const std::size_t total_bytes = val_offset + count * sizeof(__half);
+    char *storage = 0;
     cudaError_t err = cudaSuccess;
 
     zero_record(record);
@@ -142,24 +239,27 @@ __host__ __forceinline__ cudaError_t upload(const ::cellshard::dense *src, part_
     host.val = 0;
 
     if (count != 0) {
-        err = cudaMalloc((void **) &host.val, count * sizeof(__half));
+        err = cudaMalloc((void **) &storage, total_bytes);
         if (err != cudaSuccess) goto fail;
+        host.val = (__half *) (storage + val_offset);
         err = cudaMemcpy(host.val, src->val, count * sizeof(__half), cudaMemcpyHostToDevice);
         if (err != cudaSuccess) goto fail;
+    } else {
+        err = cudaMalloc((void **) &storage, sizeof(dense_view));
+        if (err != cudaSuccess) goto fail;
     }
-
-    err = cudaMalloc((void **) &deviceView, sizeof(host));
-    if (err != cudaSuccess) goto fail;
-    err = cudaMemcpy(deviceView, &host, sizeof(host), cudaMemcpyHostToDevice);
+    err = cudaMemcpy(storage + view_offset, &host, sizeof(host), cudaMemcpyHostToDevice);
     if (err != cudaSuccess) goto fail;
 
-    record->view = deviceView;
+    record->allocation = storage;
+    record->allocation_bytes = total_bytes != 0 ? total_bytes : sizeof(dense_view);
+    record->storage = storage;
+    record->view = storage + view_offset;
     record->a0 = host.val;
     return cudaSuccess;
 
 fail:
-    if (deviceView != 0) cudaFree(deviceView);
-    if (host.val != 0) cudaFree(host.val);
+    if (storage != 0) cudaFree(storage);
     zero_record(record);
     return err;
 }
@@ -171,8 +271,11 @@ __host__ __forceinline__ cudaError_t upload_async(const ::cellshard::dense *src,
                                                   part_record< ::cellshard::dense > *record,
                                                   cudaStream_t stream) {
     dense_view host;
-    dense_view *deviceView = 0;
     const std::size_t count = (std::size_t) src->rows * (std::size_t) src->cols;
+    const std::size_t view_offset = 0;
+    const std::size_t val_offset = align_up_bytes(sizeof(dense_view), alignof(__half));
+    const std::size_t total_bytes = val_offset + count * sizeof(__half);
+    char *storage = 0;
     cudaError_t err = cudaSuccess;
 
     zero_record(record);
@@ -181,24 +284,27 @@ __host__ __forceinline__ cudaError_t upload_async(const ::cellshard::dense *src,
     host.val = 0;
 
     if (count != 0) {
-        err = cudaMalloc((void **) &host.val, count * sizeof(__half));
+        err = cudaMalloc((void **) &storage, total_bytes);
         if (err != cudaSuccess) goto fail;
+        host.val = (__half *) (storage + val_offset);
         err = cudaMemcpyAsync(host.val, src->val, count * sizeof(__half), cudaMemcpyHostToDevice, stream);
         if (err != cudaSuccess) goto fail;
+    } else {
+        err = cudaMalloc((void **) &storage, sizeof(dense_view));
+        if (err != cudaSuccess) goto fail;
     }
-
-    err = cudaMalloc((void **) &deviceView, sizeof(host));
-    if (err != cudaSuccess) goto fail;
-    err = cudaMemcpyAsync(deviceView, &host, sizeof(host), cudaMemcpyHostToDevice, stream);
+    err = cudaMemcpyAsync(storage + view_offset, &host, sizeof(host), cudaMemcpyHostToDevice, stream);
     if (err != cudaSuccess) goto fail;
 
-    record->view = deviceView;
+    record->allocation = storage;
+    record->allocation_bytes = total_bytes != 0 ? total_bytes : sizeof(dense_view);
+    record->storage = storage;
+    record->view = storage + view_offset;
     record->a0 = host.val;
     return cudaSuccess;
 
 fail:
-    if (deviceView != 0) cudaFree(deviceView);
-    if (host.val != 0) cudaFree(host.val);
+    if (storage != 0) cudaFree(storage);
     zero_record(record);
     return err;
 }
@@ -211,7 +317,13 @@ fail:
 // Then it copies a small descriptor struct containing those device pointers.
 __host__ __forceinline__ cudaError_t upload(const ::cellshard::sparse::compressed *src, part_record< ::cellshard::sparse::compressed > *record) {
     compressed_view host;
-    compressed_view *deviceView = 0;
+    const std::size_t ptr_count = (std::size_t) sparse::major_dim(src) + 1u;
+    const std::size_t view_offset = 0;
+    const std::size_t major_offset = align_up_bytes(sizeof(compressed_view), alignof(unsigned int));
+    const std::size_t minor_offset = align_up_bytes(major_offset + ptr_count * sizeof(unsigned int), alignof(unsigned int));
+    const std::size_t val_offset = align_up_bytes(minor_offset + (std::size_t) src->nnz * sizeof(unsigned int), alignof(__half));
+    const std::size_t total_bytes = val_offset + (std::size_t) src->nnz * sizeof(__half);
+    char *storage = 0;
     cudaError_t err = cudaSuccess;
 
     zero_record(record);
@@ -223,40 +335,36 @@ __host__ __forceinline__ cudaError_t upload(const ::cellshard::sparse::compresse
     host.minorIdx = 0;
     host.val = 0;
 
-    if (sparse::major_dim(src) != 0) {
-        err = cudaMalloc((void **) &host.majorPtr, ((std::size_t) sparse::major_dim(src) + 1) * sizeof(unsigned int));
-        if (err != cudaSuccess) goto fail;
-        err = cudaMemcpy(host.majorPtr, src->majorPtr, ((std::size_t) sparse::major_dim(src) + 1) * sizeof(unsigned int), cudaMemcpyHostToDevice);
+    err = cudaMalloc((void **) &storage, total_bytes == 0 ? sizeof(compressed_view) : total_bytes);
+    if (err != cudaSuccess) goto fail;
+    if (ptr_count != 0) {
+        host.majorPtr = (unsigned int *) (storage + major_offset);
+        err = cudaMemcpy(host.majorPtr, src->majorPtr, ptr_count * sizeof(unsigned int), cudaMemcpyHostToDevice);
         if (err != cudaSuccess) goto fail;
     }
 
     if (src->nnz != 0) {
-        err = cudaMalloc((void **) &host.minorIdx, src->nnz * sizeof(unsigned int));
-        if (err != cudaSuccess) goto fail;
+        host.minorIdx = (unsigned int *) (storage + minor_offset);
         err = cudaMemcpy(host.minorIdx, src->minorIdx, src->nnz * sizeof(unsigned int), cudaMemcpyHostToDevice);
         if (err != cudaSuccess) goto fail;
-        err = cudaMalloc((void **) &host.val, src->nnz * sizeof(__half));
-        if (err != cudaSuccess) goto fail;
+        host.val = (__half *) (storage + val_offset);
         err = cudaMemcpy(host.val, src->val, src->nnz * sizeof(__half), cudaMemcpyHostToDevice);
         if (err != cudaSuccess) goto fail;
     }
-
-    err = cudaMalloc((void **) &deviceView, sizeof(host));
-    if (err != cudaSuccess) goto fail;
-    err = cudaMemcpy(deviceView, &host, sizeof(host), cudaMemcpyHostToDevice);
+    err = cudaMemcpy(storage + view_offset, &host, sizeof(host), cudaMemcpyHostToDevice);
     if (err != cudaSuccess) goto fail;
 
-    record->view = deviceView;
+    record->allocation = storage;
+    record->allocation_bytes = total_bytes;
+    record->storage = storage;
+    record->view = storage + view_offset;
     record->a0 = host.majorPtr;
     record->a1 = host.minorIdx;
     record->a2 = host.val;
     return cudaSuccess;
 
 fail:
-    if (deviceView != 0) cudaFree(deviceView);
-    if (host.val != 0) cudaFree(host.val);
-    if (host.minorIdx != 0) cudaFree(host.minorIdx);
-    if (host.majorPtr != 0) cudaFree(host.majorPtr);
+    if (storage != 0) cudaFree(storage);
     zero_record(record);
     return err;
 }
@@ -267,7 +375,13 @@ __host__ __forceinline__ cudaError_t upload_async(const ::cellshard::sparse::com
                                                   part_record< ::cellshard::sparse::compressed > *record,
                                                   cudaStream_t stream) {
     compressed_view host;
-    compressed_view *deviceView = 0;
+    const std::size_t ptr_count = (std::size_t) sparse::major_dim(src) + 1u;
+    const std::size_t view_offset = 0;
+    const std::size_t major_offset = align_up_bytes(sizeof(compressed_view), alignof(unsigned int));
+    const std::size_t minor_offset = align_up_bytes(major_offset + ptr_count * sizeof(unsigned int), alignof(unsigned int));
+    const std::size_t val_offset = align_up_bytes(minor_offset + (std::size_t) src->nnz * sizeof(unsigned int), alignof(__half));
+    const std::size_t total_bytes = val_offset + (std::size_t) src->nnz * sizeof(__half);
+    char *storage = 0;
     cudaError_t err = cudaSuccess;
 
     zero_record(record);
@@ -279,40 +393,36 @@ __host__ __forceinline__ cudaError_t upload_async(const ::cellshard::sparse::com
     host.minorIdx = 0;
     host.val = 0;
 
-    if (sparse::major_dim(src) != 0) {
-        err = cudaMalloc((void **) &host.majorPtr, ((std::size_t) sparse::major_dim(src) + 1) * sizeof(unsigned int));
-        if (err != cudaSuccess) goto fail;
-        err = cudaMemcpyAsync(host.majorPtr, src->majorPtr, ((std::size_t) sparse::major_dim(src) + 1) * sizeof(unsigned int), cudaMemcpyHostToDevice, stream);
+    err = cudaMalloc((void **) &storage, total_bytes == 0 ? sizeof(compressed_view) : total_bytes);
+    if (err != cudaSuccess) goto fail;
+    if (ptr_count != 0) {
+        host.majorPtr = (unsigned int *) (storage + major_offset);
+        err = cudaMemcpyAsync(host.majorPtr, src->majorPtr, ptr_count * sizeof(unsigned int), cudaMemcpyHostToDevice, stream);
         if (err != cudaSuccess) goto fail;
     }
 
     if (src->nnz != 0) {
-        err = cudaMalloc((void **) &host.minorIdx, src->nnz * sizeof(unsigned int));
-        if (err != cudaSuccess) goto fail;
+        host.minorIdx = (unsigned int *) (storage + minor_offset);
         err = cudaMemcpyAsync(host.minorIdx, src->minorIdx, src->nnz * sizeof(unsigned int), cudaMemcpyHostToDevice, stream);
         if (err != cudaSuccess) goto fail;
-        err = cudaMalloc((void **) &host.val, src->nnz * sizeof(__half));
-        if (err != cudaSuccess) goto fail;
+        host.val = (__half *) (storage + val_offset);
         err = cudaMemcpyAsync(host.val, src->val, src->nnz * sizeof(__half), cudaMemcpyHostToDevice, stream);
         if (err != cudaSuccess) goto fail;
     }
-
-    err = cudaMalloc((void **) &deviceView, sizeof(host));
-    if (err != cudaSuccess) goto fail;
-    err = cudaMemcpyAsync(deviceView, &host, sizeof(host), cudaMemcpyHostToDevice, stream);
+    err = cudaMemcpyAsync(storage + view_offset, &host, sizeof(host), cudaMemcpyHostToDevice, stream);
     if (err != cudaSuccess) goto fail;
 
-    record->view = deviceView;
+    record->allocation = storage;
+    record->allocation_bytes = total_bytes;
+    record->storage = storage;
+    record->view = storage + view_offset;
     record->a0 = host.majorPtr;
     record->a1 = host.minorIdx;
     record->a2 = host.val;
     return cudaSuccess;
 
 fail:
-    if (deviceView != 0) cudaFree(deviceView);
-    if (host.val != 0) cudaFree(host.val);
-    if (host.minorIdx != 0) cudaFree(host.minorIdx);
-    if (host.majorPtr != 0) cudaFree(host.majorPtr);
+    if (storage != 0) cudaFree(storage);
     zero_record(record);
     return err;
 }
@@ -321,7 +431,12 @@ fail:
 // row index copy, column index copy, value copy, then descriptor copy.
 __host__ __forceinline__ cudaError_t upload(const ::cellshard::sparse::coo *src, part_record< ::cellshard::sparse::coo > *record) {
     coo_view host;
-    coo_view *deviceView = 0;
+    const std::size_t view_offset = 0;
+    const std::size_t row_offset = align_up_bytes(sizeof(coo_view), alignof(unsigned int));
+    const std::size_t col_offset = align_up_bytes(row_offset + (std::size_t) src->nnz * sizeof(unsigned int), alignof(unsigned int));
+    const std::size_t val_offset = align_up_bytes(col_offset + (std::size_t) src->nnz * sizeof(unsigned int), alignof(__half));
+    const std::size_t total_bytes = val_offset + (std::size_t) src->nnz * sizeof(__half);
+    char *storage = 0;
     cudaError_t err = cudaSuccess;
 
     zero_record(record);
@@ -332,37 +447,33 @@ __host__ __forceinline__ cudaError_t upload(const ::cellshard::sparse::coo *src,
     host.colIdx = 0;
     host.val = 0;
 
+    err = cudaMalloc((void **) &storage, total_bytes == 0 ? sizeof(coo_view) : total_bytes);
+    if (err != cudaSuccess) goto fail;
     if (src->nnz != 0) {
-        err = cudaMalloc((void **) &host.rowIdx, src->nnz * sizeof(unsigned int));
-        if (err != cudaSuccess) goto fail;
+        host.rowIdx = (unsigned int *) (storage + row_offset);
         err = cudaMemcpy(host.rowIdx, src->rowIdx, src->nnz * sizeof(unsigned int), cudaMemcpyHostToDevice);
         if (err != cudaSuccess) goto fail;
-        err = cudaMalloc((void **) &host.colIdx, src->nnz * sizeof(unsigned int));
-        if (err != cudaSuccess) goto fail;
+        host.colIdx = (unsigned int *) (storage + col_offset);
         err = cudaMemcpy(host.colIdx, src->colIdx, src->nnz * sizeof(unsigned int), cudaMemcpyHostToDevice);
         if (err != cudaSuccess) goto fail;
-        err = cudaMalloc((void **) &host.val, src->nnz * sizeof(__half));
-        if (err != cudaSuccess) goto fail;
+        host.val = (__half *) (storage + val_offset);
         err = cudaMemcpy(host.val, src->val, src->nnz * sizeof(__half), cudaMemcpyHostToDevice);
         if (err != cudaSuccess) goto fail;
     }
-
-    err = cudaMalloc((void **) &deviceView, sizeof(host));
-    if (err != cudaSuccess) goto fail;
-    err = cudaMemcpy(deviceView, &host, sizeof(host), cudaMemcpyHostToDevice);
+    err = cudaMemcpy(storage + view_offset, &host, sizeof(host), cudaMemcpyHostToDevice);
     if (err != cudaSuccess) goto fail;
 
-    record->view = deviceView;
+    record->allocation = storage;
+    record->allocation_bytes = total_bytes;
+    record->storage = storage;
+    record->view = storage + view_offset;
     record->a0 = host.rowIdx;
     record->a1 = host.colIdx;
     record->a2 = host.val;
     return cudaSuccess;
 
 fail:
-    if (deviceView != 0) cudaFree(deviceView);
-    if (host.val != 0) cudaFree(host.val);
-    if (host.colIdx != 0) cudaFree(host.colIdx);
-    if (host.rowIdx != 0) cudaFree(host.rowIdx);
+    if (storage != 0) cudaFree(storage);
     zero_record(record);
     return err;
 }
@@ -373,7 +484,12 @@ __host__ __forceinline__ cudaError_t upload_async(const ::cellshard::sparse::coo
                                                   part_record< ::cellshard::sparse::coo > *record,
                                                   cudaStream_t stream) {
     coo_view host;
-    coo_view *deviceView = 0;
+    const std::size_t view_offset = 0;
+    const std::size_t row_offset = align_up_bytes(sizeof(coo_view), alignof(unsigned int));
+    const std::size_t col_offset = align_up_bytes(row_offset + (std::size_t) src->nnz * sizeof(unsigned int), alignof(unsigned int));
+    const std::size_t val_offset = align_up_bytes(col_offset + (std::size_t) src->nnz * sizeof(unsigned int), alignof(__half));
+    const std::size_t total_bytes = val_offset + (std::size_t) src->nnz * sizeof(__half);
+    char *storage = 0;
     cudaError_t err = cudaSuccess;
 
     zero_record(record);
@@ -384,37 +500,33 @@ __host__ __forceinline__ cudaError_t upload_async(const ::cellshard::sparse::coo
     host.colIdx = 0;
     host.val = 0;
 
+    err = cudaMalloc((void **) &storage, total_bytes == 0 ? sizeof(coo_view) : total_bytes);
+    if (err != cudaSuccess) goto fail;
     if (src->nnz != 0) {
-        err = cudaMalloc((void **) &host.rowIdx, src->nnz * sizeof(unsigned int));
-        if (err != cudaSuccess) goto fail;
+        host.rowIdx = (unsigned int *) (storage + row_offset);
         err = cudaMemcpyAsync(host.rowIdx, src->rowIdx, src->nnz * sizeof(unsigned int), cudaMemcpyHostToDevice, stream);
         if (err != cudaSuccess) goto fail;
-        err = cudaMalloc((void **) &host.colIdx, src->nnz * sizeof(unsigned int));
-        if (err != cudaSuccess) goto fail;
+        host.colIdx = (unsigned int *) (storage + col_offset);
         err = cudaMemcpyAsync(host.colIdx, src->colIdx, src->nnz * sizeof(unsigned int), cudaMemcpyHostToDevice, stream);
         if (err != cudaSuccess) goto fail;
-        err = cudaMalloc((void **) &host.val, src->nnz * sizeof(__half));
-        if (err != cudaSuccess) goto fail;
+        host.val = (__half *) (storage + val_offset);
         err = cudaMemcpyAsync(host.val, src->val, src->nnz * sizeof(__half), cudaMemcpyHostToDevice, stream);
         if (err != cudaSuccess) goto fail;
     }
-
-    err = cudaMalloc((void **) &deviceView, sizeof(host));
-    if (err != cudaSuccess) goto fail;
-    err = cudaMemcpyAsync(deviceView, &host, sizeof(host), cudaMemcpyHostToDevice, stream);
+    err = cudaMemcpyAsync(storage + view_offset, &host, sizeof(host), cudaMemcpyHostToDevice, stream);
     if (err != cudaSuccess) goto fail;
 
-    record->view = deviceView;
+    record->allocation = storage;
+    record->allocation_bytes = total_bytes;
+    record->storage = storage;
+    record->view = storage + view_offset;
     record->a0 = host.rowIdx;
     record->a1 = host.colIdx;
     record->a2 = host.val;
     return cudaSuccess;
 
 fail:
-    if (deviceView != 0) cudaFree(deviceView);
-    if (host.val != 0) cudaFree(host.val);
-    if (host.colIdx != 0) cudaFree(host.colIdx);
-    if (host.rowIdx != 0) cudaFree(host.rowIdx);
+    if (storage != 0) cudaFree(storage);
     zero_record(record);
     return err;
 }
@@ -423,7 +535,11 @@ fail:
 // descriptor that points at those allocations.
 __host__ __forceinline__ cudaError_t upload(const ::cellshard::sparse::dia *src, part_record< ::cellshard::sparse::dia > *record) {
     dia_view host;
-    dia_view *deviceView = 0;
+    const std::size_t view_offset = 0;
+    const std::size_t offsets_offset = align_up_bytes(sizeof(dia_view), alignof(int));
+    const std::size_t val_offset = align_up_bytes(offsets_offset + (std::size_t) src->num_diagonals * sizeof(int), alignof(__half));
+    const std::size_t total_bytes = val_offset + (std::size_t) src->nnz * sizeof(__half);
+    char *storage = 0;
     cudaError_t err = cudaSuccess;
 
     zero_record(record);
@@ -434,33 +550,31 @@ __host__ __forceinline__ cudaError_t upload(const ::cellshard::sparse::dia *src,
     host.offsets = 0;
     host.val = 0;
 
+    err = cudaMalloc((void **) &storage, total_bytes == 0 ? sizeof(dia_view) : total_bytes);
+    if (err != cudaSuccess) goto fail;
     if (src->num_diagonals != 0) {
-        err = cudaMalloc((void **) &host.offsets, src->num_diagonals * sizeof(int));
-        if (err != cudaSuccess) goto fail;
+        host.offsets = (int *) (storage + offsets_offset);
         err = cudaMemcpy(host.offsets, src->offsets, src->num_diagonals * sizeof(int), cudaMemcpyHostToDevice);
         if (err != cudaSuccess) goto fail;
     }
     if (src->nnz != 0) {
-        err = cudaMalloc((void **) &host.val, src->nnz * sizeof(__half));
-        if (err != cudaSuccess) goto fail;
+        host.val = (__half *) (storage + val_offset);
         err = cudaMemcpy(host.val, src->val, src->nnz * sizeof(__half), cudaMemcpyHostToDevice);
         if (err != cudaSuccess) goto fail;
     }
-
-    err = cudaMalloc((void **) &deviceView, sizeof(host));
-    if (err != cudaSuccess) goto fail;
-    err = cudaMemcpy(deviceView, &host, sizeof(host), cudaMemcpyHostToDevice);
+    err = cudaMemcpy(storage + view_offset, &host, sizeof(host), cudaMemcpyHostToDevice);
     if (err != cudaSuccess) goto fail;
 
-    record->view = deviceView;
+    record->allocation = storage;
+    record->allocation_bytes = total_bytes;
+    record->storage = storage;
+    record->view = storage + view_offset;
     record->a0 = host.offsets;
     record->a1 = host.val;
     return cudaSuccess;
 
 fail:
-    if (deviceView != 0) cudaFree(deviceView);
-    if (host.val != 0) cudaFree(host.val);
-    if (host.offsets != 0) cudaFree(host.offsets);
+    if (storage != 0) cudaFree(storage);
     zero_record(record);
     return err;
 }
@@ -471,7 +585,11 @@ __host__ __forceinline__ cudaError_t upload_async(const ::cellshard::sparse::dia
                                                   part_record< ::cellshard::sparse::dia > *record,
                                                   cudaStream_t stream) {
     dia_view host;
-    dia_view *deviceView = 0;
+    const std::size_t view_offset = 0;
+    const std::size_t offsets_offset = align_up_bytes(sizeof(dia_view), alignof(int));
+    const std::size_t val_offset = align_up_bytes(offsets_offset + (std::size_t) src->num_diagonals * sizeof(int), alignof(__half));
+    const std::size_t total_bytes = val_offset + (std::size_t) src->nnz * sizeof(__half);
+    char *storage = 0;
     cudaError_t err = cudaSuccess;
 
     zero_record(record);
@@ -482,33 +600,31 @@ __host__ __forceinline__ cudaError_t upload_async(const ::cellshard::sparse::dia
     host.offsets = 0;
     host.val = 0;
 
+    err = cudaMalloc((void **) &storage, total_bytes == 0 ? sizeof(dia_view) : total_bytes);
+    if (err != cudaSuccess) goto fail;
     if (src->num_diagonals != 0) {
-        err = cudaMalloc((void **) &host.offsets, src->num_diagonals * sizeof(int));
-        if (err != cudaSuccess) goto fail;
+        host.offsets = (int *) (storage + offsets_offset);
         err = cudaMemcpyAsync(host.offsets, src->offsets, src->num_diagonals * sizeof(int), cudaMemcpyHostToDevice, stream);
         if (err != cudaSuccess) goto fail;
     }
     if (src->nnz != 0) {
-        err = cudaMalloc((void **) &host.val, src->nnz * sizeof(__half));
-        if (err != cudaSuccess) goto fail;
+        host.val = (__half *) (storage + val_offset);
         err = cudaMemcpyAsync(host.val, src->val, src->nnz * sizeof(__half), cudaMemcpyHostToDevice, stream);
         if (err != cudaSuccess) goto fail;
     }
-
-    err = cudaMalloc((void **) &deviceView, sizeof(host));
-    if (err != cudaSuccess) goto fail;
-    err = cudaMemcpyAsync(deviceView, &host, sizeof(host), cudaMemcpyHostToDevice, stream);
+    err = cudaMemcpyAsync(storage + view_offset, &host, sizeof(host), cudaMemcpyHostToDevice, stream);
     if (err != cudaSuccess) goto fail;
 
-    record->view = deviceView;
+    record->allocation = storage;
+    record->allocation_bytes = total_bytes;
+    record->storage = storage;
+    record->view = storage + view_offset;
     record->a0 = host.offsets;
     record->a1 = host.val;
     return cudaSuccess;
 
 fail:
-    if (deviceView != 0) cudaFree(deviceView);
-    if (host.val != 0) cudaFree(host.val);
-    if (host.offsets != 0) cudaFree(host.offsets);
+    if (storage != 0) cudaFree(storage);
     zero_record(record);
     return err;
 }
@@ -517,6 +633,12 @@ template<typename MatrixT>
 __host__ __forceinline__ cudaError_t release(part_record<MatrixT> *record) {
     cudaError_t err = cudaSuccess;
 
+    if (record->allocation != 0) {
+        err = cudaFree(record->allocation);
+        if (err != cudaSuccess) return err;
+        zero_record(record);
+        return cudaSuccess;
+    }
     if (record->a2 != 0) {
         err = cudaFree(record->a2);
         if (err != cudaSuccess) return err;
@@ -537,32 +659,88 @@ __host__ __forceinline__ cudaError_t release(part_record<MatrixT> *record) {
     return cudaSuccess;
 }
 
+template<typename MatrixT>
+__host__ __forceinline__ cudaError_t upload_part_current_device(sharded_device<MatrixT> *state,
+                                                                const ::cellshard::sharded<MatrixT> *view,
+                                                                unsigned long partId,
+                                                                int deviceId) {
+    cudaError_t err = cudaSuccess;
+
+    // The caller already selected the destination device. Keep that selection
+    // stable across as many part uploads as possible so shard uploads only pay
+    // one cudaSetDevice() in the common case.
+    if (partId >= view->num_parts || partId >= state->capacity || view->parts[partId] == 0) return cudaErrorInvalidValue;
+    if (state->parts[partId].view != 0) {
+        if (state->parts[partId].device_id == deviceId) return cudaSuccess;
+        err = release_part(state, partId);
+        if (err != cudaSuccess) return err;
+        err = cudaSetDevice(deviceId);
+        if (err != cudaSuccess) return err;
+    }
+    err = upload(view->parts[partId], &state->parts[partId]);
+    if (err != cudaSuccess) return err;
+    state->parts[partId].allocation = state->parts[partId].storage;
+    state->parts[partId].group_begin = partId;
+    state->parts[partId].group_end = partId + 1;
+    state->parts[partId].device_id = deviceId;
+    return cudaSuccess;
+}
+
+template<typename MatrixT>
+__host__ __forceinline__ cudaError_t upload_part_current_device_async(sharded_device<MatrixT> *state,
+                                                                      const ::cellshard::sharded<MatrixT> *view,
+                                                                      unsigned long partId,
+                                                                      int deviceId,
+                                                                      cudaStream_t stream) {
+    cudaError_t err = cudaSuccess;
+
+    // Async here means stream-ordered copies after the caller has already
+    // selected the destination device. Host-side decision-making stays outside
+    // this helper so whole-shard uploads can queue densely on one stream.
+    if (partId >= view->num_parts || partId >= state->capacity || view->parts[partId] == 0) return cudaErrorInvalidValue;
+    if (state->parts[partId].view != 0) {
+        if (state->parts[partId].device_id == deviceId) return cudaSuccess;
+        err = release_part(state, partId);
+        if (err != cudaSuccess) return err;
+        err = cudaSetDevice(deviceId);
+        if (err != cudaSuccess) return err;
+    }
+    err = upload_async(view->parts[partId], &state->parts[partId], stream);
+    if (err != cudaSuccess) return err;
+    state->parts[partId].allocation = state->parts[partId].storage;
+    state->parts[partId].group_begin = partId;
+    state->parts[partId].group_end = partId + 1;
+    state->parts[partId].device_id = deviceId;
+    return cudaSuccess;
+}
+
 // Byte estimates below are the resident device footprint after upload. They are
 // not disk bytes and not host bytes. Use them when balancing shard ownership
 // across GPUs.
 __host__ __forceinline__ std::size_t device_part_bytes(const ::cellshard::sharded< ::cellshard::dense > *view, unsigned long partId) {
-    return sizeof(dense_view) + (std::size_t) view->part_nnz[partId] * sizeof(__half);
+    const std::size_t val_offset = align_up_bytes(sizeof(dense_view), alignof(__half));
+    return val_offset + (std::size_t) view->part_nnz[partId] * sizeof(__half);
 }
 
 __host__ __forceinline__ std::size_t device_part_bytes(const ::cellshard::sharded< ::cellshard::sparse::compressed > *view, unsigned long partId) {
     const unsigned long ptr_dim = view->part_aux[partId] == sparse::compressed_by_col ? view->cols : view->part_rows[partId];
-    return sizeof(compressed_view)
-        + (std::size_t) (ptr_dim + 1) * sizeof(unsigned int)
-        + (std::size_t) view->part_nnz[partId] * sizeof(unsigned int)
-        + (std::size_t) view->part_nnz[partId] * sizeof(__half);
+    const std::size_t major_offset = align_up_bytes(sizeof(compressed_view), alignof(unsigned int));
+    const std::size_t minor_offset = align_up_bytes(major_offset + (std::size_t) (ptr_dim + 1) * sizeof(unsigned int), alignof(unsigned int));
+    const std::size_t val_offset = align_up_bytes(minor_offset + (std::size_t) view->part_nnz[partId] * sizeof(unsigned int), alignof(__half));
+    return val_offset + (std::size_t) view->part_nnz[partId] * sizeof(__half);
 }
 
 __host__ __forceinline__ std::size_t device_part_bytes(const ::cellshard::sharded< ::cellshard::sparse::coo > *view, unsigned long partId) {
-    return sizeof(coo_view)
-        + (std::size_t) view->part_nnz[partId] * sizeof(unsigned int)
-        + (std::size_t) view->part_nnz[partId] * sizeof(unsigned int)
-        + (std::size_t) view->part_nnz[partId] * sizeof(__half);
+    const std::size_t row_offset = align_up_bytes(sizeof(coo_view), alignof(unsigned int));
+    const std::size_t col_offset = align_up_bytes(row_offset + (std::size_t) view->part_nnz[partId] * sizeof(unsigned int), alignof(unsigned int));
+    const std::size_t val_offset = align_up_bytes(col_offset + (std::size_t) view->part_nnz[partId] * sizeof(unsigned int), alignof(__half));
+    return val_offset + (std::size_t) view->part_nnz[partId] * sizeof(__half);
 }
 
 __host__ __forceinline__ std::size_t device_part_bytes(const ::cellshard::sharded< ::cellshard::sparse::dia > *view, unsigned long partId) {
-    return sizeof(dia_view)
-        + (std::size_t) view->part_aux[partId] * sizeof(int)
-        + (std::size_t) view->part_nnz[partId] * sizeof(__half);
+    const std::size_t offsets_offset = align_up_bytes(sizeof(dia_view), alignof(int));
+    const std::size_t val_offset = align_up_bytes(offsets_offset + (std::size_t) view->part_aux[partId] * sizeof(int), alignof(__half));
+    return val_offset + (std::size_t) view->part_nnz[partId] * sizeof(__half);
 }
 
 template<typename MatrixT>
@@ -605,6 +783,7 @@ __host__ __forceinline__ int set_shards_by_device_bytes(::cellshard::sharded<Mat
         view->shard_offsets[shardCount] = view->rows;
     }
     view->num_shards = shardCount;
+    ::cellshard::rebuild_shard_parts(view);
     return 1;
 }
 
@@ -614,18 +793,9 @@ template<typename MatrixT>
 __host__ __forceinline__ cudaError_t upload_part(sharded_device<MatrixT> *state, const ::cellshard::sharded<MatrixT> *view, unsigned long partId, int deviceId) {
     cudaError_t err = cudaSuccess;
 
-    if (partId >= view->num_parts || partId >= state->capacity || view->parts[partId] == 0) return cudaErrorInvalidValue;
-    if (state->parts[partId].view != 0) {
-        if (state->parts[partId].device_id == deviceId) return cudaSuccess;
-        err = release_part(state, partId);
-        if (err != cudaSuccess) return err;
-    }
     err = cudaSetDevice(deviceId);
     if (err != cudaSuccess) return err;
-    err = upload(view->parts[partId], &state->parts[partId]);
-    if (err != cudaSuccess) return err;
-    state->parts[partId].device_id = deviceId;
-    return cudaSuccess;
+    return upload_part_current_device(state, view, partId, deviceId);
 }
 
 // Async upload_part still inspects host state synchronously before enqueueing
@@ -638,28 +808,170 @@ __host__ __forceinline__ cudaError_t upload_part_async(sharded_device<MatrixT> *
                                                        cudaStream_t stream) {
     cudaError_t err = cudaSuccess;
 
-    if (partId >= view->num_parts || partId >= state->capacity || view->parts[partId] == 0) return cudaErrorInvalidValue;
-    if (state->parts[partId].view != 0) {
-        if (state->parts[partId].device_id == deviceId) return cudaSuccess;
-        err = release_part(state, partId);
-        if (err != cudaSuccess) return err;
-    }
     err = cudaSetDevice(deviceId);
     if (err != cudaSuccess) return err;
-    err = upload_async(view->parts[partId], &state->parts[partId], stream);
-    if (err != cudaSuccess) return err;
-    state->parts[partId].device_id = deviceId;
-    return cudaSuccess;
+    return upload_part_current_device_async(state, view, partId, deviceId, stream);
 }
 
 template<typename MatrixT>
 __host__ __forceinline__ cudaError_t release_part(sharded_device<MatrixT> *state, unsigned long partId) {
+    unsigned long begin = 0;
+    unsigned long end = 0;
+    unsigned long owner = 0;
+    unsigned long i = 0;
     cudaError_t err = cudaSuccess;
 
     if (partId >= state->capacity || state->parts[partId].view == 0) return cudaSuccess;
     err = cudaSetDevice(state->parts[partId].device_id >= 0 ? state->parts[partId].device_id : 0);
     if (err != cudaSuccess) return err;
-    return release(&state->parts[partId]);
+    begin = state->parts[partId].group_begin;
+    end = state->parts[partId].group_end;
+    if (end <= begin || end > state->capacity) {
+        return release(&state->parts[partId]);
+    }
+    owner = begin;
+    if (state->parts[owner].allocation != 0) {
+        err = cache_allocation(state,
+                               state->parts[owner].device_id,
+                               state->parts[owner].allocation,
+                               state->parts[owner].allocation_bytes);
+        if (err != cudaSuccess) return err;
+    } else if (state->parts[owner].storage != 0) {
+        err = cudaFree(state->parts[owner].storage);
+        if (err != cudaSuccess) return err;
+    }
+    for (i = begin; i < end; ++i) zero_record(&state->parts[i]);
+    return cudaSuccess;
+}
+
+// Compressed parts already live in one packed host allocation
+// [majorPtr][minorIdx][val]. When staging a full shard, mirror that layout on
+// device and pack all descriptors into one front-matter block. That changes the
+// hot stage path from:
+// - 1 cudaMalloc per part
+// - 4 H2D copies per part
+// to:
+// - 1 cudaMalloc per shard
+// - 1 descriptor copy per shard
+// - 1 payload copy per part
+//
+// The payload copies remain because the host parts are separate allocations, but
+// allocator churn and descriptor traffic drop sharply.
+__host__ __forceinline__ std::size_t compressed_payload_bytes(const ::cellshard::sparse::compressed *src) {
+    const std::size_t ptr_count = (std::size_t) sparse::major_dim(src) + 1u;
+    const std::size_t minor_offset = align_up_bytes(ptr_count * sizeof(unsigned int), alignof(unsigned int));
+    const std::size_t val_offset = align_up_bytes(minor_offset + (std::size_t) src->nnz * sizeof(unsigned int), alignof(__half));
+    return val_offset + (std::size_t) src->nnz * sizeof(__half);
+}
+
+__host__ __forceinline__ cudaError_t upload_compressed_shard_current_device_async(
+    sharded_device< ::cellshard::sparse::compressed > *state,
+    const ::cellshard::sharded< ::cellshard::sparse::compressed > *view,
+    unsigned long shardId,
+    int deviceId,
+    cudaStream_t stream
+) {
+    unsigned long begin = 0;
+    unsigned long end = 0;
+    unsigned long part = 0;
+    std::size_t descriptor_bytes = 0;
+    std::size_t allocation_bytes = 0;
+    std::size_t total_bytes = 0;
+    char *allocation = 0;
+    char *descriptor_base = 0;
+    char *payload_base = 0;
+    std::vector<compressed_view> host_views;
+    cudaError_t err = cudaSuccess;
+
+    if (shardId >= view->num_shards) return cudaErrorInvalidValue;
+    begin = ::cellshard::first_part_in_shard(view, shardId);
+    end = ::cellshard::last_part_in_shard(view, shardId);
+    if (begin >= end) return cudaSuccess;
+
+    for (part = begin; part < end; ++part) {
+        if (part >= state->capacity || view->parts[part] == 0) return cudaErrorInvalidValue;
+        if (state->parts[part].view == 0 || state->parts[part].device_id != deviceId) {
+            break;
+        }
+    }
+    if (part == end) return cudaSuccess;
+
+    for (part = begin; part < end; ++part) {
+        if (state->parts[part].view != 0) {
+            err = release_part(state, part);
+            if (err != cudaSuccess) return err;
+        }
+    }
+
+    host_views.resize((std::size_t) (end - begin));
+    descriptor_bytes = align_up_bytes(host_views.size() * sizeof(compressed_view), alignof(unsigned int));
+    total_bytes = descriptor_bytes;
+    for (part = begin; part < end; ++part) {
+        total_bytes = align_up_bytes(total_bytes, alignof(unsigned int));
+        total_bytes += compressed_payload_bytes(view->parts[part]);
+    }
+
+    allocation = (char *) take_cached_allocation(state, deviceId, total_bytes, &allocation_bytes);
+    if (allocation == 0) {
+        err = cudaMalloc((void **) &allocation, total_bytes);
+        if (err != cudaSuccess) return err;
+        allocation_bytes = total_bytes;
+    }
+
+    descriptor_base = allocation;
+    payload_base = allocation + descriptor_bytes;
+    for (part = begin; part < end; ++part) {
+        const ::cellshard::sparse::compressed *src = view->parts[part];
+        const std::size_t part_payload_bytes = compressed_payload_bytes(src);
+        const std::size_t ptr_count = (std::size_t) sparse::major_dim(src) + 1u;
+        const std::size_t minor_offset = align_up_bytes(ptr_count * sizeof(unsigned int), alignof(unsigned int));
+        const std::size_t val_offset = align_up_bytes(minor_offset + (std::size_t) src->nnz * sizeof(unsigned int), alignof(__half));
+        compressed_view &dst = host_views[(std::size_t) (part - begin)];
+
+        payload_base = (char *) align_up_bytes((std::size_t) payload_base, alignof(unsigned int));
+        dst.rows = src->rows;
+        dst.cols = src->cols;
+        dst.nnz = src->nnz;
+        dst.axis = src->axis;
+        dst.majorPtr = (unsigned int *) payload_base;
+        dst.minorIdx = (unsigned int *) (payload_base + minor_offset);
+        dst.val = (__half *) (payload_base + val_offset);
+
+        err = cudaMemcpyAsync(payload_base,
+                              src->storage,
+                              part_payload_bytes,
+                              cudaMemcpyHostToDevice,
+                              stream);
+        if (err != cudaSuccess) goto fail;
+        payload_base += part_payload_bytes;
+    }
+
+    err = cudaMemcpyAsync(descriptor_base,
+                          host_views.data(),
+                          host_views.size() * sizeof(compressed_view),
+                          cudaMemcpyHostToDevice,
+                          stream);
+    if (err != cudaSuccess) goto fail;
+
+    for (part = begin; part < end; ++part) {
+        const unsigned long slot = part - begin;
+        state->parts[part].allocation = part == begin ? allocation : 0;
+        state->parts[part].allocation_bytes = part == begin ? allocation_bytes : 0;
+        state->parts[part].storage = part == begin ? allocation : 0;
+        state->parts[part].view = descriptor_base + slot * sizeof(compressed_view);
+        state->parts[part].a0 = host_views[(std::size_t) slot].majorPtr;
+        state->parts[part].a1 = host_views[(std::size_t) slot].minorIdx;
+        state->parts[part].a2 = host_views[(std::size_t) slot].val;
+        state->parts[part].group_begin = begin;
+        state->parts[part].group_end = end;
+        state->parts[part].device_id = deviceId;
+    }
+    return cudaSuccess;
+
+fail:
+    if (allocation != 0) cudaFree(allocation);
+    for (part = begin; part < end; ++part) zero_record(&state->parts[part]);
+    return err;
 }
 
 // Shard upload is a loop over per-part uploads. There is no packed multi-part
@@ -674,11 +986,28 @@ __host__ __forceinline__ cudaError_t upload_shard(sharded_device<MatrixT> *state
     if (shardId >= view->num_shards) return cudaErrorInvalidValue;
     begin = ::cellshard::first_part_in_shard(view, shardId);
     end = ::cellshard::last_part_in_shard(view, shardId);
+    err = cudaSetDevice(deviceId);
+    if (err != cudaSuccess) return err;
     for (i = begin; i < end; ++i) {
-        err = upload_part(state, view, i, deviceId);
+        err = upload_part_current_device(state, view, i, deviceId);
         if (err != cudaSuccess) return err;
     }
     return cudaSuccess;
+}
+
+__host__ __forceinline__ cudaError_t upload_shard(
+    sharded_device< ::cellshard::sparse::compressed > *state,
+    const ::cellshard::sharded< ::cellshard::sparse::compressed > *view,
+    unsigned long shardId,
+    int deviceId
+) {
+    cudaError_t err = cudaSuccess;
+
+    err = cudaSetDevice(deviceId);
+    if (err != cudaSuccess) return err;
+    err = upload_compressed_shard_current_device_async(state, view, shardId, deviceId, (cudaStream_t) 0);
+    if (err != cudaSuccess) return err;
+    return cudaStreamSynchronize((cudaStream_t) 0);
 }
 
 // Async shard upload preserves the same per-part behavior and copy count as the
@@ -697,11 +1026,28 @@ __host__ __forceinline__ cudaError_t upload_shard_async(sharded_device<MatrixT> 
     if (shardId >= view->num_shards) return cudaErrorInvalidValue;
     begin = ::cellshard::first_part_in_shard(view, shardId);
     end = ::cellshard::last_part_in_shard(view, shardId);
+    err = cudaSetDevice(deviceId);
+    if (err != cudaSuccess) return err;
     for (i = begin; i < end; ++i) {
-        err = upload_part_async(state, view, i, deviceId, stream);
+        err = upload_part_current_device_async(state, view, i, deviceId, stream);
         if (err != cudaSuccess) return err;
     }
     return cudaSuccess;
+}
+
+__host__ __forceinline__ cudaError_t upload_shard_async(
+    sharded_device< ::cellshard::sparse::compressed > *state,
+    const ::cellshard::sharded< ::cellshard::sparse::compressed > *view,
+    unsigned long shardId,
+    int deviceId,
+    cudaStream_t stream
+) {
+    cudaError_t err = cudaSuccess;
+
+    if (shardId >= view->num_shards) return cudaErrorInvalidValue;
+    err = cudaSetDevice(deviceId);
+    if (err != cudaSuccess) return err;
+    return upload_compressed_shard_current_device_async(state, view, shardId, deviceId, stream);
 }
 
 template<typename MatrixT>
@@ -715,6 +1061,7 @@ __host__ __forceinline__ cudaError_t release_shard(sharded_device<MatrixT> *stat
     begin = ::cellshard::first_part_in_shard(view, shardId);
     end = ::cellshard::last_part_in_shard(view, shardId);
     for (i = begin; i < end; ++i) {
+        if (i >= state->capacity || state->parts[i].view == 0) continue;
         err = release_part(state, i);
         if (err != cudaSuccess) return err;
     }
@@ -748,7 +1095,9 @@ __host__ __forceinline__ cudaError_t stage_part(sharded_device<MatrixT> *state,
     if (view->parts[partId] == 0) {
         if (!::cellshard::fetch_part(view, files, partId)) return cudaErrorInvalidValue;
     }
-    err = upload_part(state, view, partId, deviceId);
+    err = cudaSetDevice(deviceId);
+    if (err != cudaSuccess) return err;
+    err = upload_part_current_device(state, view, partId, deviceId);
     if (err != cudaSuccess) return err;
     if (drop_host_after_upload) {
         if (!::cellshard::drop_part(view, partId)) return cudaErrorInvalidValue;
@@ -778,7 +1127,9 @@ __host__ __forceinline__ cudaError_t stage_part_async(sharded_device<MatrixT> *s
     if (view->parts[partId] == 0) {
         if (!::cellshard::fetch_part(view, files, partId)) return cudaErrorInvalidValue;
     }
-    err = upload_part_async(state, view, partId, deviceId, stream);
+    err = cudaSetDevice(deviceId);
+    if (err != cudaSuccess) return err;
+    err = upload_part_current_device_async(state, view, partId, deviceId, stream);
     if (err != cudaSuccess) return err;
     if (drop_host_after_upload) {
         if (!::cellshard::drop_part(view, partId)) return cudaErrorInvalidValue;
@@ -786,8 +1137,8 @@ __host__ __forceinline__ cudaError_t stage_part_async(sharded_device<MatrixT> *s
     return cudaSuccess;
 }
 
-// Shard staging is a serial loop over stage_part(). If the caller wants good
-// overlap, shard size and part count need to be chosen accordingly.
+// Shard staging now fetches any cold host parts for the whole shard first and
+// then uploads with one device selection across the shard.
 template<typename MatrixT>
 __host__ __forceinline__ cudaError_t stage_shard(sharded_device<MatrixT> *state,
                                ::cellshard::sharded<MatrixT> *view,
@@ -795,23 +1146,22 @@ __host__ __forceinline__ cudaError_t stage_shard(sharded_device<MatrixT> *state,
                                unsigned long shardId,
                                int deviceId,
                                int drop_host_after_upload) {
-    unsigned long begin = 0;
-    unsigned long end = 0;
-    unsigned long i = 0;
     cudaError_t err = cudaSuccess;
 
     if (shardId >= view->num_shards) return cudaErrorInvalidValue;
-    begin = ::cellshard::first_part_in_shard(view, shardId);
-    end = ::cellshard::last_part_in_shard(view, shardId);
-    for (i = begin; i < end; ++i) {
-        err = stage_part(state, view, files, i, deviceId, drop_host_after_upload);
-        if (err != cudaSuccess) return err;
+    if (!::cellshard::shard_loaded(view, shardId)) {
+        if (!::cellshard::fetch_shard(view, files, shardId)) return cudaErrorInvalidValue;
+    }
+    err = upload_shard(state, view, shardId, deviceId);
+    if (err != cudaSuccess) return err;
+    if (drop_host_after_upload) {
+        if (!::cellshard::drop_shard(view, shardId)) return cudaErrorInvalidValue;
     }
     return cudaSuccess;
 }
 
-// Async shard staging still performs synchronous packfile reads for any cold
-// parts before it queues H2D copies on the supplied stream.
+// Async shard staging now front-loads any cold host fetch for the whole shard,
+// then uploads the resident part set with one device selection.
 template<typename MatrixT>
 __host__ __forceinline__ cudaError_t stage_shard_async(sharded_device<MatrixT> *state,
                                                        ::cellshard::sharded<MatrixT> *view,
@@ -820,17 +1170,16 @@ __host__ __forceinline__ cudaError_t stage_shard_async(sharded_device<MatrixT> *
                                                        int deviceId,
                                                        cudaStream_t stream,
                                                        int drop_host_after_upload) {
-    unsigned long begin = 0;
-    unsigned long end = 0;
-    unsigned long i = 0;
     cudaError_t err = cudaSuccess;
 
     if (shardId >= view->num_shards) return cudaErrorInvalidValue;
-    begin = ::cellshard::first_part_in_shard(view, shardId);
-    end = ::cellshard::last_part_in_shard(view, shardId);
-    for (i = begin; i < end; ++i) {
-        err = stage_part_async(state, view, files, i, deviceId, stream, drop_host_after_upload);
-        if (err != cudaSuccess) return err;
+    if (!::cellshard::shard_loaded(view, shardId)) {
+        if (!::cellshard::fetch_shard(view, files, shardId)) return cudaErrorInvalidValue;
+    }
+    err = upload_shard_async(state, view, shardId, deviceId, stream);
+    if (err != cudaSuccess) return err;
+    if (drop_host_after_upload) {
+        if (!::cellshard::drop_shard(view, shardId)) return cudaErrorInvalidValue;
     }
     return cudaSuccess;
 }

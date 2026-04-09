@@ -74,12 +74,14 @@ struct disk_format_code<sparse::dia> {
 // them.
 struct dense_load_result {
     disk_header h;
+    void *storage;
     void *val;
 };
 
 struct compressed_load_result {
     disk_header h;
     types::u32 axis;
+    void *storage;
     types::ptr_t *majorPtr;
     types::idx_t *minorIdx;
     void *val;
@@ -87,6 +89,7 @@ struct compressed_load_result {
 
 struct coo_load_result {
     disk_header h;
+    void *storage;
     types::idx_t *rowIdx;
     types::idx_t *colIdx;
     void *val;
@@ -95,6 +98,7 @@ struct coo_load_result {
 struct dia_load_result {
     disk_header h;
     types::idx_t num_diagonals;
+    void *storage;
     int *offsets;
     void *val;
 };
@@ -166,10 +170,12 @@ inline int store(const char *filename, const dense *m) {
 inline int load(const char *filename, dense *m) {
     dense_load_result tmp;
 
+    tmp.storage = 0;
     tmp.val = 0;
     if (!load_dense_raw(filename, sizeof(real::storage_t), &tmp)) return 0;
     clear(m);
     init(m, tmp.h.rows, tmp.h.cols);
+    m->storage = tmp.storage;
     m->val = (real::storage_t *) tmp.val;
     return 1;
 }
@@ -193,12 +199,14 @@ inline int load(const char *filename, sparse::compressed *m) {
     compressed_load_result tmp;
 
     tmp.axis = sparse::compressed_by_row;
+    tmp.storage = 0;
     tmp.majorPtr = 0;
     tmp.minorIdx = 0;
     tmp.val = 0;
     if (!load_compressed_raw(filename, sizeof(real::storage_t), &tmp)) return 0;
     sparse::clear(m);
     sparse::init(m, tmp.h.rows, tmp.h.cols, tmp.h.nnz, tmp.axis);
+    m->storage = tmp.storage;
     m->majorPtr = tmp.majorPtr;
     m->minorIdx = tmp.minorIdx;
     m->val = (real::storage_t *) tmp.val;
@@ -212,12 +220,14 @@ inline int store(const char *filename, const sparse::coo *m) {
 inline int load(const char *filename, sparse::coo *m) {
     coo_load_result tmp;
 
+    tmp.storage = 0;
     tmp.rowIdx = 0;
     tmp.colIdx = 0;
     tmp.val = 0;
     if (!load_coo_raw(filename, sizeof(real::storage_t), &tmp)) return 0;
     sparse::clear(m);
     sparse::init(m, tmp.h.rows, tmp.h.cols, tmp.h.nnz);
+    m->storage = tmp.storage;
     m->rowIdx = tmp.rowIdx;
     m->colIdx = tmp.colIdx;
     m->val = (real::storage_t *) tmp.val;
@@ -232,12 +242,14 @@ inline int load(const char *filename, sparse::dia *m) {
     dia_load_result tmp;
 
     tmp.num_diagonals = 0;
+    tmp.storage = 0;
     tmp.offsets = 0;
     tmp.val = 0;
     if (!load_dia_raw(filename, sizeof(real::storage_t), &tmp)) return 0;
     sparse::clear(m);
     sparse::init(m, tmp.h.rows, tmp.h.cols, tmp.h.nnz);
     m->num_diagonals = tmp.num_diagonals;
+    m->storage = tmp.storage;
     m->offsets = tmp.offsets;
     m->val = (real::storage_t *) tmp.val;
     return 1;

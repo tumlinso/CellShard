@@ -3,6 +3,9 @@
 #include <cstddef>
 #include <cstdlib>
 #include <cstring>
+#include <atomic>
+#include <thread>
+#include <vector>
 
 #include <cuda_runtime.h>
 
@@ -25,6 +28,21 @@
 namespace cellshard {
 namespace distributed {
 
+struct shard_weight {
+    unsigned long shard_id;
+    std::size_t bytes;
+};
+
+inline int compare_shard_weight_desc(const void *lhs, const void *rhs) {
+    const shard_weight *a = (const shard_weight *) lhs;
+    const shard_weight *b = (const shard_weight *) rhs;
+    if (a->bytes > b->bytes) return -1;
+    if (a->bytes < b->bytes) return 1;
+    if (a->shard_id < b->shard_id) return -1;
+    if (a->shard_id > b->shard_id) return 1;
+    return 0;
+}
+
 // local_context is intentionally minimal:
 // - one visible device id per local GPU
 // - one optional stream per device
@@ -40,6 +58,7 @@ struct local_context {
     unsigned char *peer_access;
 #if CELLSHARD_HAS_NCCL
     ncclComm_t *comms;
+    unsigned char nccl_ready;
 #endif
 };
 
@@ -62,6 +81,7 @@ inline void init(local_context *ctx) {
     ctx->peer_access = 0;
 #if CELLSHARD_HAS_NCCL
     ctx->comms = 0;
+    ctx->nccl_ready = 0;
 #endif
 }
 
@@ -194,8 +214,23 @@ inline cudaError_t enable_peer_access(local_context *ctx) {
 
 #if CELLSHARD_HAS_NCCL
 inline ncclResult_t init_local_nccl(local_context *ctx) {
+    ncclResult_t result = ncclSuccess;
+    unsigned int i = 0;
+
     if (ctx == 0 || ctx->device_count == 0 || ctx->device_ids == 0 || ctx->comms == 0) return ncclInvalidArgument;
-    return ncclCommInitAll(ctx->comms, (int) ctx->device_count, ctx->device_ids);
+    result = ncclCommInitAll(ctx->comms, (int) ctx->device_count, ctx->device_ids);
+    if (result == ncclSuccess) {
+        ctx->nccl_ready = 1u;
+        return result;
+    }
+    for (i = 0; i < ctx->device_count; ++i) {
+        if (ctx->comms[i] != 0) {
+            ncclCommDestroy(ctx->comms[i]);
+            ctx->comms[i] = 0;
+        }
+    }
+    ctx->nccl_ready = 0u;
+    return result;
 }
 #endif
 
@@ -252,23 +287,39 @@ template<typename MatrixT>
 inline int assign_shards_by_bytes(shard_map *map,
                                   const ::cellshard::sharded<MatrixT> *view,
                                   const local_context *ctx) {
+    shard_weight *weights = 0;
     unsigned long i = 0;
+    int ok = 0;
 
     if (map == 0 || view == 0 || ctx == 0 || ctx->device_count == 0) return 0;
     if (!reserve(map, view->num_shards, ctx->device_count)) return 0;
+    // Largest-first greedy placement is materially better than input-order
+    // assignment for skewed shard sizes. The real bottleneck here is eventual
+    // resident device footprint, so sort by device_shard_bytes() before the
+    // per-device load-balancing pass.
+    if (view->num_shards != 0) {
+        weights = (shard_weight *) std::calloc((std::size_t) view->num_shards, sizeof(shard_weight));
+        if (weights == 0) return 0;
+    }
+    for (i = 0; i < view->num_shards; ++i) {
+        weights[i].shard_id = i;
+        weights[i].bytes = ::cellshard::device::device_shard_bytes(view, i);
+    }
+    std::qsort(weights, (std::size_t) view->num_shards, sizeof(shard_weight), compare_shard_weight_desc);
     for (i = 0; i < view->num_shards; ++i) {
         unsigned int best = 0;
         unsigned int d = 1;
-        // Balance by eventual resident device footprint, not source bytes on
-        // disk. This is the metric that matters once shards are uploaded.
-        const std::size_t shard_bytes = ::cellshard::device::device_shard_bytes(view, i);
+        const unsigned long shard_id = weights[i].shard_id;
+        const std::size_t shard_bytes = weights[i].bytes;
         for (d = 1; d < ctx->device_count; ++d) {
             if (map->device_bytes[d] < map->device_bytes[best]) best = d;
         }
-        map->device_slot[i] = (int) best;
+        map->device_slot[shard_id] = (int) best;
         map->device_bytes[best] += shard_bytes;
     }
-    return 1;
+    ok = 1;
+    std::free(weights);
+    return ok;
 }
 
 template<typename MatrixT>
@@ -346,17 +397,37 @@ inline cudaError_t stage_all_shards_on_owners(device_fleet<MatrixT> *fleet,
                                               ::cellshard::sharded<MatrixT> *view,
                                               const ::cellshard::shard_storage *storage,
                                               int drop_host_after_upload) {
-    unsigned long i = 0;
-    cudaError_t err = cudaSuccess;
+    std::vector<std::thread> workers;
+    std::atomic<int> first_error((int) cudaSuccess);
 
     if (view == 0) return cudaErrorInvalidValue;
-    // This is currently a host loop over shards. It is explicit by design so
-    // the caller can replace it with a more specialized schedule later.
-    for (i = 0; i < view->num_shards; ++i) {
-        err = stage_shard_on_owner(fleet, ctx, map, view, storage, i, drop_host_after_upload);
-        if (err != cudaSuccess) return err;
+    // Queue owner-local work concurrently across GPUs. A single host thread
+    // walking every device serially can leave copy engines underfed even when
+    // each device has its own stream and independent shard queue.
+    workers.reserve(ctx->device_count);
+    for (unsigned int slot = 0; slot < ctx->device_count; ++slot) {
+        workers.emplace_back([&, slot]() {
+            unsigned long i = 0;
+            for (i = 0; i < view->num_shards; ++i) {
+                cudaError_t err = cudaSuccess;
+                if (first_error.load() != (int) cudaSuccess) return;
+                if (map == 0 || map->device_slot == 0 || i >= map->shard_count) {
+                    int expected = (int) cudaSuccess;
+                    first_error.compare_exchange_strong(expected, (int) cudaErrorInvalidValue);
+                    return;
+                }
+                if ((unsigned int) map->device_slot[i] != slot) continue;
+                err = stage_shard_on_owner(fleet, ctx, map, view, storage, i, drop_host_after_upload);
+                if (err != cudaSuccess) {
+                    int expected = (int) cudaSuccess;
+                    first_error.compare_exchange_strong(expected, (int) err);
+                    return;
+                }
+            }
+        });
     }
-    return cudaSuccess;
+    for (std::thread &worker : workers) worker.join();
+    return (cudaError_t) first_error.load();
 }
 
 inline cudaError_t synchronize(const local_context *ctx) {

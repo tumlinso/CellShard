@@ -263,15 +263,6 @@ The heaviest families are:
 - stages the incoming shard before releasing the outgoing one
 - transient device footprint includes both shards
 
-`convert_single_mtx_to_sharded_coo()`
-
-- scans the MTX file
-- partitions rows
-- counts part nnz
-- allocates per-window COO payload
-- parses and copies text entries into host COO buffers
-- stores one packfile window at a time
-
 `build_pinned_triplet_to_compressed()`
 
 - copies pinned host triplets to device

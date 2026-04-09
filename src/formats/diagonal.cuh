@@ -13,6 +13,9 @@ struct alignas(16) dia {
     types::dim_t cols;
     types::nnz_t nnz;
 
+    // When non-null, this owns the packed host allocation containing offsets
+    // and values. offsets/val point inside it.
+    void *storage;
     int *offsets;
     real::storage_t *val;
     types::idx_t num_diagonals;
@@ -28,6 +31,7 @@ __host__ __device__ __forceinline__ void init(
     m->rows = rows;
     m->cols = cols;
     m->nnz = nnz;
+    m->storage = 0;
     m->offsets = 0;
     m->val = 0;
     m->num_diagonals = 0;
@@ -60,8 +64,12 @@ __host__ __device__ __forceinline__ real::storage_t *at(dia * __restrict__ m, ty
 
 // Release host arrays and reset metadata.
 __host__ __forceinline__ void clear(dia * __restrict__ m) {
-    std::free(m->offsets);
-    std::free(m->val);
+    if (m->storage != 0) std::free(m->storage);
+    else {
+        std::free(m->offsets);
+        std::free(m->val);
+    }
+    m->storage = 0;
     m->offsets = 0;
     m->val = 0;
     m->num_diagonals = 0;
@@ -72,18 +80,25 @@ __host__ __forceinline__ void clear(dia * __restrict__ m) {
 
 // allocate() rebuilds offsets and values from current metadata.
 __host__ __forceinline__ int allocate(dia * __restrict__ m) {
-    std::free(m->offsets);
-    std::free(m->val);
+    const std::size_t offsets_bytes = (std::size_t) m->num_diagonals * sizeof(int);
+    const std::size_t val_offset = ((offsets_bytes + alignof(real::storage_t) - 1u) / alignof(real::storage_t)) * alignof(real::storage_t);
+    const std::size_t total_bytes = val_offset + (std::size_t) m->nnz * sizeof(real::storage_t);
+    void *storage = 0;
+
+    if (m->storage != 0) std::free(m->storage);
+    else {
+        std::free(m->offsets);
+        std::free(m->val);
+    }
+    m->storage = 0;
     m->offsets = 0;
     m->val = 0;
-    if (m->num_diagonals != 0) m->offsets = (int *) std::malloc((std::size_t) m->num_diagonals * sizeof(int));
-    if (m->nnz != 0) m->val = (real::storage_t *) std::malloc((std::size_t) m->nnz * sizeof(real::storage_t));
-    if (m->num_diagonals != 0 && m->offsets == 0) return 0;
-    if (m->nnz != 0 && m->val == 0) {
-        std::free(m->offsets);
-        m->offsets = 0;
-        return 0;
-    }
+    if (total_bytes == 0) return 1;
+    storage = std::malloc(total_bytes);
+    if (storage == 0) return 0;
+    m->storage = storage;
+    m->offsets = m->num_diagonals != 0 ? (int *) storage : 0;
+    m->val = m->nnz != 0 ? (real::storage_t *) ((char *) storage + val_offset) : 0;
     return 1;
 }
 

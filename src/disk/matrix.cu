@@ -25,6 +25,10 @@ inline int read_block(std::FILE *fp, void *ptr, std::size_t elem_size, std::size
     return std::fread(ptr, elem_size, count, fp) == count;
 }
 
+inline void configure_stream(std::FILE *fp) {
+    std::setvbuf(fp, 0, _IOFBF, (std::size_t) 8u << 20u);
+}
+
 inline int write_header(std::FILE *fp, unsigned char format, types::dim_t rows, types::dim_t cols, types::nnz_t nnz) {
     if (!write_block(fp, &format, sizeof(format), 1)) return 0;
     if (!write_block(fp, &rows, sizeof(rows), 1)) return 0;
@@ -47,28 +51,44 @@ inline void *alloc_bytes(std::size_t bytes) {
     return std::malloc(bytes);
 }
 
+inline std::size_t align_up_bytes(std::size_t value, std::size_t alignment) {
+    return (value + alignment - 1u) & ~(alignment - 1u);
+}
+
 // Cleanup helpers for partially built load results.
 inline void free_compressed_result(compressed_load_result *out) {
-    std::free(out->majorPtr);
-    std::free(out->minorIdx);
-    std::free(out->val);
+    if (out->storage != 0) std::free(out->storage);
+    else {
+        std::free(out->majorPtr);
+        std::free(out->minorIdx);
+        std::free(out->val);
+    }
+    out->storage = 0;
     out->majorPtr = 0;
     out->minorIdx = 0;
     out->val = 0;
 }
 
 inline void free_coo_result(coo_load_result *out) {
-    std::free(out->rowIdx);
-    std::free(out->colIdx);
-    std::free(out->val);
+    if (out->storage != 0) std::free(out->storage);
+    else {
+        std::free(out->rowIdx);
+        std::free(out->colIdx);
+        std::free(out->val);
+    }
+    out->storage = 0;
     out->rowIdx = 0;
     out->colIdx = 0;
     out->val = 0;
 }
 
 inline void free_dia_result(dia_load_result *out) {
-    std::free(out->offsets);
-    std::free(out->val);
+    if (out->storage != 0) std::free(out->storage);
+    else {
+        std::free(out->offsets);
+        std::free(out->val);
+    }
+    out->storage = 0;
     out->offsets = 0;
     out->val = 0;
     out->num_diagonals = 0;
@@ -110,6 +130,7 @@ int store_dense_raw(const char *filename, types::dim_t rows, types::dim_t cols, 
 
     fp = std::fopen(filename, "wb");
     if (fp == 0) return 0;
+    configure_stream(fp);
     ok = store_dense_raw(fp, rows, cols, nnz, val, value_size);
 
 done:
@@ -131,6 +152,7 @@ int load_dense_raw(const char *filename, std::size_t value_size, dense_load_resu
     out->val = 0;
     fp = std::fopen(filename, "rb");
     if (fp == 0) return 0;
+    configure_stream(fp);
     ok = load_dense_raw(fp, value_size, out);
 
 done:
@@ -142,17 +164,20 @@ done:
 int load_dense_raw(std::FILE *fp, std::size_t value_size, dense_load_result *out) {
     int ok = 0;
 
+    out->storage = 0;
     out->val = 0;
     if (!read_header(fp, &out->h)) goto done;
     if (!check_disk_format(disk_format_dense, out->h.format, "dense matrix")) goto done;
-    out->val = alloc_bytes((std::size_t) out->h.nnz * value_size);
-    if (out->h.nnz != 0 && out->val == 0) goto done;
+    out->storage = alloc_bytes((std::size_t) out->h.nnz * value_size);
+    out->val = out->storage;
+    if (out->h.nnz != 0 && out->storage == 0) goto done;
     if (!read_block(fp, out->val, value_size, out->h.nnz)) goto done;
     ok = 1;
 
 done:
     if (!ok) {
-        std::free(out->val);
+        std::free(out->storage);
+        out->storage = 0;
         out->val = 0;
     }
     return ok;
@@ -164,6 +189,7 @@ int store_compressed_raw(const char *filename, types::dim_t rows, types::dim_t c
 
     fp = std::fopen(filename, "wb");
     if (fp == 0) return 0;
+    configure_stream(fp);
     ok = store_compressed_raw(fp, rows, cols, nnz, axis, major_dim, majorPtr, minorIdx, val, value_size);
 
 done:
@@ -186,11 +212,13 @@ int load_compressed_raw(const char *filename, std::size_t value_size, compressed
     int ok = 0;
 
     out->axis = sparse::compressed_by_row;
+    out->storage = 0;
     out->majorPtr = 0;
     out->minorIdx = 0;
     out->val = 0;
     fp = std::fopen(filename, "rb");
     if (fp == 0) return 0;
+    configure_stream(fp);
     ok = load_compressed_raw(fp, value_size, out);
 
 done:
@@ -201,8 +229,13 @@ done:
 int load_compressed_raw(std::FILE *fp, std::size_t value_size, compressed_load_result *out) {
     int ok = 0;
     types::dim_t major_dim = 0;
+    std::size_t major_bytes = 0;
+    std::size_t minor_offset = 0;
+    std::size_t val_offset = 0;
+    std::size_t total_bytes = 0;
 
     out->axis = sparse::compressed_by_row;
+    out->storage = 0;
     out->majorPtr = 0;
     out->minorIdx = 0;
     out->val = 0;
@@ -210,11 +243,15 @@ int load_compressed_raw(std::FILE *fp, std::size_t value_size, compressed_load_r
     if (!check_disk_format(disk_format_compressed, out->h.format, "compressed matrix")) goto done;
     if (!read_block(fp, &out->axis, sizeof(out->axis), 1)) goto done;
     major_dim = out->axis == sparse::compressed_by_col ? out->h.cols : out->h.rows;
-    if (major_dim != 0) out->majorPtr = (types::ptr_t *) alloc_bytes((std::size_t) (major_dim + 1) * sizeof(types::ptr_t));
-    out->minorIdx = (types::idx_t *) alloc_bytes((std::size_t) out->h.nnz * sizeof(types::idx_t));
-    out->val = alloc_bytes((std::size_t) out->h.nnz * value_size);
-    if (major_dim != 0 && out->majorPtr == 0) goto done;
-    if (out->h.nnz != 0 && (out->minorIdx == 0 || out->val == 0)) goto done;
+    major_bytes = ((std::size_t) major_dim + 1u) * sizeof(types::ptr_t);
+    minor_offset = align_up_bytes(major_bytes, alignof(types::idx_t));
+    val_offset = align_up_bytes(minor_offset + (std::size_t) out->h.nnz * sizeof(types::idx_t), alignof(real::storage_t));
+    total_bytes = val_offset + (std::size_t) out->h.nnz * value_size;
+    out->storage = alloc_bytes(total_bytes);
+    if (total_bytes != 0 && out->storage == 0) goto done;
+    out->majorPtr = major_dim != 0 ? (types::ptr_t *) out->storage : 0;
+    out->minorIdx = out->h.nnz != 0 ? (types::idx_t *) ((char *) out->storage + minor_offset) : 0;
+    out->val = out->h.nnz != 0 ? (void *) ((char *) out->storage + val_offset) : 0;
     if (!read_block(fp, out->val, value_size, out->h.nnz)) goto done;
     if (major_dim != 0 && !read_block(fp, out->majorPtr, sizeof(types::ptr_t), (std::size_t) major_dim + 1)) goto done;
     if (!read_block(fp, out->minorIdx, sizeof(types::idx_t), out->h.nnz)) goto done;
@@ -231,6 +268,7 @@ int store_coo_raw(const char *filename, types::dim_t rows, types::dim_t cols, ty
 
     fp = std::fopen(filename, "wb");
     if (fp == 0) return 0;
+    configure_stream(fp);
     ok = store_coo_raw(fp, rows, cols, nnz, rowIdx, colIdx, val, value_size);
 
 done:
@@ -251,11 +289,13 @@ int load_coo_raw(const char *filename, std::size_t value_size, coo_load_result *
     std::FILE *fp = 0;
     int ok = 0;
 
+    out->storage = 0;
     out->rowIdx = 0;
     out->colIdx = 0;
     out->val = 0;
     fp = std::fopen(filename, "rb");
     if (fp == 0) return 0;
+    configure_stream(fp);
     ok = load_coo_raw(fp, value_size, out);
 
 done:
@@ -265,16 +305,26 @@ done:
 
 int load_coo_raw(std::FILE *fp, std::size_t value_size, coo_load_result *out) {
     int ok = 0;
+    std::size_t row_bytes = 0;
+    std::size_t col_offset = 0;
+    std::size_t val_offset = 0;
+    std::size_t total_bytes = 0;
 
+    out->storage = 0;
     out->rowIdx = 0;
     out->colIdx = 0;
     out->val = 0;
     if (!read_header(fp, &out->h)) goto done;
     if (!check_disk_format(disk_format_coo, out->h.format, "coo matrix")) goto done;
-    out->rowIdx = (types::idx_t *) alloc_bytes((std::size_t) out->h.nnz * sizeof(types::idx_t));
-    out->colIdx = (types::idx_t *) alloc_bytes((std::size_t) out->h.nnz * sizeof(types::idx_t));
-    out->val = alloc_bytes((std::size_t) out->h.nnz * value_size);
-    if (out->h.nnz != 0 && (out->rowIdx == 0 || out->colIdx == 0 || out->val == 0)) goto done;
+    row_bytes = (std::size_t) out->h.nnz * sizeof(types::idx_t);
+    col_offset = align_up_bytes(row_bytes, alignof(types::idx_t));
+    val_offset = align_up_bytes(col_offset + (std::size_t) out->h.nnz * sizeof(types::idx_t), alignof(real::storage_t));
+    total_bytes = val_offset + (std::size_t) out->h.nnz * value_size;
+    out->storage = alloc_bytes(total_bytes);
+    if (total_bytes != 0 && out->storage == 0) goto done;
+    out->rowIdx = out->h.nnz != 0 ? (types::idx_t *) out->storage : 0;
+    out->colIdx = out->h.nnz != 0 ? (types::idx_t *) ((char *) out->storage + col_offset) : 0;
+    out->val = out->h.nnz != 0 ? (void *) ((char *) out->storage + val_offset) : 0;
     if (!read_block(fp, out->val, value_size, out->h.nnz)) goto done;
     if (!read_block(fp, out->rowIdx, sizeof(types::idx_t), out->h.nnz)) goto done;
     if (!read_block(fp, out->colIdx, sizeof(types::idx_t), out->h.nnz)) goto done;
@@ -291,6 +341,7 @@ int store_dia_raw(const char *filename, types::dim_t rows, types::dim_t cols, ty
 
     fp = std::fopen(filename, "wb");
     if (fp == 0) return 0;
+    configure_stream(fp);
     ok = store_dia_raw(fp, rows, cols, nnz, num_diagonals, offsets, val, value_size);
 
 done:
@@ -312,10 +363,12 @@ int load_dia_raw(const char *filename, std::size_t value_size, dia_load_result *
     int ok = 0;
 
     out->num_diagonals = 0;
+    out->storage = 0;
     out->offsets = 0;
     out->val = 0;
     fp = std::fopen(filename, "rb");
     if (fp == 0) return 0;
+    configure_stream(fp);
     ok = load_dia_raw(fp, value_size, out);
 
 done:
@@ -325,17 +378,24 @@ done:
 
 int load_dia_raw(std::FILE *fp, std::size_t value_size, dia_load_result *out) {
     int ok = 0;
+    std::size_t offsets_bytes = 0;
+    std::size_t val_offset = 0;
+    std::size_t total_bytes = 0;
 
     out->num_diagonals = 0;
+    out->storage = 0;
     out->offsets = 0;
     out->val = 0;
     if (!read_header(fp, &out->h)) goto done;
     if (!check_disk_format(disk_format_dia, out->h.format, "dia matrix")) goto done;
     if (!read_block(fp, &out->num_diagonals, sizeof(types::idx_t), 1)) goto done;
-    out->offsets = (int *) alloc_bytes((std::size_t) out->num_diagonals * sizeof(int));
-    out->val = alloc_bytes((std::size_t) out->h.nnz * value_size);
-    if (out->num_diagonals != 0 && out->offsets == 0) goto done;
-    if (out->h.nnz != 0 && out->val == 0) goto done;
+    offsets_bytes = (std::size_t) out->num_diagonals * sizeof(int);
+    val_offset = align_up_bytes(offsets_bytes, alignof(real::storage_t));
+    total_bytes = val_offset + (std::size_t) out->h.nnz * value_size;
+    out->storage = alloc_bytes(total_bytes);
+    if (total_bytes != 0 && out->storage == 0) goto done;
+    out->offsets = out->num_diagonals != 0 ? (int *) out->storage : 0;
+    out->val = out->h.nnz != 0 ? (void *) ((char *) out->storage + val_offset) : 0;
     if (!read_block(fp, out->offsets, sizeof(int), out->num_diagonals)) goto done;
     if (!read_block(fp, out->val, value_size, out->h.nnz)) goto done;
     ok = 1;
@@ -352,10 +412,12 @@ int store(std::FILE *fp, const dense *m) {
 int load(std::FILE *fp, dense *m) {
     dense_load_result tmp;
 
+    tmp.storage = 0;
     tmp.val = 0;
     if (!load_dense_raw(fp, sizeof(real::storage_t), &tmp)) return 0;
     clear(m);
     init(m, tmp.h.rows, tmp.h.cols);
+    m->storage = tmp.storage;
     m->val = (real::storage_t *) tmp.val;
     return 1;
 }
@@ -368,12 +430,14 @@ int load(std::FILE *fp, sparse::compressed *m) {
     compressed_load_result tmp;
 
     tmp.axis = sparse::compressed_by_row;
+    tmp.storage = 0;
     tmp.majorPtr = 0;
     tmp.minorIdx = 0;
     tmp.val = 0;
     if (!load_compressed_raw(fp, sizeof(real::storage_t), &tmp)) return 0;
     sparse::clear(m);
     sparse::init(m, tmp.h.rows, tmp.h.cols, tmp.h.nnz, tmp.axis);
+    m->storage = tmp.storage;
     m->majorPtr = tmp.majorPtr;
     m->minorIdx = tmp.minorIdx;
     m->val = (real::storage_t *) tmp.val;
@@ -387,12 +451,14 @@ int store(std::FILE *fp, const sparse::coo *m) {
 int load(std::FILE *fp, sparse::coo *m) {
     coo_load_result tmp;
 
+    tmp.storage = 0;
     tmp.rowIdx = 0;
     tmp.colIdx = 0;
     tmp.val = 0;
     if (!load_coo_raw(fp, sizeof(real::storage_t), &tmp)) return 0;
     sparse::clear(m);
     sparse::init(m, tmp.h.rows, tmp.h.cols, tmp.h.nnz);
+    m->storage = tmp.storage;
     m->rowIdx = tmp.rowIdx;
     m->colIdx = tmp.colIdx;
     m->val = (real::storage_t *) tmp.val;
@@ -407,12 +473,14 @@ int load(std::FILE *fp, sparse::dia *m) {
     dia_load_result tmp;
 
     tmp.num_diagonals = 0;
+    tmp.storage = 0;
     tmp.offsets = 0;
     tmp.val = 0;
     if (!load_dia_raw(fp, sizeof(real::storage_t), &tmp)) return 0;
     sparse::clear(m);
     sparse::init(m, tmp.h.rows, tmp.h.cols, tmp.h.nnz);
     m->num_diagonals = tmp.num_diagonals;
+    m->storage = tmp.storage;
     m->offsets = tmp.offsets;
     m->val = (real::storage_t *) tmp.val;
     return 1;

@@ -16,6 +16,9 @@ struct alignas(16) coo {
     types::dim_t cols;
     types::nnz_t nnz;
 
+    // When non-null, this owns the packed host allocation containing all three
+    // arrays. rowIdx/colIdx/val point inside it.
+    void *storage;
     types::idx_t *rowIdx;
     types::idx_t *colIdx;
     real::storage_t *val;
@@ -31,6 +34,7 @@ __host__ __device__ __forceinline__ void init(
     m->rows = rows;
     m->cols = cols;
     m->nnz = nnz;
+    m->storage = 0;
     m->rowIdx = 0;
     m->colIdx = 0;
     m->val = 0;
@@ -61,9 +65,13 @@ __host__ __device__ __forceinline__ real::storage_t *at(coo * __restrict__ m, ty
 
 // Release all host arrays and reset metadata.
 __host__ __forceinline__ void clear(coo * __restrict__ m) {
-    std::free(m->rowIdx);
-    std::free(m->colIdx);
-    std::free(m->val);
+    if (m->storage != 0) std::free(m->storage);
+    else {
+        std::free(m->rowIdx);
+        std::free(m->colIdx);
+        std::free(m->val);
+    }
+    m->storage = 0;
     m->rowIdx = 0;
     m->colIdx = 0;
     m->val = 0;
@@ -74,25 +82,29 @@ __host__ __forceinline__ void clear(coo * __restrict__ m) {
 
 // allocate() discards any previous payload and allocates all three arrays.
 __host__ __forceinline__ int allocate(coo * __restrict__ m) {
-    std::free(m->rowIdx);
-    std::free(m->colIdx);
-    std::free(m->val);
+    const std::size_t row_bytes = (std::size_t) m->nnz * sizeof(types::idx_t);
+    const std::size_t col_offset = ((row_bytes + alignof(types::idx_t) - 1u) / alignof(types::idx_t)) * alignof(types::idx_t);
+    const std::size_t val_offset = ((col_offset + (std::size_t) m->nnz * sizeof(types::idx_t) + alignof(real::storage_t) - 1u) / alignof(real::storage_t)) * alignof(real::storage_t);
+    const std::size_t total_bytes = val_offset + (std::size_t) m->nnz * sizeof(real::storage_t);
+    void *storage = 0;
+
+    if (m->storage != 0) std::free(m->storage);
+    else {
+        std::free(m->rowIdx);
+        std::free(m->colIdx);
+        std::free(m->val);
+    }
+    m->storage = 0;
     m->rowIdx = 0;
     m->colIdx = 0;
     m->val = 0;
     if (m->nnz == 0) return 1;
-    m->rowIdx = (types::idx_t *) std::malloc((std::size_t) m->nnz * sizeof(types::idx_t));
-    m->colIdx = (types::idx_t *) std::malloc((std::size_t) m->nnz * sizeof(types::idx_t));
-    m->val = (real::storage_t *) std::malloc((std::size_t) m->nnz * sizeof(real::storage_t));
-    if (m->rowIdx == 0 || m->colIdx == 0 || m->val == 0) {
-        std::free(m->rowIdx);
-        std::free(m->colIdx);
-        std::free(m->val);
-        m->rowIdx = 0;
-        m->colIdx = 0;
-        m->val = 0;
-        return 0;
-    }
+    storage = std::malloc(total_bytes);
+    if (storage == 0) return 0;
+    m->storage = storage;
+    m->rowIdx = (types::idx_t *) storage;
+    m->colIdx = (types::idx_t *) ((char *) storage + col_offset);
+    m->val = (real::storage_t *) ((char *) storage + val_offset);
     return 1;
 }
 
@@ -107,6 +119,7 @@ __host__ __forceinline__ int concatenate_rows(coo * __restrict__ dst, const coo 
     dst->rows = top->rows + bottom->rows;
     dst->cols = top->cols != 0 ? top->cols : bottom->cols;
     dst->nnz = top->nnz + bottom->nnz;
+    dst->storage = 0;
     dst->rowIdx = 0;
     dst->colIdx = 0;
     dst->val = 0;
@@ -136,6 +149,7 @@ __host__ __forceinline__ int append_rows(coo * __restrict__ dst, const coo * __r
     const types::dim_t oldRows = dst->rows;
     const types::nnz_t oldNnz = dst->nnz;
     const types::nnz_t newNnz = dst->nnz + src->nnz;
+    void *storage = 0;
     types::idx_t *rowIdx = 0;
     types::idx_t *colIdx = 0;
     real::storage_t *val = 0;
@@ -144,17 +158,18 @@ __host__ __forceinline__ int append_rows(coo * __restrict__ dst, const coo * __r
     if (dst->cols == 0) dst->cols = src->cols;
     dst->nnz = newNnz;
     if (newNnz != 0) {
-        rowIdx = (types::idx_t *) std::malloc((std::size_t) newNnz * sizeof(types::idx_t));
-        colIdx = (types::idx_t *) std::malloc((std::size_t) newNnz * sizeof(types::idx_t));
-        val = (real::storage_t *) std::malloc((std::size_t) newNnz * sizeof(real::storage_t));
-        if (rowIdx == 0 || colIdx == 0 || val == 0) {
-            std::free(rowIdx);
-            std::free(colIdx);
-            std::free(val);
+        const std::size_t row_bytes = (std::size_t) newNnz * sizeof(types::idx_t);
+        const std::size_t col_off = ((row_bytes + alignof(types::idx_t) - 1u) / alignof(types::idx_t)) * alignof(types::idx_t);
+        const std::size_t val_off = ((col_off + (std::size_t) newNnz * sizeof(types::idx_t) + alignof(real::storage_t) - 1u) / alignof(real::storage_t)) * alignof(real::storage_t);
+        storage = std::malloc(val_off + (std::size_t) newNnz * sizeof(real::storage_t));
+        if (storage == 0) {
             dst->rows = oldRows;
             dst->nnz = oldNnz;
             return 0;
         }
+        rowIdx = (types::idx_t *) storage;
+        colIdx = (types::idx_t *) ((char *) storage + col_off);
+        val = (real::storage_t *) ((char *) storage + val_off);
     }
 
     if (oldNnz != 0) {
@@ -162,9 +177,13 @@ __host__ __forceinline__ int append_rows(coo * __restrict__ dst, const coo * __r
         std::memcpy(colIdx, dst->colIdx, (std::size_t) oldNnz * sizeof(types::idx_t));
         std::memcpy(val, dst->val, (std::size_t) oldNnz * sizeof(real::storage_t));
     }
-    std::free(dst->rowIdx);
-    std::free(dst->colIdx);
-    std::free(dst->val);
+    if (dst->storage != 0) std::free(dst->storage);
+    else {
+        std::free(dst->rowIdx);
+        std::free(dst->colIdx);
+        std::free(dst->val);
+    }
+    dst->storage = storage;
     dst->rowIdx = rowIdx;
     dst->colIdx = colIdx;
     dst->val = val;

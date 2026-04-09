@@ -14,6 +14,7 @@
 #include "sharded_host.cuh"
 #include "../disk/matrix.cuh"
 #include "shard_paths.cuh"
+#include "series_h5.cuh"
 
 namespace cellshard {
 
@@ -172,7 +173,7 @@ done:
 // Header-only load path. This allocates host metadata tables and optionally
 // binds packfile locators, but does not fetch any part payload.
 template<typename MatrixT>
-inline int load_header(const char *filename, sharded<MatrixT> *m, shard_storage *s) {
+inline int load_packfile_header(const char *filename, sharded<MatrixT> *m, shard_storage *s) {
     sharded_header_load_result tmp;
     unsigned long i = 0;
     int ok = 0;
@@ -212,7 +213,8 @@ inline int load_header(const char *filename, sharded<MatrixT> *m, shard_storage 
     }
     if (m->shard_capacity != 0) {
         m->shard_offsets = (unsigned long *) std::calloc((std::size_t) (m->shard_capacity + 1), sizeof(unsigned long));
-        if (m->shard_offsets == 0) {
+        m->shard_parts = (unsigned long *) std::calloc((std::size_t) (m->shard_capacity + 1), sizeof(unsigned long));
+        if (m->shard_offsets == 0 || m->shard_parts == 0) {
             clear(m);
             goto done;
         }
@@ -228,6 +230,7 @@ inline int load_header(const char *filename, sharded<MatrixT> *m, shard_storage 
     }
     if (m->num_shards != 0 && !sharded_from_u64(tmp.shard_offsets[m->num_shards], &m->shard_offsets[m->num_shards], "shard_offsets", filename)) goto done;
     rebuild_part_offsets(m);
+    rebuild_shard_parts(m);
     if (s != 0) {
         init(s);
         if (!reserve(s, (unsigned int) m->num_parts)) goto done;
@@ -251,6 +254,25 @@ done:
 
 template<typename MatrixT>
 inline int load_header(const char *filename, sharded<MatrixT> *m) {
+    return load_packfile_header(filename, m, 0);
+}
+
+template<typename MatrixT>
+inline int load_header(const char *filename, sharded<MatrixT> *m, shard_storage *s) {
+    return load_packfile_header(filename, m, s);
+}
+
+inline int load_header(const char *filename, sharded<sparse::compressed> *m, shard_storage *s) {
+    const char *ext = std::strrchr(filename != 0 ? filename : "", '.');
+    if (ext != 0) {
+        if (std::strcmp(ext, ".csh5") == 0 || std::strcmp(ext, ".h5") == 0 || std::strcmp(ext, ".hdf5") == 0) {
+            return load_series_compressed_h5_header(filename, m, s);
+        }
+    }
+    return load_packfile_header(filename, m, s);
+}
+
+inline int load_header(const char *filename, sharded<sparse::compressed> *m) {
     return load_header(filename, m, 0);
 }
 

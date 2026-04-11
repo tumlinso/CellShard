@@ -822,6 +822,8 @@ __host__ __forceinline__ cudaError_t release_part(sharded_device<MatrixT> *state
     cudaError_t err = cudaSuccess;
 
     if (partId >= state->capacity || state->parts[partId].view == 0) return cudaSuccess;
+    // Release is cheap only when it can hand the packed allocation back to the
+    // small cache below. A cold cudaFree path is still visible in timelines.
     err = cudaSetDevice(state->parts[partId].device_id >= 0 ? state->parts[partId].device_id : 0);
     if (err != cudaSuccess) return err;
     begin = state->parts[partId].group_begin;
@@ -1060,6 +1062,8 @@ __host__ __forceinline__ cudaError_t release_shard(sharded_device<MatrixT> *stat
     if (shardId >= view->num_shards) return cudaErrorInvalidValue;
     begin = ::cellshard::first_part_in_shard(view, shardId);
     end = ::cellshard::last_part_in_shard(view, shardId);
+    // Release loops over resident parts; there is no separate shard-level free
+    // path beyond grouped packed allocations handled inside release_part().
     for (i = begin; i < end; ++i) {
         if (i >= state->capacity || state->parts[i].view == 0) continue;
         err = release_part(state, i);

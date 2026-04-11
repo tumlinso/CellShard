@@ -69,7 +69,8 @@ inline int read_sharded_block(std::FILE *fp, void *ptr, std::size_t elem_size, s
     return std::fread(ptr, elem_size, count, fp) == count;
 }
 
-// Host-sized unsigned long metadata is normalized to fixed u64 on disk.
+// Host-sized unsigned long metadata is normalized to fixed u64 on disk so
+// packfiles stay architecture-stable even if the host ABI changes.
 inline int sharded_to_u64(unsigned long value, std::uint64_t *out, const char *label, const char *filename) {
     *out = (std::uint64_t) value;
     if ((unsigned long) *out != value) {
@@ -92,6 +93,7 @@ inline int store_sharded_index_array(std::FILE *fp, const unsigned long *src, st
     std::uint64_t value = 0;
     std::size_t i = 0;
 
+    // This is metadata-sized scalar I/O, not a heavy payload path.
     for (i = 0; i < count; ++i) {
         if (!sharded_to_u64(src[i], &value, label, filename)) return 0;
         if (!write_sharded_block(fp, &value, sizeof(value), 1)) return 0;
@@ -123,6 +125,8 @@ inline int store_header(const char *filename, const sharded<MatrixT> *m) {
     unsigned long i = 0;
     int ok = 0;
 
+    // Header writes are synchronous host work and do not imply any part payload
+    // is resident or being copied.
     if (m == 0) return 0;
     if (m->num_parts != 0) {
         part_rows = (std::uint64_t *) std::calloc((std::size_t) m->num_parts, sizeof(std::uint64_t));
@@ -188,6 +192,8 @@ inline int load_packfile_header(const char *filename, sharded<MatrixT> *m, shard
     tmp.shard_offsets = 0;
     tmp.part_offsets = 0;
     tmp.part_bytes = 0;
+    // This is the cheap open path for large sharded datasets: load metadata,
+    // bind locators, and leave payload bytes on disk until fetch time.
     if (!load_sharded_header_raw(filename, &tmp)) return 0;
     clear(m);
     init(m);

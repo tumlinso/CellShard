@@ -13,6 +13,8 @@ enum {
     series_h5_schema_version = 1u
 };
 
+// Codec families describe how one stored part payload should be interpreted
+// after the lightweight series metadata has already been loaded.
 enum {
     series_codec_family_none = 0u,
     series_codec_family_standard_csr = 1u,
@@ -50,6 +52,8 @@ struct series_dataset_table_view {
     const std::uint64_t *nnz;
 };
 
+// Provenance tables are metadata-only views used at file-build time. They can
+// be large on the host, but they are not part of the steady-state fetch path.
 struct series_provenance_view {
     series_text_column_view global_barcodes;
     const std::uint32_t *cell_dataset_ids;
@@ -63,6 +67,42 @@ struct series_provenance_view {
 
     const std::uint64_t *dataset_feature_offsets;
     const std::uint32_t *dataset_feature_to_global;
+};
+
+struct series_metadata_table_view {
+    std::uint32_t rows;
+    std::uint32_t cols;
+    series_text_column_view column_names;
+    series_text_column_view field_values;
+    const std::uint32_t *row_offsets;
+};
+
+struct series_embedded_metadata_view {
+    std::uint32_t count;
+    const std::uint32_t *dataset_indices;
+    const std::uint64_t *global_row_begin;
+    const std::uint64_t *global_row_end;
+    const series_metadata_table_view *tables;
+};
+
+struct series_browse_cache_view {
+    std::uint32_t selected_feature_count;
+    const std::uint32_t *selected_feature_indices;
+    const float *gene_sum;
+    const float *gene_detected;
+    const float *gene_sq_sum;
+
+    std::uint32_t dataset_count;
+    const float *dataset_feature_mean;
+
+    std::uint32_t shard_count;
+    const float *shard_feature_mean;
+
+    std::uint32_t part_count;
+    std::uint32_t sample_rows_per_part;
+    const std::uint32_t *part_sample_row_offsets;
+    const std::uint64_t *part_sample_global_rows;
+    const float *part_sample_values;
 };
 
 struct series_layout_view {
@@ -84,15 +124,24 @@ struct series_layout_view {
     std::uint32_t num_codecs;
 };
 
+// Create/append helpers are whole-file synchronous HDF5 operations.
 int create_series_compressed_h5(const char *filename,
                                 const series_layout_view *layout,
                                 const series_dataset_table_view *datasets,
                                 const series_provenance_view *provenance);
 
+int append_series_embedded_metadata_h5(const char *filename,
+                                       const series_embedded_metadata_view *metadata);
+
+int append_series_browse_cache_h5(const char *filename,
+                                  const series_browse_cache_view *browse);
+
 int append_standard_csr_part_h5(const char *filename,
                                 unsigned long part_id,
                                 const sparse::compressed *part);
 
+// Header load binds a lazy shard_storage backend; fetch/prefetch calls are the
+// points that actually materialize part payloads or populate local caches.
 int bind_series_h5(shard_storage *s, const char *path);
 int bind_series_h5_part_cache(shard_storage *s, const char *cache_dir);
 int load_series_compressed_h5_header(const char *filename,

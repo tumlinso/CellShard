@@ -443,6 +443,8 @@ template<typename MatrixT>
 __host__ __forceinline__ int fetch_part(sharded<MatrixT> *m, const shard_storage *s, unsigned long partId) {
     std::uint64_t cursor = 0;
     shard_storage *storage = const_cast<shard_storage *>(s);
+    // Synchronous host materialization from packfile. This is explicit I/O and
+    // allocation work, not a cheap metadata operation.
     if (partId >= m->num_parts || storage == 0 || partId >= storage->capacity || storage->packfile_path == 0 || storage->locators == 0) return 0;
     if (!ensure_packfile_open(storage)) return 0;
     return load_part_from_open_packfile(m, storage, partId, &cursor);
@@ -510,6 +512,8 @@ __host__ __forceinline__ int fetch_shard(sharded<MatrixT> *m, const shard_storag
 
     if (shardId >= m->num_shards || storage == 0 || storage->packfile_path == 0 || storage->locators == 0) return 0;
     if (!ensure_packfile_open(storage)) return 0;
+    // Shard fetch is a simple loop over part fetches. Cost scales with parts
+    // per shard plus packfile seek/read behavior.
     begin = first_part_in_shard(m, shardId);
     end = last_part_in_shard(m, shardId);
     for (i = begin; i < end; ++i) {

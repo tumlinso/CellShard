@@ -24,6 +24,8 @@ static const char matrix_group[] = "/matrix";
 static const char datasets_group[] = "/datasets";
 static const char provenance_group[] = "/provenance";
 static const char codecs_group[] = "/codecs";
+static const char embedded_metadata_group[] = "/embedded_metadata";
+static const char browse_group[] = "/browse";
 static const char payload_group[] = "/payload";
 static const char payload_standard_group[] = "/payload/standard_csr";
 
@@ -559,6 +561,129 @@ done:
     if (prov >= 0) H5Gclose(prov);
     if (dsets >= 0) H5Gclose(dsets);
     if (matrix >= 0) H5Gclose(matrix);
+    if (file >= 0) H5Fclose(file);
+    return ok;
+}
+
+int append_series_embedded_metadata_h5(const char *filename,
+                                       const series_embedded_metadata_view *metadata) {
+    hid_t file = (hid_t) -1;
+    hid_t root = (hid_t) -1;
+    int ok = 0;
+
+    if (filename == 0) return 0;
+    file = H5Fopen(filename, H5F_ACC_RDWR, H5P_DEFAULT);
+    if (file < 0) return 0;
+    if (!ensure_magic(file)) goto done;
+    root = create_group(file, embedded_metadata_group);
+    if (root < 0) goto done;
+
+    if (!write_attr_u32(root, "count", metadata != 0 ? metadata->count : 0u)) goto done;
+    if (metadata == 0 || metadata->count == 0u) {
+        ok = 1;
+        goto done;
+    }
+
+    if (!write_dataset_1d(root, "dataset_indices", H5T_NATIVE_UINT32, (hsize_t) metadata->count, metadata->dataset_indices)) goto done;
+    if (!write_dataset_1d(root, "global_row_begin", H5T_NATIVE_UINT64, (hsize_t) metadata->count, metadata->global_row_begin)) goto done;
+    if (!write_dataset_1d(root, "global_row_end", H5T_NATIVE_UINT64, (hsize_t) metadata->count, metadata->global_row_end)) goto done;
+
+    for (std::uint32_t i = 0; i < metadata->count; ++i) {
+        char name[64];
+        hid_t table = (hid_t) -1;
+        const series_metadata_table_view *view = metadata->tables + i;
+        if (std::snprintf(name, sizeof(name), "table_%u", i) <= 0) goto done;
+        table = create_group(root, name);
+        if (table < 0) goto done;
+        if (!write_attr_u32(table, "rows", view->rows) || !write_attr_u32(table, "cols", view->cols)) {
+            H5Gclose(table);
+            goto done;
+        }
+        if (!write_text_column(table, "column_names", &view->column_names)
+            || !write_text_column(table, "field_values", &view->field_values)
+            || !write_dataset_1d(table, "row_offsets", H5T_NATIVE_UINT32, (hsize_t) view->rows + 1u, view->row_offsets)) {
+            H5Gclose(table);
+            goto done;
+        }
+        H5Gclose(table);
+    }
+
+    ok = 1;
+
+done:
+    if (root >= 0) H5Gclose(root);
+    if (file >= 0) H5Fclose(file);
+    return ok;
+}
+
+int append_series_browse_cache_h5(const char *filename,
+                                  const series_browse_cache_view *browse) {
+    hid_t file = (hid_t) -1;
+    hid_t root = (hid_t) -1;
+    int ok = 0;
+    const hsize_t selected = (hsize_t) (browse != 0 ? browse->selected_feature_count : 0u);
+
+    if (filename == 0) return 0;
+    file = H5Fopen(filename, H5F_ACC_RDWR, H5P_DEFAULT);
+    if (file < 0) return 0;
+    if (!ensure_magic(file)) goto done;
+    root = create_group(file, browse_group);
+    if (root < 0) goto done;
+
+    if (!write_attr_u32(root, "selected_feature_count", browse != 0 ? browse->selected_feature_count : 0u)) goto done;
+    if (!write_attr_u32(root, "dataset_count", browse != 0 ? browse->dataset_count : 0u)) goto done;
+    if (!write_attr_u32(root, "shard_count", browse != 0 ? browse->shard_count : 0u)) goto done;
+    if (!write_attr_u32(root, "part_count", browse != 0 ? browse->part_count : 0u)) goto done;
+    if (!write_attr_u32(root, "sample_rows_per_part", browse != 0 ? browse->sample_rows_per_part : 0u)) goto done;
+
+    if (browse == 0 || browse->selected_feature_count == 0u) {
+        ok = 1;
+        goto done;
+    }
+
+    if (!write_dataset_1d(root, "selected_feature_indices", H5T_NATIVE_UINT32, selected, browse->selected_feature_indices)) goto done;
+    if (!write_dataset_1d(root, "gene_sum", H5T_NATIVE_FLOAT, selected, browse->gene_sum)) goto done;
+    if (!write_dataset_1d(root, "gene_detected", H5T_NATIVE_FLOAT, selected, browse->gene_detected)) goto done;
+    if (!write_dataset_1d(root, "gene_sq_sum", H5T_NATIVE_FLOAT, selected, browse->gene_sq_sum)) goto done;
+
+    if (browse->dataset_count != 0u
+        && !write_dataset_1d(root,
+                             "dataset_feature_mean",
+                             H5T_NATIVE_FLOAT,
+                             (hsize_t) browse->dataset_count * selected,
+                             browse->dataset_feature_mean)) goto done;
+
+    if (browse->shard_count != 0u
+        && !write_dataset_1d(root,
+                             "shard_feature_mean",
+                             H5T_NATIVE_FLOAT,
+                             (hsize_t) browse->shard_count * selected,
+                             browse->shard_feature_mean)) goto done;
+
+    if (browse->part_count != 0u) {
+        const hsize_t row_count = (hsize_t) browse->part_count * (hsize_t) browse->sample_rows_per_part;
+        const hsize_t value_count = row_count * selected;
+        if (!write_dataset_1d(root,
+                              "part_sample_row_offsets",
+                              H5T_NATIVE_UINT32,
+                              (hsize_t) browse->part_count + 1u,
+                              browse->part_sample_row_offsets)) goto done;
+        if (!write_dataset_1d(root,
+                              "part_sample_global_rows",
+                              H5T_NATIVE_UINT64,
+                              row_count,
+                              browse->part_sample_global_rows)) goto done;
+        if (!write_dataset_1d(root,
+                              "part_sample_values",
+                              H5T_NATIVE_FLOAT,
+                              value_count,
+                              browse->part_sample_values)) goto done;
+    }
+
+    ok = 1;
+
+done:
+    if (root >= 0) H5Gclose(root);
     if (file >= 0) H5Fclose(file);
     return ok;
 }

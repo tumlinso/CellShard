@@ -39,11 +39,15 @@ struct shard_storage {
     shard_storage_close_fn close_backend;
 };
 
+// Metadata-only lifecycle; init() does not open any backend handle.
 void init(shard_storage *s);
 void clear(shard_storage *s);
+// reserve() only grows locator tables. It does not fetch any part bytes.
 int reserve(shard_storage *s, unsigned int capacity);
+// Bind one packfile path and one locator per part for later lazy fetches.
 int bind_packfile(shard_storage *s, const char *path);
 int bind_part(shard_storage *s, unsigned int partId, std::uint64_t offset, std::uint64_t bytes);
+// ensure_packfile_open() pays the actual backend-open cost once and caches it.
 int ensure_packfile_open(shard_storage *s);
 void close_packfile(shard_storage *s);
 

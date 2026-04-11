@@ -142,6 +142,8 @@ __host__ __forceinline__ int allocate(compressed * __restrict__ m) {
     m->val = 0;
 
     if (total_bytes == 0) return 1;
+    // One packed host allocation keeps the CSR payload pointer-stable and makes
+    // later pin/upload paths cheaper than three unrelated allocations.
     storage = std::malloc(total_bytes);
     if (storage == 0) return 0;
     m->storage = storage;

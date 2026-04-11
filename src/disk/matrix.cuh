@@ -145,7 +145,8 @@ inline std::size_t packed_bytes(const sparse::dia *, types::dim_t, types::dim_t,
     return packed_dia_bytes(nnz, (types::idx_t) num_diagonals, value_size);
 }
 
-// FILE* variants let packfile code write/read many parts through one open file.
+// FILE* variants let packfile code write/read many parts through one open file
+// handle, which avoids reopen churn in sequential shard fetch/store loops.
 int store(std::FILE *fp, const dense *m);
 int load(std::FILE *fp, dense *m);
 int store(std::FILE *fp, const sparse::compressed *m);
@@ -156,6 +157,7 @@ int store(std::FILE *fp, const sparse::dia *m);
 int load(std::FILE *fp, sparse::dia *m);
 
 // Filename variants open a file and do a full synchronous host I/O operation.
+// Load paths allocate and take ownership of a fresh host payload every call.
 inline int store(const char *filename, const dense *m) {
     return store_dense_raw(
         filename,

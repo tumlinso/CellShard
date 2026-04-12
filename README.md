@@ -10,6 +10,11 @@ Its job is narrow:
 - stage shards to GPU
 - provide the sparse conversion machinery needed to support that runtime
 
+Native sparse posture:
+
+- `blocked_ell` is the native sparse layout for persisted and staged execution
+- `compressed` remains available as a secondary compatibility and fallback format where a caller still needs CSR-style access
+
 CellShard is not the bioinformatics toolkit. It is the storage and staging substrate that supports `Cellerator`.
 
 Build output is ignored in the repo-level `.gitignore`.
@@ -62,6 +67,11 @@ The novel combination is:
 - part/shard-aware fetch and release
 - GPU-first staging for out-of-core workloads
 - direct same-machine multi-GPU shard execution support
+
+Current layout policy:
+
+- Blocked-ELL is the primary layout to optimize, persist, fetch, and stage
+- compressed is the secondary path for algorithms that still require row-compressed semantics
 
 ## Local Multi-GPU Runtime
 

@@ -69,6 +69,19 @@ inline void free_compressed_result(compressed_load_result *out) {
     out->val = 0;
 }
 
+inline void free_blocked_ell_result(blocked_ell_load_result *out) {
+    if (out->storage != 0) std::free(out->storage);
+    else {
+        std::free(out->blockColIdx);
+        std::free(out->val);
+    }
+    out->storage = 0;
+    out->blockColIdx = 0;
+    out->val = 0;
+    out->block_size = 0u;
+    out->ell_cols = 0u;
+}
+
 inline void free_coo_result(coo_load_result *out) {
     if (out->storage != 0) std::free(out->storage);
     else {
@@ -262,6 +275,104 @@ done:
     return ok;
 }
 
+int store_blocked_ell_raw(const char *filename,
+                          types::dim_t rows,
+                          types::dim_t cols,
+                          types::nnz_t nnz,
+                          types::u32 block_size,
+                          types::u32 ell_cols,
+                          const types::idx_t *blockColIdx,
+                          const void *val,
+                          std::size_t value_size) {
+    std::FILE *fp = 0;
+    int ok = 0;
+
+    fp = std::fopen(filename, "wb");
+    if (fp == 0) return 0;
+    configure_stream(fp);
+    ok = store_blocked_ell_raw(fp, rows, cols, nnz, block_size, ell_cols, blockColIdx, val, value_size);
+
+done:
+    std::fclose(fp);
+    return ok;
+}
+
+int store_blocked_ell_raw(std::FILE *fp,
+                          types::dim_t rows,
+                          types::dim_t cols,
+                          types::nnz_t nnz,
+                          types::u32 block_size,
+                          types::u32 ell_cols,
+                          const types::idx_t *blockColIdx,
+                          const void *val,
+                          std::size_t value_size) {
+    const std::size_t row_blocks = block_size == 0u ? 0u : ((std::size_t) rows + block_size - 1u) / block_size;
+    const std::size_t ell_width = block_size == 0u ? 0u : (std::size_t) ell_cols / block_size;
+
+    if (!write_header(fp, disk_format_blocked_ell, rows, cols, nnz)) return 0;
+    if (!write_block(fp, &block_size, sizeof(block_size), 1)) return 0;
+    if (!write_block(fp, &ell_cols, sizeof(ell_cols), 1)) return 0;
+    if (!write_block(fp, blockColIdx, sizeof(types::idx_t), row_blocks * ell_width)) return 0;
+    if (!write_block(fp, val, value_size, (std::size_t) rows * (std::size_t) ell_cols)) return 0;
+    return 1;
+}
+
+int load_blocked_ell_raw(const char *filename, std::size_t value_size, blocked_ell_load_result *out) {
+    std::FILE *fp = 0;
+    int ok = 0;
+
+    out->block_size = 0u;
+    out->ell_cols = 0u;
+    out->storage = 0;
+    out->blockColIdx = 0;
+    out->val = 0;
+    fp = std::fopen(filename, "rb");
+    if (fp == 0) return 0;
+    configure_stream(fp);
+    ok = load_blocked_ell_raw(fp, value_size, out);
+
+done:
+    std::fclose(fp);
+    return ok;
+}
+
+int load_blocked_ell_raw(std::FILE *fp, std::size_t value_size, blocked_ell_load_result *out) {
+    int ok = 0;
+    const std::size_t idx_bytes_alignment = alignof(types::idx_t);
+    const std::size_t val_bytes_alignment = alignof(real::storage_t);
+    std::size_t idx_bytes = 0u;
+    std::size_t val_offset = 0u;
+    std::size_t total_bytes = 0u;
+    std::size_t row_blocks = 0u;
+    std::size_t ell_width = 0u;
+
+    out->block_size = 0u;
+    out->ell_cols = 0u;
+    out->storage = 0;
+    out->blockColIdx = 0;
+    out->val = 0;
+    if (!read_header(fp, &out->h)) goto done;
+    if (!check_disk_format(disk_format_blocked_ell, out->h.format, "blocked ell matrix")) goto done;
+    if (!read_block(fp, &out->block_size, sizeof(out->block_size), 1)) goto done;
+    if (!read_block(fp, &out->ell_cols, sizeof(out->ell_cols), 1)) goto done;
+    row_blocks = out->block_size == 0u ? 0u : ((std::size_t) out->h.rows + out->block_size - 1u) / out->block_size;
+    ell_width = out->block_size == 0u ? 0u : (std::size_t) out->ell_cols / out->block_size;
+    idx_bytes = row_blocks * ell_width * sizeof(types::idx_t);
+    val_offset = align_up_bytes(idx_bytes, val_bytes_alignment > idx_bytes_alignment ? val_bytes_alignment : idx_bytes_alignment);
+    total_bytes = val_offset + (std::size_t) out->h.rows * (std::size_t) out->ell_cols * value_size;
+    out->storage = alloc_bytes(total_bytes);
+    if (total_bytes != 0u && out->storage == 0) goto done;
+    out->blockColIdx = idx_bytes != 0u ? (types::idx_t *) out->storage : 0;
+    out->val = out->h.rows != 0u && out->ell_cols != 0u ? (void *) ((char *) out->storage + val_offset) : 0;
+    if (!read_block(fp, out->blockColIdx, sizeof(types::idx_t), row_blocks * ell_width)) goto done;
+    if (!read_block(fp, out->val, value_size, (std::size_t) out->h.rows * (std::size_t) out->ell_cols)) goto done;
+    ok = 1;
+
+done:
+    if (!ok) free_blocked_ell_result(out);
+    return ok;
+}
+
 int store_coo_raw(const char *filename, types::dim_t rows, types::dim_t cols, types::nnz_t nnz, const types::idx_t *rowIdx, const types::idx_t *colIdx, const void *val, std::size_t value_size) {
     std::FILE *fp = 0;
     int ok = 0;
@@ -440,6 +551,27 @@ int load(std::FILE *fp, sparse::compressed *m) {
     m->storage = tmp.storage;
     m->majorPtr = tmp.majorPtr;
     m->minorIdx = tmp.minorIdx;
+    m->val = (real::storage_t *) tmp.val;
+    return 1;
+}
+
+int store(std::FILE *fp, const sparse::blocked_ell *m) {
+    return store_blocked_ell_raw(fp, m->rows, m->cols, m->nnz, m->block_size, m->ell_cols, m->blockColIdx, m->val, sizeof(real::storage_t));
+}
+
+int load(std::FILE *fp, sparse::blocked_ell *m) {
+    blocked_ell_load_result tmp;
+
+    tmp.block_size = 0u;
+    tmp.ell_cols = 0u;
+    tmp.storage = 0;
+    tmp.blockColIdx = 0;
+    tmp.val = 0;
+    if (!load_blocked_ell_raw(fp, sizeof(real::storage_t), &tmp)) return 0;
+    sparse::clear(m);
+    sparse::init(m, tmp.h.rows, tmp.h.cols, tmp.h.nnz, tmp.block_size, tmp.ell_cols);
+    m->storage = tmp.storage;
+    m->blockColIdx = tmp.blockColIdx;
     m->val = (real::storage_t *) tmp.val;
     return 1;
 }

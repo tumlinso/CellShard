@@ -463,6 +463,19 @@ __host__ __forceinline__ int fetch_part(sharded<sparse::compressed> *m, const sh
     return load_part_from_open_packfile(m, storage, partId, &cursor);
 }
 
+__host__ __forceinline__ int fetch_part(sharded<sparse::blocked_ell> *m, const shard_storage *s, unsigned long partId) {
+    std::uint64_t cursor = 0;
+    shard_storage *storage = const_cast<shard_storage *>(s);
+
+    if (partId >= m->num_parts || storage == 0 || storage->packfile_path == 0) return 0;
+    if (storage->backend == shard_storage_backend_series_h5) {
+        return fetch_series_blocked_ell_h5_part(m, s, partId);
+    }
+    if (partId >= storage->capacity || storage->locators == 0) return 0;
+    if (!ensure_packfile_open(storage)) return 0;
+    return load_part_from_open_packfile(m, storage, partId, &cursor);
+}
+
 template<typename MatrixT>
 __host__ __forceinline__ int fetch_all_parts(sharded<MatrixT> *m, const shard_storage *s) {
     unsigned long i = 0;
@@ -485,6 +498,31 @@ __host__ __forceinline__ int fetch_all_parts(sharded<sparse::compressed> *m, con
     if (storage->backend == shard_storage_backend_series_h5) {
         for (i = 0; i < m->num_parts; ++i) {
             if (!fetch_series_compressed_h5_part(m, s, i)) return 0;
+        }
+        if (m->num_shards == 0) return set_shards_to_parts(m);
+        return 1;
+    }
+
+    {
+        std::uint64_t cursor = 0;
+        if (storage->locators == 0) return 0;
+        if (!ensure_packfile_open(storage)) return 0;
+        for (i = 0; i < m->num_parts; ++i) {
+            if (!load_part_from_open_packfile(m, storage, i, &cursor)) return 0;
+        }
+    }
+    if (m->num_shards == 0) return set_shards_to_parts(m);
+    return 1;
+}
+
+__host__ __forceinline__ int fetch_all_parts(sharded<sparse::blocked_ell> *m, const shard_storage *s) {
+    unsigned long i = 0;
+    shard_storage *storage = const_cast<shard_storage *>(s);
+
+    if (storage == 0 || storage->packfile_path == 0) return 0;
+    if (storage->backend == shard_storage_backend_series_h5) {
+        for (i = 0; i < m->num_parts; ++i) {
+            if (!fetch_series_blocked_ell_h5_part(m, s, i)) return 0;
         }
         if (m->num_shards == 0) return set_shards_to_parts(m);
         return 1;
@@ -532,6 +570,32 @@ __host__ __forceinline__ int fetch_shard(sharded<sparse::compressed> *m, const s
     if (shardId >= m->num_shards || storage == 0 || storage->packfile_path == 0) return 0;
     if (storage->backend == shard_storage_backend_series_h5) {
         return fetch_series_compressed_h5_shard(m, s, shardId);
+    }
+    if (storage->locators == 0) return 0;
+    if (!ensure_packfile_open(storage)) return 0;
+    begin = first_part_in_shard(m, shardId);
+    end = last_part_in_shard(m, shardId);
+    for (i = begin; i < end; ++i) {
+        if (!load_part_from_open_packfile(m, storage, i, &cursor)) return 0;
+    }
+    return 1;
+}
+
+__host__ __forceinline__ int fetch_shard(sharded<sparse::blocked_ell> *m, const shard_storage *s, unsigned long shardId) {
+    unsigned long begin = 0;
+    unsigned long end = 0;
+    unsigned long i = 0;
+    std::uint64_t cursor = 0;
+    shard_storage *storage = const_cast<shard_storage *>(s);
+
+    if (shardId >= m->num_shards || storage == 0 || storage->packfile_path == 0) return 0;
+    if (storage->backend == shard_storage_backend_series_h5) {
+        begin = first_part_in_shard(m, shardId);
+        end = last_part_in_shard(m, shardId);
+        for (i = begin; i < end; ++i) {
+            if (!fetch_series_blocked_ell_h5_part(m, s, i)) return 0;
+        }
+        return 1;
     }
     if (storage->locators == 0) return 0;
     if (!ensure_packfile_open(storage)) return 0;

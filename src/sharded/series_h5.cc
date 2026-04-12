@@ -26,8 +26,10 @@ static const char provenance_group[] = "/provenance";
 static const char codecs_group[] = "/codecs";
 static const char embedded_metadata_group[] = "/embedded_metadata";
 static const char browse_group[] = "/browse";
+static const char execution_group[] = "/execution";
 static const char payload_group[] = "/payload";
 static const char payload_standard_group[] = "/payload/standard_csr";
+static const char payload_blocked_ell_group[] = "/payload/blocked_ell";
 
 struct series_h5_state {
     hid_t file;
@@ -35,6 +37,8 @@ struct series_h5_state {
     std::uint32_t num_codecs;
     std::uint64_t *part_indptr_offsets;
     std::uint64_t *part_nnz_offsets;
+    std::uint64_t *part_block_idx_offsets;
+    std::uint64_t *part_value_offsets;
     std::uint32_t *part_codec_ids;
     series_codec_descriptor *codecs;
     char *cache_dir;
@@ -46,6 +50,8 @@ inline void series_h5_state_init(series_h5_state *state) {
     state->num_codecs = 0;
     state->part_indptr_offsets = 0;
     state->part_nnz_offsets = 0;
+    state->part_block_idx_offsets = 0;
+    state->part_value_offsets = 0;
     state->part_codec_ids = 0;
     state->codecs = 0;
     state->cache_dir = 0;
@@ -56,11 +62,15 @@ inline void series_h5_state_clear(series_h5_state *state) {
     state->file = (hid_t) -1;
     std::free(state->part_indptr_offsets);
     std::free(state->part_nnz_offsets);
+    std::free(state->part_block_idx_offsets);
+    std::free(state->part_value_offsets);
     std::free(state->part_codec_ids);
     std::free(state->codecs);
     std::free(state->cache_dir);
     state->part_indptr_offsets = 0;
     state->part_nnz_offsets = 0;
+    state->part_block_idx_offsets = 0;
+    state->part_value_offsets = 0;
     state->part_codec_ids = 0;
     state->codecs = 0;
     state->cache_dir = 0;
@@ -245,6 +255,16 @@ inline std::size_t standard_csr_part_bytes(std::uint64_t rows, std::uint64_t nnz
         + (std::size_t) nnz * sizeof(real::storage_t);
 }
 
+inline std::size_t blocked_ell_part_block_index_count(std::uint64_t rows, std::uint64_t aux) {
+    const types::u32 block_size = sparse::unpack_blocked_ell_block_size((unsigned long) aux);
+    const std::uint64_t ell_width = sparse::unpack_blocked_ell_ell_width((unsigned long) aux);
+    return block_size == 0u ? 0u : ((rows + block_size - 1u) / block_size) * ell_width;
+}
+
+inline std::size_t blocked_ell_part_value_count(std::uint64_t rows, std::uint64_t aux) {
+    return (std::size_t) rows * (std::size_t) sparse::unpack_blocked_ell_cols((unsigned long) aux);
+}
+
 int open_series_h5_backend(shard_storage *s);
 void close_series_h5_backend(shard_storage *s);
 
@@ -257,12 +277,27 @@ inline int ensure_directory_exists(const char *path) {
     return 0;
 }
 
+inline int build_cache_part_path_with_suffix(const series_h5_state *state,
+                                             unsigned long part_id,
+                                             const char *suffix,
+                                             char *path,
+                                             std::size_t cap) {
+    if (state == 0 || state->cache_dir == 0 || *state->cache_dir == 0 || path == 0 || cap == 0) return 0;
+    return std::snprintf(path, cap, "%s/part.%lu.%s", state->cache_dir, part_id, suffix != 0 ? suffix : "cache") > 0;
+}
+
 inline int build_cache_part_path(const series_h5_state *state,
                                  unsigned long part_id,
                                  char *path,
                                  std::size_t cap) {
-    if (state == 0 || state->cache_dir == 0 || *state->cache_dir == 0 || path == 0 || cap == 0) return 0;
-    return std::snprintf(path, cap, "%s/part.%lu.cscache", state->cache_dir, part_id) > 0;
+    return build_cache_part_path_with_suffix(state, part_id, "cscache", path, cap);
+}
+
+inline int build_blocked_ell_cache_part_path(const series_h5_state *state,
+                                             unsigned long part_id,
+                                             char *path,
+                                             std::size_t cap) {
+    return build_cache_part_path_with_suffix(state, part_id, "becache", path, cap);
 }
 
 inline int load_standard_csr_part_from_cache(sharded<sparse::compressed> *m,
@@ -301,6 +336,45 @@ inline int store_standard_csr_part_to_cache(const series_h5_state *state,
     if (state == 0 || part == 0 || state->cache_dir == 0) return 0;
     if (!ensure_directory_exists(state->cache_dir)) return 0;
     if (!build_cache_part_path(state, part_id, path, sizeof(path))) return 0;
+    return ::cellshard::store(path, part);
+}
+
+inline int load_blocked_ell_part_from_cache(sharded<sparse::blocked_ell> *m,
+                                            const series_h5_state *state,
+                                            unsigned long part_id) {
+    char path[4096];
+    sparse::blocked_ell *part = 0;
+    int ok = 0;
+
+    if (m == 0 || state == 0 || !build_blocked_ell_cache_part_path(state, part_id, path, sizeof(path))) return 0;
+    if (::access(path, R_OK) != 0) return 0;
+    part = new sparse::blocked_ell;
+    sparse::init(part);
+    if (!::cellshard::load(path, part)) goto done;
+    if (part->rows != m->part_rows[part_id]) goto done;
+    if (part->cols != m->cols) goto done;
+    if (part->nnz != m->part_nnz[part_id]) goto done;
+    if (::cellshard::part_aux(part) != m->part_aux[part_id]) goto done;
+    if (m->parts[part_id] != 0) destroy(m->parts[part_id]);
+    m->parts[part_id] = part;
+    part = 0;
+    ok = 1;
+
+done:
+    if (part != 0) {
+        sparse::clear(part);
+        delete part;
+    }
+    return ok;
+}
+
+inline int store_blocked_ell_part_to_cache(const series_h5_state *state,
+                                           unsigned long part_id,
+                                           const sparse::blocked_ell *part) {
+    char path[4096];
+    if (state == 0 || part == 0 || state->cache_dir == 0) return 0;
+    if (!ensure_directory_exists(state->cache_dir)) return 0;
+    if (!build_blocked_ell_cache_part_path(state, part_id, path, sizeof(path))) return 0;
     return ::cellshard::store(path, part);
 }
 
@@ -431,6 +505,7 @@ int create_series_compressed_h5(const char *filename,
     std::uint64_t total_nnz = 0;
     std::uint64_t *part_indptr_offsets = 0;
     std::uint64_t *part_nnz_offsets = 0;
+    std::uint64_t *part_aux = 0;
     std::uint32_t i = 0;
     int ok = 0;
 
@@ -439,13 +514,15 @@ int create_series_compressed_h5(const char *filename,
 
     part_indptr_offsets = (std::uint64_t *) std::calloc((std::size_t) layout->num_parts, sizeof(std::uint64_t));
     part_nnz_offsets = (std::uint64_t *) std::calloc((std::size_t) layout->num_parts, sizeof(std::uint64_t));
-    if ((layout->num_parts != 0) && (part_indptr_offsets == 0 || part_nnz_offsets == 0)) goto done;
+    part_aux = (std::uint64_t *) std::calloc((std::size_t) layout->num_parts, sizeof(std::uint64_t));
+    if ((layout->num_parts != 0) && (part_indptr_offsets == 0 || part_nnz_offsets == 0 || part_aux == 0)) goto done;
 
     for (i = 0; i < layout->num_parts; ++i) {
         part_indptr_offsets[i] = total_indptr;
         part_nnz_offsets[i] = total_nnz;
         total_indptr += layout->part_rows[i] + 1u;
         total_nnz += layout->part_nnz[i];
+        part_aux[i] = layout->part_aux != 0 ? layout->part_aux[i] : (std::uint64_t) layout->part_axes[i];
     }
 
     file = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
@@ -472,6 +549,7 @@ int create_series_compressed_h5(const char *filename,
     if (!write_dataset_1d(matrix, "part_rows", H5T_NATIVE_UINT64, (hsize_t) layout->num_parts, layout->part_rows)) goto done;
     if (!write_dataset_1d(matrix, "part_nnz", H5T_NATIVE_UINT64, (hsize_t) layout->num_parts, layout->part_nnz)) goto done;
     if (!write_dataset_1d(matrix, "part_axes", H5T_NATIVE_UINT32, (hsize_t) layout->num_parts, layout->part_axes)) goto done;
+    if (!write_dataset_1d(matrix, "part_aux", H5T_NATIVE_UINT64, (hsize_t) layout->num_parts, part_aux)) goto done;
     if (!write_dataset_1d(matrix, "part_row_offsets", H5T_NATIVE_UINT64, (hsize_t) layout->num_parts + 1u, layout->part_row_offsets)) goto done;
     if (!write_dataset_1d(matrix, "part_dataset_ids", H5T_NATIVE_UINT32, (hsize_t) layout->num_parts, layout->part_dataset_ids)) goto done;
     if (!write_dataset_1d(matrix, "part_codec_ids", H5T_NATIVE_UINT32, (hsize_t) layout->num_parts, layout->part_codec_ids)) goto done;
@@ -555,6 +633,162 @@ int create_series_compressed_h5(const char *filename,
 done:
     std::free(part_indptr_offsets);
     std::free(part_nnz_offsets);
+    std::free(part_aux);
+    if (payload >= 0) H5Gclose(payload);
+    if (payload_root >= 0) H5Gclose(payload_root);
+    if (codecs >= 0) H5Gclose(codecs);
+    if (prov >= 0) H5Gclose(prov);
+    if (dsets >= 0) H5Gclose(dsets);
+    if (matrix >= 0) H5Gclose(matrix);
+    if (file >= 0) H5Fclose(file);
+    return ok;
+}
+
+int create_series_blocked_ell_h5(const char *filename,
+                                 const series_layout_view *layout,
+                                 const series_dataset_table_view *datasets,
+                                 const series_provenance_view *provenance) {
+    hid_t file = (hid_t) -1;
+    hid_t matrix = (hid_t) -1;
+    hid_t dsets = (hid_t) -1;
+    hid_t prov = (hid_t) -1;
+    hid_t codecs = (hid_t) -1;
+    hid_t payload_root = (hid_t) -1;
+    hid_t payload = (hid_t) -1;
+    std::uint64_t total_block_idx = 0;
+    std::uint64_t total_values = 0;
+    std::uint64_t *part_aux = 0;
+    std::uint64_t *part_block_idx_offsets = 0;
+    std::uint64_t *part_value_offsets = 0;
+    std::uint32_t i = 0;
+    int ok = 0;
+
+    if (filename == 0 || layout == 0) return 0;
+    if (layout->part_rows == 0 || layout->part_nnz == 0 || layout->part_aux == 0 || layout->part_row_offsets == 0 || layout->part_dataset_ids == 0 || layout->part_codec_ids == 0 || layout->shard_offsets == 0) return 0;
+
+    part_aux = (std::uint64_t *) std::calloc((std::size_t) layout->num_parts, sizeof(std::uint64_t));
+    part_block_idx_offsets = (std::uint64_t *) std::calloc((std::size_t) layout->num_parts, sizeof(std::uint64_t));
+    part_value_offsets = (std::uint64_t *) std::calloc((std::size_t) layout->num_parts, sizeof(std::uint64_t));
+    if ((layout->num_parts != 0) && (part_aux == 0 || part_block_idx_offsets == 0 || part_value_offsets == 0)) goto done;
+
+    for (i = 0; i < layout->num_parts; ++i) {
+        part_aux[i] = layout->part_aux[i];
+        part_block_idx_offsets[i] = total_block_idx;
+        part_value_offsets[i] = total_values;
+        total_block_idx += blocked_ell_part_block_index_count(layout->part_rows[i], part_aux[i]);
+        total_values += blocked_ell_part_value_count(layout->part_rows[i], part_aux[i]);
+    }
+
+    file = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+    if (file < 0) goto done;
+    if (!write_attr_string(file, "cellshard_magic", series_magic)) goto done;
+    if (!write_attr_u32(file, "schema_version", series_h5_schema_version)) goto done;
+    if (!write_attr_string(file, "matrix_format", "blocked_ell")) goto done;
+    if (!write_attr_u64(file, "rows", layout->rows)) goto done;
+    if (!write_attr_u64(file, "cols", layout->cols)) goto done;
+    if (!write_attr_u64(file, "nnz", layout->nnz)) goto done;
+    if (!write_attr_u64(file, "num_parts", layout->num_parts)) goto done;
+    if (!write_attr_u64(file, "num_shards", layout->num_shards)) goto done;
+    if (!write_attr_u64(file, "num_codecs", layout->num_codecs)) goto done;
+    if (!write_attr_u64(file, "num_datasets", datasets != 0 ? datasets->count : 0u)) goto done;
+
+    matrix = create_group(file, matrix_group);
+    dsets = create_group(file, datasets_group);
+    prov = create_group(file, provenance_group);
+    codecs = create_group(file, codecs_group);
+    payload_root = create_group(file, payload_group);
+    payload = payload_root >= 0 ? create_group(payload_root, "blocked_ell") : (hid_t) -1;
+    if (matrix < 0 || dsets < 0 || prov < 0 || codecs < 0 || payload_root < 0 || payload < 0) goto done;
+
+    if (!write_dataset_1d(matrix, "part_rows", H5T_NATIVE_UINT64, (hsize_t) layout->num_parts, layout->part_rows)) goto done;
+    if (!write_dataset_1d(matrix, "part_nnz", H5T_NATIVE_UINT64, (hsize_t) layout->num_parts, layout->part_nnz)) goto done;
+    if (layout->part_axes != 0) {
+        if (!write_dataset_1d(matrix, "part_axes", H5T_NATIVE_UINT32, (hsize_t) layout->num_parts, layout->part_axes)) goto done;
+    }
+    if (!write_dataset_1d(matrix, "part_aux", H5T_NATIVE_UINT64, (hsize_t) layout->num_parts, part_aux)) goto done;
+    if (!write_dataset_1d(matrix, "part_row_offsets", H5T_NATIVE_UINT64, (hsize_t) layout->num_parts + 1u, layout->part_row_offsets)) goto done;
+    if (!write_dataset_1d(matrix, "part_dataset_ids", H5T_NATIVE_UINT32, (hsize_t) layout->num_parts, layout->part_dataset_ids)) goto done;
+    if (!write_dataset_1d(matrix, "part_codec_ids", H5T_NATIVE_UINT32, (hsize_t) layout->num_parts, layout->part_codec_ids)) goto done;
+    if (!write_dataset_1d(matrix, "shard_offsets", H5T_NATIVE_UINT64, (hsize_t) layout->num_shards + 1u, layout->shard_offsets)) goto done;
+
+    if (datasets != 0) {
+        if (!write_text_column(dsets, "dataset_ids", &datasets->dataset_ids)) goto done;
+        if (!write_text_column(dsets, "matrix_paths", &datasets->matrix_paths)) goto done;
+        if (!write_text_column(dsets, "feature_paths", &datasets->feature_paths)) goto done;
+        if (!write_text_column(dsets, "barcode_paths", &datasets->barcode_paths)) goto done;
+        if (!write_text_column(dsets, "metadata_paths", &datasets->metadata_paths)) goto done;
+        if (!write_dataset_1d(dsets, "formats", H5T_NATIVE_UINT32, (hsize_t) datasets->count, datasets->formats)) goto done;
+        if (!write_dataset_1d(dsets, "row_begin", H5T_NATIVE_UINT64, (hsize_t) datasets->count, datasets->row_begin)) goto done;
+        if (!write_dataset_1d(dsets, "row_end", H5T_NATIVE_UINT64, (hsize_t) datasets->count, datasets->row_end)) goto done;
+        if (!write_dataset_1d(dsets, "rows", H5T_NATIVE_UINT64, (hsize_t) datasets->count, datasets->rows)) goto done;
+        if (!write_dataset_1d(dsets, "cols", H5T_NATIVE_UINT64, (hsize_t) datasets->count, datasets->cols)) goto done;
+        if (!write_dataset_1d(dsets, "nnz", H5T_NATIVE_UINT64, (hsize_t) datasets->count, datasets->nnz)) goto done;
+    }
+
+    if (provenance != 0) {
+        if (!write_text_column(prov, "global_barcodes", &provenance->global_barcodes)) goto done;
+        if (!write_dataset_1d(prov, "cell_dataset_ids", H5T_NATIVE_UINT32, (hsize_t) layout->rows, provenance->cell_dataset_ids)) goto done;
+        if (!write_dataset_1d(prov, "cell_local_indices", H5T_NATIVE_UINT64, (hsize_t) layout->rows, provenance->cell_local_indices)) goto done;
+        if (!write_text_column(prov, "feature_ids", &provenance->feature_ids)) goto done;
+        if (!write_text_column(prov, "feature_names", &provenance->feature_names)) goto done;
+        if (!write_text_column(prov, "feature_types", &provenance->feature_types)) goto done;
+        if (!write_dataset_1d(prov, "feature_dataset_ids", H5T_NATIVE_UINT32, (hsize_t) layout->cols, provenance->feature_dataset_ids)) goto done;
+        if (!write_dataset_1d(prov, "feature_local_indices", H5T_NATIVE_UINT64, (hsize_t) layout->cols, provenance->feature_local_indices)) goto done;
+        if (datasets != 0) {
+            if (!write_dataset_1d(prov, "dataset_feature_offsets", H5T_NATIVE_UINT64, (hsize_t) datasets->count + 1u, provenance->dataset_feature_offsets)) goto done;
+            if (!write_dataset_1d(prov, "dataset_feature_to_global", H5T_NATIVE_UINT32, (hsize_t) provenance->dataset_feature_offsets[datasets->count], provenance->dataset_feature_to_global)) goto done;
+        }
+    }
+
+    if (layout->num_codecs != 0) {
+        std::uint32_t *codec_id = (std::uint32_t *) std::calloc((std::size_t) layout->num_codecs, sizeof(std::uint32_t));
+        std::uint32_t *family = (std::uint32_t *) std::calloc((std::size_t) layout->num_codecs, sizeof(std::uint32_t));
+        std::uint32_t *value_code = (std::uint32_t *) std::calloc((std::size_t) layout->num_codecs, sizeof(std::uint32_t));
+        std::uint32_t *scale_value_code = (std::uint32_t *) std::calloc((std::size_t) layout->num_codecs, sizeof(std::uint32_t));
+        std::uint32_t *bits = (std::uint32_t *) std::calloc((std::size_t) layout->num_codecs, sizeof(std::uint32_t));
+        std::uint32_t *flags = (std::uint32_t *) std::calloc((std::size_t) layout->num_codecs, sizeof(std::uint32_t));
+        if (codec_id == 0 || family == 0 || value_code == 0 || scale_value_code == 0 || bits == 0 || flags == 0) {
+            std::free(codec_id);
+            std::free(family);
+            std::free(value_code);
+            std::free(scale_value_code);
+            std::free(bits);
+            std::free(flags);
+            goto done;
+        }
+        for (i = 0; i < layout->num_codecs; ++i) {
+            codec_id[i] = layout->codecs[i].codec_id;
+            family[i] = layout->codecs[i].family;
+            value_code[i] = layout->codecs[i].value_code;
+            scale_value_code[i] = layout->codecs[i].scale_value_code;
+            bits[i] = layout->codecs[i].bits;
+            flags[i] = layout->codecs[i].flags;
+        }
+        if (!write_dataset_1d(codecs, "codec_id", H5T_NATIVE_UINT32, (hsize_t) layout->num_codecs, codec_id)) goto done;
+        if (!write_dataset_1d(codecs, "family", H5T_NATIVE_UINT32, (hsize_t) layout->num_codecs, family)) goto done;
+        if (!write_dataset_1d(codecs, "value_code", H5T_NATIVE_UINT32, (hsize_t) layout->num_codecs, value_code)) goto done;
+        if (!write_dataset_1d(codecs, "scale_value_code", H5T_NATIVE_UINT32, (hsize_t) layout->num_codecs, scale_value_code)) goto done;
+        if (!write_dataset_1d(codecs, "bits", H5T_NATIVE_UINT32, (hsize_t) layout->num_codecs, bits)) goto done;
+        if (!write_dataset_1d(codecs, "flags", H5T_NATIVE_UINT32, (hsize_t) layout->num_codecs, flags)) goto done;
+        std::free(codec_id);
+        std::free(family);
+        std::free(value_code);
+        std::free(scale_value_code);
+        std::free(bits);
+        std::free(flags);
+    }
+
+    if (!write_dataset_1d(payload, "part_block_idx_offsets", H5T_NATIVE_UINT64, (hsize_t) layout->num_parts, part_block_idx_offsets)) goto done;
+    if (!write_dataset_1d(payload, "part_value_offsets", H5T_NATIVE_UINT64, (hsize_t) layout->num_parts, part_value_offsets)) goto done;
+    if (!write_dataset_1d(payload, "block_col_idx", H5T_NATIVE_UINT32, (hsize_t) total_block_idx, 0)) goto done;
+    if (!write_dataset_1d(payload, "values", H5T_NATIVE_UINT16, (hsize_t) total_values, 0)) goto done;
+
+    ok = 1;
+
+done:
+    std::free(part_aux);
+    std::free(part_block_idx_offsets);
+    std::free(part_value_offsets);
     if (payload >= 0) H5Gclose(payload);
     if (payload_root >= 0) H5Gclose(payload_root);
     if (codecs >= 0) H5Gclose(codecs);
@@ -678,6 +912,92 @@ int append_series_browse_cache_h5(const char *filename,
                               H5T_NATIVE_FLOAT,
                               value_count,
                               browse->part_sample_values)) goto done;
+    }
+
+    ok = 1;
+
+done:
+    if (root >= 0) H5Gclose(root);
+    if (file >= 0) H5Fclose(file);
+    return ok;
+}
+
+int append_series_execution_h5(const char *filename,
+                               const series_execution_view *execution) {
+    hid_t file = (hid_t) -1;
+    hid_t root = (hid_t) -1;
+    int ok = 0;
+
+    if (filename == 0) return 0;
+    file = H5Fopen(filename, H5F_ACC_RDWR, H5P_DEFAULT);
+    if (file < 0) return 0;
+    if (!ensure_magic(file)) goto done;
+    root = create_group(file, execution_group);
+    if (root < 0) goto done;
+
+    if (!write_attr_u32(root, "part_count", execution != 0 ? execution->part_count : 0u)) goto done;
+    if (!write_attr_u32(root, "shard_count", execution != 0 ? execution->shard_count : 0u)) goto done;
+    if (!write_attr_u32(root, "preferred_base_format", execution != 0 ? execution->preferred_base_format : series_execution_format_unknown)) goto done;
+
+    if (execution == 0) {
+        ok = 1;
+        goto done;
+    }
+
+    if (execution->part_count != 0u) {
+        if (!write_dataset_1d(root,
+                              "part_execution_formats",
+                              H5T_NATIVE_UINT32,
+                              (hsize_t) execution->part_count,
+                              execution->part_execution_formats)) goto done;
+        if (!write_dataset_1d(root,
+                              "part_blocked_ell_block_sizes",
+                              H5T_NATIVE_UINT32,
+                              (hsize_t) execution->part_count,
+                              execution->part_blocked_ell_block_sizes)) goto done;
+        if (!write_dataset_1d(root,
+                              "part_blocked_ell_fill_ratios",
+                              H5T_NATIVE_FLOAT,
+                              (hsize_t) execution->part_count,
+                              execution->part_blocked_ell_fill_ratios)) goto done;
+        if (!write_dataset_1d(root,
+                              "part_execution_bytes",
+                              H5T_NATIVE_UINT64,
+                              (hsize_t) execution->part_count,
+                              execution->part_execution_bytes)) goto done;
+        if (!write_dataset_1d(root,
+                              "part_blocked_ell_bytes",
+                              H5T_NATIVE_UINT64,
+                              (hsize_t) execution->part_count,
+                              execution->part_blocked_ell_bytes)) goto done;
+    }
+
+    if (execution->shard_count != 0u) {
+        if (!write_dataset_1d(root,
+                              "shard_execution_formats",
+                              H5T_NATIVE_UINT32,
+                              (hsize_t) execution->shard_count,
+                              execution->shard_execution_formats)) goto done;
+        if (!write_dataset_1d(root,
+                              "shard_blocked_ell_block_sizes",
+                              H5T_NATIVE_UINT32,
+                              (hsize_t) execution->shard_count,
+                              execution->shard_blocked_ell_block_sizes)) goto done;
+        if (!write_dataset_1d(root,
+                              "shard_blocked_ell_fill_ratios",
+                              H5T_NATIVE_FLOAT,
+                              (hsize_t) execution->shard_count,
+                              execution->shard_blocked_ell_fill_ratios)) goto done;
+        if (!write_dataset_1d(root,
+                              "shard_execution_bytes",
+                              H5T_NATIVE_UINT64,
+                              (hsize_t) execution->shard_count,
+                              execution->shard_execution_bytes)) goto done;
+        if (!write_dataset_1d(root,
+                              "shard_preferred_pair_ids",
+                              H5T_NATIVE_UINT32,
+                              (hsize_t) execution->shard_count,
+                              execution->shard_preferred_pair_ids)) goto done;
     }
 
     ok = 1;
@@ -815,6 +1135,108 @@ done:
     if (d_values >= 0) H5Dclose(d_values);
     if (d_indices >= 0) H5Dclose(d_indices);
     if (d_indptr >= 0) H5Dclose(d_indptr);
+    if (payload >= 0) H5Gclose(payload);
+    if (file >= 0) H5Fclose(file);
+    return ok;
+}
+
+int append_blocked_ell_part_h5(const char *filename,
+                               unsigned long part_id,
+                               const sparse::blocked_ell *part) {
+    hid_t file = (hid_t) -1;
+    hid_t payload = (hid_t) -1;
+    hid_t d_block_idx = (hid_t) -1;
+    hid_t d_values = (hid_t) -1;
+    std::uint64_t *part_block_idx_offsets = 0;
+    std::uint64_t *part_value_offsets = 0;
+    std::uint64_t num_parts = 0;
+    const std::size_t row_blocks = sparse::row_block_count(part);
+    const std::size_t ell_width = sparse::ell_width_blocks(part);
+    int ok = 0;
+
+    if (filename == 0 || part == 0) return 0;
+
+    file = H5Fopen(filename, H5F_ACC_RDWR, H5P_DEFAULT);
+    if (file < 0) return 0;
+    if (!ensure_magic(file)) goto done;
+    if (!read_attr_u64(file, "num_parts", &num_parts)) goto done;
+    if (part_id >= num_parts) goto done;
+
+    part_block_idx_offsets = (std::uint64_t *) std::calloc((std::size_t) num_parts, sizeof(std::uint64_t));
+    part_value_offsets = (std::uint64_t *) std::calloc((std::size_t) num_parts, sizeof(std::uint64_t));
+    if ((num_parts != 0) && (part_block_idx_offsets == 0 || part_value_offsets == 0)) goto done;
+
+    payload = H5Gopen2(file, payload_blocked_ell_group, H5P_DEFAULT);
+    if (payload < 0) goto done;
+    if (!read_dataset_1d(payload, "part_block_idx_offsets", H5T_NATIVE_UINT64, part_block_idx_offsets)) goto done;
+    if (!read_dataset_1d(payload, "part_value_offsets", H5T_NATIVE_UINT64, part_value_offsets)) goto done;
+    d_block_idx = H5Dopen2(payload, "block_col_idx", H5P_DEFAULT);
+    d_values = H5Dopen2(payload, "values", H5P_DEFAULT);
+    if (d_block_idx < 0 || d_values < 0) goto done;
+
+    {
+        hsize_t off[1];
+        hsize_t dims[1];
+        hid_t filespace = (hid_t) -1;
+        hid_t memspace = (hid_t) -1;
+
+        off[0] = (hsize_t) part_block_idx_offsets[part_id];
+        dims[0] = (hsize_t) (row_blocks * ell_width);
+        filespace = H5Dget_space(d_block_idx);
+        if (filespace < 0) goto done;
+        if (H5Sselect_hyperslab(filespace, H5S_SELECT_SET, off, 0, dims, 0) < 0) {
+            H5Sclose(filespace);
+            goto done;
+        }
+        memspace = H5Screate_simple(1, dims, 0);
+        if (memspace < 0) {
+            H5Sclose(filespace);
+            goto done;
+        }
+        if (H5Dwrite(d_block_idx, H5T_NATIVE_UINT32, memspace, filespace, H5P_DEFAULT, part->blockColIdx) < 0) {
+            H5Sclose(memspace);
+            H5Sclose(filespace);
+            goto done;
+        }
+        H5Sclose(memspace);
+        H5Sclose(filespace);
+    }
+
+    {
+        hsize_t off[1];
+        hsize_t dims[1];
+        hid_t filespace = (hid_t) -1;
+        hid_t memspace = (hid_t) -1;
+
+        off[0] = (hsize_t) part_value_offsets[part_id];
+        dims[0] = (hsize_t) ((std::size_t) part->rows * (std::size_t) part->ell_cols);
+        filespace = H5Dget_space(d_values);
+        if (filespace < 0) goto done;
+        if (H5Sselect_hyperslab(filespace, H5S_SELECT_SET, off, 0, dims, 0) < 0) {
+            H5Sclose(filespace);
+            goto done;
+        }
+        memspace = H5Screate_simple(1, dims, 0);
+        if (memspace < 0) {
+            H5Sclose(filespace);
+            goto done;
+        }
+        if (H5Dwrite(d_values, H5T_NATIVE_UINT16, memspace, filespace, H5P_DEFAULT, part->val) < 0) {
+            H5Sclose(memspace);
+            H5Sclose(filespace);
+            goto done;
+        }
+        H5Sclose(memspace);
+        H5Sclose(filespace);
+    }
+
+    ok = 1;
+
+done:
+    std::free(part_block_idx_offsets);
+    std::free(part_value_offsets);
+    if (d_values >= 0) H5Dclose(d_values);
+    if (d_block_idx >= 0) H5Dclose(d_block_idx);
     if (payload >= 0) H5Gclose(payload);
     if (file >= 0) H5Fclose(file);
     return ok;
@@ -997,6 +1419,131 @@ done:
     return ok;
 }
 
+int load_series_blocked_ell_h5_header(const char *filename,
+                                      sharded<sparse::blocked_ell> *m,
+                                      shard_storage *s) {
+    hid_t file = (hid_t) -1;
+    hid_t matrix = (hid_t) -1;
+    hid_t codecs = (hid_t) -1;
+    std::uint64_t rows = 0;
+    std::uint64_t cols = 0;
+    std::uint64_t nnz = 0;
+    std::uint64_t num_parts = 0;
+    std::uint64_t num_shards = 0;
+    std::uint64_t num_codecs = 0;
+    std::uint64_t *part_rows = 0;
+    std::uint64_t *part_nnz = 0;
+    std::uint64_t *part_aux = 0;
+    std::uint64_t *part_row_offsets = 0;
+    std::uint64_t *shard_offsets = 0;
+    unsigned long *part_rows_ul = 0;
+    unsigned long *part_nnz_ul = 0;
+    unsigned long *part_aux_ul = 0;
+    unsigned long *shard_offsets_ul = 0;
+    unsigned long i = 0;
+    int ok = 0;
+
+    if (filename == 0 || m == 0) return 0;
+    file = H5Fopen(filename, H5F_ACC_RDONLY, H5P_DEFAULT);
+    if (file < 0) return 0;
+    if (!ensure_magic(file)) goto done;
+    if (!read_attr_u64(file, "rows", &rows)) goto done;
+    if (!read_attr_u64(file, "cols", &cols)) goto done;
+    if (!read_attr_u64(file, "nnz", &nnz)) goto done;
+    if (!read_attr_u64(file, "num_parts", &num_parts)) goto done;
+    if (!read_attr_u64(file, "num_shards", &num_shards)) goto done;
+    if (!read_attr_u64(file, "num_codecs", &num_codecs)) goto done;
+
+    matrix = H5Gopen2(file, matrix_group, H5P_DEFAULT);
+    codecs = H5Gopen2(file, codecs_group, H5P_DEFAULT);
+    if (matrix < 0 || codecs < 0) goto done;
+
+    part_rows = (std::uint64_t *) std::calloc((std::size_t) num_parts, sizeof(std::uint64_t));
+    part_nnz = (std::uint64_t *) std::calloc((std::size_t) num_parts, sizeof(std::uint64_t));
+    part_aux = (std::uint64_t *) std::calloc((std::size_t) num_parts, sizeof(std::uint64_t));
+    part_row_offsets = (std::uint64_t *) std::calloc((std::size_t) num_parts + 1u, sizeof(std::uint64_t));
+    shard_offsets = (std::uint64_t *) std::calloc((std::size_t) num_shards + 1u, sizeof(std::uint64_t));
+    part_rows_ul = (unsigned long *) std::calloc((std::size_t) num_parts, sizeof(unsigned long));
+    part_nnz_ul = (unsigned long *) std::calloc((std::size_t) num_parts, sizeof(unsigned long));
+    part_aux_ul = (unsigned long *) std::calloc((std::size_t) num_parts, sizeof(unsigned long));
+    shard_offsets_ul = (unsigned long *) std::calloc((std::size_t) num_shards + 1u, sizeof(unsigned long));
+    if ((num_parts != 0) && (part_rows == 0 || part_nnz == 0 || part_aux == 0 || part_row_offsets == 0 || part_rows_ul == 0 || part_nnz_ul == 0 || part_aux_ul == 0)) goto done;
+    if ((num_shards + 1u) != 0u && (shard_offsets == 0 || shard_offsets_ul == 0)) goto done;
+
+    if (!read_dataset_1d(matrix, "part_rows", H5T_NATIVE_UINT64, part_rows)) goto done;
+    if (!read_dataset_1d(matrix, "part_nnz", H5T_NATIVE_UINT64, part_nnz)) goto done;
+    if (!read_dataset_1d(matrix, "part_aux", H5T_NATIVE_UINT64, part_aux)) goto done;
+    if (!read_dataset_1d(matrix, "part_row_offsets", H5T_NATIVE_UINT64, part_row_offsets)) goto done;
+    if (!read_dataset_1d(matrix, "shard_offsets", H5T_NATIVE_UINT64, shard_offsets)) goto done;
+
+    clear(m);
+    init(m);
+    for (i = 0; i < (unsigned long) num_parts; ++i) {
+        if (!sharded_from_u64(part_rows[i], part_rows_ul + i, "part_rows", filename)) goto done;
+        if (!sharded_from_u64(part_nnz[i], part_nnz_ul + i, "part_nnz", filename)) goto done;
+        if (!sharded_from_u64(part_aux[i], part_aux_ul + i, "part_aux", filename)) goto done;
+    }
+    for (i = 0; i <= (unsigned long) num_shards; ++i) {
+        if (!sharded_from_u64(shard_offsets[i], shard_offsets_ul + i, "shard_offsets", filename)) goto done;
+    }
+    if (!define_parts(m, (unsigned long) cols, (unsigned long) num_parts, part_rows_ul, part_nnz_ul, part_aux_ul)) goto done;
+    if (!reshard(m, (unsigned long) num_shards, shard_offsets_ul)) goto done;
+    m->rows = (unsigned long) rows;
+    m->nnz = (unsigned long) nnz;
+
+    if (s != 0) {
+        series_h5_state *state = 0;
+        if (!bind_series_h5(s, filename)) goto done;
+        s->capacity = (unsigned int) num_parts;
+        state = (series_h5_state *) s->backend_state;
+        state->num_parts = num_parts;
+        state->num_codecs = (std::uint32_t) num_codecs;
+        if (num_parts != 0) {
+            state->part_block_idx_offsets = (std::uint64_t *) std::calloc((std::size_t) num_parts, sizeof(std::uint64_t));
+            state->part_value_offsets = (std::uint64_t *) std::calloc((std::size_t) num_parts, sizeof(std::uint64_t));
+            state->part_codec_ids = (std::uint32_t *) std::calloc((std::size_t) num_parts, sizeof(std::uint32_t));
+            if (state->part_block_idx_offsets == 0 || state->part_value_offsets == 0 || state->part_codec_ids == 0) goto done;
+        }
+        if (num_codecs != 0) {
+            state->codecs = (series_codec_descriptor *) std::calloc((std::size_t) num_codecs, sizeof(series_codec_descriptor));
+            if (state->codecs == 0) goto done;
+        }
+        {
+            hid_t payload = H5Gopen2(file, payload_blocked_ell_group, H5P_DEFAULT);
+            if (payload < 0) goto done;
+            if (!read_dataset_1d(payload, "part_block_idx_offsets", H5T_NATIVE_UINT64, state->part_block_idx_offsets)) {
+                H5Gclose(payload);
+                goto done;
+            }
+            if (!read_dataset_1d(payload, "part_value_offsets", H5T_NATIVE_UINT64, state->part_value_offsets)) {
+                H5Gclose(payload);
+                goto done;
+            }
+            H5Gclose(payload);
+        }
+        if (!read_dataset_1d(matrix, "part_codec_ids", H5T_NATIVE_UINT32, state->part_codec_ids)) goto done;
+        if (!load_codec_table(codecs, state->codecs, (std::uint32_t) num_codecs)) goto done;
+    }
+
+    ok = 1;
+
+done:
+    if (!ok && s != 0) clear(s);
+    std::free(part_rows);
+    std::free(part_nnz);
+    std::free(part_aux);
+    std::free(part_row_offsets);
+    std::free(shard_offsets);
+    std::free(part_rows_ul);
+    std::free(part_nnz_ul);
+    std::free(part_aux_ul);
+    std::free(shard_offsets_ul);
+    if (codecs >= 0) H5Gclose(codecs);
+    if (matrix >= 0) H5Gclose(matrix);
+    if (file >= 0) H5Fclose(file);
+    return ok;
+}
+
 int fetch_series_compressed_h5_part(sharded<sparse::compressed> *m,
                                     const shard_storage *s,
                                     unsigned long part_id) {
@@ -1136,6 +1683,153 @@ int prefetch_series_compressed_h5_shard_to_cache(const sharded<sparse::compresse
     end = last_part_in_shard(m, shard_id);
     for (i = begin; i < end; ++i) {
         if (!prefetch_series_compressed_h5_part_to_cache(m, s, i)) return 0;
+    }
+    return 1;
+}
+
+int fetch_series_blocked_ell_h5_part(sharded<sparse::blocked_ell> *m,
+                                     const shard_storage *s,
+                                     unsigned long part_id) {
+    shard_storage *storage = const_cast<shard_storage *>(s);
+    series_h5_state *state = 0;
+    const series_codec_descriptor *codec = 0;
+    sparse::blocked_ell *part = 0;
+    hid_t payload = (hid_t) -1;
+    hid_t d_block_idx = (hid_t) -1;
+    hid_t d_values = (hid_t) -1;
+    const unsigned long aux = m != 0 && part_id < m->num_parts ? m->part_aux[part_id] : 0ul;
+    const types::u32 block_size = sparse::unpack_blocked_ell_block_size(aux);
+    const types::u32 ell_cols = sparse::unpack_blocked_ell_cols(aux);
+    const std::size_t block_idx_count = blocked_ell_part_block_index_count(m->part_rows[part_id], aux);
+    const std::size_t value_count = blocked_ell_part_value_count(m->part_rows[part_id], aux);
+    int ok = 0;
+
+    if (m == 0 || storage == 0 || storage->backend != shard_storage_backend_series_h5 || part_id >= m->num_parts || storage->backend_state == 0) return 0;
+    state = (series_h5_state *) storage->backend_state;
+    if (state->cache_dir != 0 && load_blocked_ell_part_from_cache(m, state, part_id)) return 1;
+    if (storage->open_backend == 0 || !storage->open_backend(storage)) return 0;
+    codec = find_codec(state, state->part_codec_ids[part_id]);
+    if (codec == 0 || codec->family != series_codec_family_blocked_ell || codec->value_code != (std::uint32_t) real::code_of<real::storage_t>::code) return 0;
+
+    if (m->parts[part_id] != 0) destroy(m->parts[part_id]);
+    m->parts[part_id] = 0;
+
+    payload = H5Gopen2(state->file, payload_blocked_ell_group, H5P_DEFAULT);
+    if (payload < 0) return 0;
+    d_block_idx = H5Dopen2(payload, "block_col_idx", H5P_DEFAULT);
+    d_values = H5Dopen2(payload, "values", H5P_DEFAULT);
+    if (d_block_idx < 0 || d_values < 0) goto done;
+
+    part = new sparse::blocked_ell;
+    sparse::init(part,
+                 (types::dim_t) m->part_rows[part_id],
+                 (types::dim_t) m->cols,
+                 (types::nnz_t) m->part_nnz[part_id],
+                 block_size,
+                 ell_cols);
+    if (!sparse::allocate(part)) goto done;
+    if (!read_hyperslab_1d(d_block_idx, H5T_NATIVE_UINT32, state->part_block_idx_offsets[part_id], (std::uint64_t) block_idx_count, part->blockColIdx)) goto done;
+    if (!read_hyperslab_1d(d_values, H5T_NATIVE_UINT16, state->part_value_offsets[part_id], (std::uint64_t) value_count, part->val)) goto done;
+    if (state->cache_dir != 0) {
+        if (!store_blocked_ell_part_to_cache(state, part_id, part)) goto done;
+    }
+    m->parts[part_id] = part;
+    part = 0;
+    ok = 1;
+
+done:
+    if (part != 0) {
+        sparse::clear(part);
+        delete part;
+    }
+    if (d_values >= 0) H5Dclose(d_values);
+    if (d_block_idx >= 0) H5Dclose(d_block_idx);
+    if (payload >= 0) H5Gclose(payload);
+    return ok;
+}
+
+int fetch_series_blocked_ell_h5_shard(sharded<sparse::blocked_ell> *m,
+                                      const shard_storage *s,
+                                      unsigned long shard_id) {
+    unsigned long begin = 0;
+    unsigned long end = 0;
+    unsigned long i = 0;
+
+    if (m == 0 || s == 0 || shard_id >= m->num_shards) return 0;
+    begin = first_part_in_shard(m, shard_id);
+    end = last_part_in_shard(m, shard_id);
+    for (i = begin; i < end; ++i) {
+        if (!fetch_series_blocked_ell_h5_part(m, s, i)) return 0;
+    }
+    return 1;
+}
+
+int prefetch_series_blocked_ell_h5_part_to_cache(const sharded<sparse::blocked_ell> *m,
+                                                 const shard_storage *s,
+                                                 unsigned long part_id) {
+    shard_storage *storage = const_cast<shard_storage *>(s);
+    series_h5_state *state = 0;
+    sparse::blocked_ell part;
+    const series_codec_descriptor *codec = 0;
+    hid_t payload = (hid_t) -1;
+    hid_t d_block_idx = (hid_t) -1;
+    hid_t d_values = (hid_t) -1;
+    const unsigned long aux = m != 0 && part_id < m->num_parts ? m->part_aux[part_id] : 0ul;
+    const types::u32 block_size = sparse::unpack_blocked_ell_block_size(aux);
+    const types::u32 ell_cols = sparse::unpack_blocked_ell_cols(aux);
+    const std::size_t block_idx_count = blocked_ell_part_block_index_count(m->part_rows[part_id], aux);
+    const std::size_t value_count = blocked_ell_part_value_count(m->part_rows[part_id], aux);
+    int ok = 0;
+
+    if (m == 0 || storage == 0 || storage->backend != shard_storage_backend_series_h5 || part_id >= m->num_parts || storage->backend_state == 0) return 0;
+    if (storage->open_backend == 0 || !storage->open_backend(storage)) return 0;
+    state = (series_h5_state *) storage->backend_state;
+    if (state->cache_dir == 0) return 0;
+    if (load_blocked_ell_part_from_cache(const_cast<sharded<sparse::blocked_ell> *>(m), state, part_id)) {
+        drop_part(const_cast<sharded<sparse::blocked_ell> *>(m), part_id);
+        return 1;
+    }
+    codec = find_codec(state, state->part_codec_ids[part_id]);
+    if (codec == 0 || codec->family != series_codec_family_blocked_ell || codec->value_code != (std::uint32_t) real::code_of<real::storage_t>::code) return 0;
+
+    sparse::init(&part,
+                 (types::dim_t) m->part_rows[part_id],
+                 (types::dim_t) m->cols,
+                 (types::nnz_t) m->part_nnz[part_id],
+                 block_size,
+                 ell_cols);
+    if (!sparse::allocate(&part)) goto done;
+
+    payload = H5Gopen2(state->file, payload_blocked_ell_group, H5P_DEFAULT);
+    if (payload < 0) goto done;
+    d_block_idx = H5Dopen2(payload, "block_col_idx", H5P_DEFAULT);
+    d_values = H5Dopen2(payload, "values", H5P_DEFAULT);
+    if (d_block_idx < 0 || d_values < 0) goto done;
+    if (!read_hyperslab_1d(d_block_idx, H5T_NATIVE_UINT32, state->part_block_idx_offsets[part_id], (std::uint64_t) block_idx_count, part.blockColIdx)) goto done;
+    if (!read_hyperslab_1d(d_values, H5T_NATIVE_UINT16, state->part_value_offsets[part_id], (std::uint64_t) value_count, part.val)) goto done;
+    if (!store_blocked_ell_part_to_cache(state, part_id, &part)) goto done;
+    ok = 1;
+
+done:
+    if (d_values >= 0) H5Dclose(d_values);
+    if (d_block_idx >= 0) H5Dclose(d_block_idx);
+    if (payload >= 0) H5Gclose(payload);
+    sparse::clear(&part);
+    return ok;
+}
+
+int prefetch_series_blocked_ell_h5_shard_to_cache(const sharded<sparse::blocked_ell> *m,
+                                                  const shard_storage *s,
+                                                  unsigned long shard_id) {
+    unsigned long begin = 0;
+    unsigned long end = 0;
+    unsigned long i = 0;
+
+    if (m == 0 || s == 0 || shard_id >= m->num_shards) return 0;
+    begin = first_part_in_shard(m, shard_id);
+    end = last_part_in_shard(m, shard_id);
+    for (i = begin; i < end; ++i) {
+        if (!prefetch_series_blocked_ell_h5_part_to_cache(m, s, i)) return 0;
     }
     return 1;
 }

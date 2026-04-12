@@ -282,6 +282,20 @@ inline int load_header(const char *filename, sharded<sparse::compressed> *m) {
     return load_header(filename, m, 0);
 }
 
+inline int load_header(const char *filename, sharded<sparse::blocked_ell> *m, shard_storage *s) {
+    const char *ext = std::strrchr(filename != 0 ? filename : "", '.');
+    if (ext != 0) {
+        if (std::strcmp(ext, ".csh5") == 0 || std::strcmp(ext, ".h5") == 0 || std::strcmp(ext, ".hdf5") == 0) {
+            return load_series_blocked_ell_h5_header(filename, m, s);
+        }
+    }
+    return load_packfile_header(filename, m, s);
+}
+
+inline int load_header(const char *filename, sharded<sparse::blocked_ell> *m) {
+    return load_header(filename, m, 0);
+}
+
 // Full sharded store path:
 // - requires every part to be materialized on host
 // - computes aligned payload offsets

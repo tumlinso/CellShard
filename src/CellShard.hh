@@ -11,6 +11,10 @@
 //
 // Downstream code that wants a smaller compile surface should include only the
 // specific headers it needs instead of this umbrella.
+//
+// Sparse layout posture:
+// - `blocked_ell` is the native sparse type
+// - `compressed` is the secondary fallback / compatibility type
 
 #include "types.cuh"
 #include "offset_span.cuh"

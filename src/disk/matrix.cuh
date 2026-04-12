@@ -95,6 +95,15 @@ struct compressed_load_result {
     void *val;
 };
 
+struct blocked_ell_load_result {
+    disk_header h;
+    types::u32 block_size;
+    types::u32 ell_cols;
+    void *storage;
+    types::idx_t *blockColIdx;
+    void *val;
+};
+
 struct coo_load_result {
     disk_header h;
     void *storage;
@@ -134,6 +143,11 @@ int load_compressed_raw(const char *filename, std::size_t value_size, compressed
 int store_compressed_raw(std::FILE *fp, types::dim_t rows, types::dim_t cols, types::nnz_t nnz, types::u32 axis, types::dim_t major_dim, const types::ptr_t *majorPtr, const types::idx_t *minorIdx, const void *val, std::size_t value_size);
 int load_compressed_raw(std::FILE *fp, std::size_t value_size, compressed_load_result *out);
 
+int store_blocked_ell_raw(const char *filename, types::dim_t rows, types::dim_t cols, types::nnz_t nnz, types::u32 block_size, types::u32 ell_cols, const types::idx_t *blockColIdx, const void *val, std::size_t value_size);
+int load_blocked_ell_raw(const char *filename, std::size_t value_size, blocked_ell_load_result *out);
+int store_blocked_ell_raw(std::FILE *fp, types::dim_t rows, types::dim_t cols, types::nnz_t nnz, types::u32 block_size, types::u32 ell_cols, const types::idx_t *blockColIdx, const void *val, std::size_t value_size);
+int load_blocked_ell_raw(std::FILE *fp, std::size_t value_size, blocked_ell_load_result *out);
+
 int store_coo_raw(const char *filename, types::dim_t rows, types::dim_t cols, types::nnz_t nnz, const types::idx_t *rowIdx, const types::idx_t *colIdx, const void *val, std::size_t value_size);
 int load_coo_raw(const char *filename, std::size_t value_size, coo_load_result *out);
 int store_coo_raw(std::FILE *fp, types::dim_t rows, types::dim_t cols, types::nnz_t nnz, const types::idx_t *rowIdx, const types::idx_t *colIdx, const void *val, std::size_t value_size);
@@ -170,6 +184,8 @@ int store(std::FILE *fp, const dense *m);
 int load(std::FILE *fp, dense *m);
 int store(std::FILE *fp, const sparse::compressed *m);
 int load(std::FILE *fp, sparse::compressed *m);
+int store(std::FILE *fp, const sparse::blocked_ell *m);
+int load(std::FILE *fp, sparse::blocked_ell *m);
 int store(std::FILE *fp, const sparse::coo *m);
 int load(std::FILE *fp, sparse::coo *m);
 int store(std::FILE *fp, const sparse::dia *m);
@@ -230,6 +246,37 @@ inline int load(const char *filename, sparse::compressed *m) {
     m->storage = tmp.storage;
     m->majorPtr = tmp.majorPtr;
     m->minorIdx = tmp.minorIdx;
+    m->val = (real::storage_t *) tmp.val;
+    return 1;
+}
+
+inline int store(const char *filename, const sparse::blocked_ell *m) {
+    return store_blocked_ell_raw(
+        filename,
+        m->rows,
+        m->cols,
+        m->nnz,
+        m->block_size,
+        m->ell_cols,
+        m->blockColIdx,
+        m->val,
+        sizeof(real::storage_t)
+    );
+}
+
+inline int load(const char *filename, sparse::blocked_ell *m) {
+    blocked_ell_load_result tmp;
+
+    tmp.block_size = 0u;
+    tmp.ell_cols = 0u;
+    tmp.storage = 0;
+    tmp.blockColIdx = 0;
+    tmp.val = 0;
+    if (!load_blocked_ell_raw(filename, sizeof(real::storage_t), &tmp)) return 0;
+    sparse::clear(m);
+    sparse::init(m, tmp.h.rows, tmp.h.cols, tmp.h.nnz, tmp.block_size, tmp.ell_cols);
+    m->storage = tmp.storage;
+    m->blockColIdx = tmp.blockColIdx;
     m->val = (real::storage_t *) tmp.val;
     return 1;
 }

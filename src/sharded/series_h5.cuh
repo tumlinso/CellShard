@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../formats/compressed.cuh"
+#include "../formats/blocked_ell.cuh"
 #include "../real.cuh"
 #include "shard_paths.cuh"
 #include "sharded.cuh"
@@ -18,7 +19,15 @@ enum {
 enum {
     series_codec_family_none = 0u,
     series_codec_family_standard_csr = 1u,
-    series_codec_family_quantized_csr = 2u
+    series_codec_family_quantized_csr = 2u,
+    series_codec_family_blocked_ell = 3u
+};
+
+enum {
+    series_execution_format_unknown = 0u,
+    series_execution_format_compressed = 1u,
+    series_execution_format_blocked_ell = 2u,
+    series_execution_format_mixed = 3u
 };
 
 struct series_codec_descriptor {
@@ -115,6 +124,7 @@ struct series_layout_view {
     const std::uint64_t *part_rows;
     const std::uint64_t *part_nnz;
     const std::uint32_t *part_axes;
+    const std::uint64_t *part_aux;
     const std::uint64_t *part_row_offsets;
     const std::uint32_t *part_dataset_ids;
     const std::uint32_t *part_codec_ids;
@@ -124,11 +134,33 @@ struct series_layout_view {
     std::uint32_t num_codecs;
 };
 
+struct series_execution_view {
+    std::uint32_t part_count;
+    const std::uint32_t *part_execution_formats;
+    const std::uint32_t *part_blocked_ell_block_sizes;
+    const float *part_blocked_ell_fill_ratios;
+    const std::uint64_t *part_execution_bytes;
+    const std::uint64_t *part_blocked_ell_bytes;
+
+    std::uint32_t shard_count;
+    const std::uint32_t *shard_execution_formats;
+    const std::uint32_t *shard_blocked_ell_block_sizes;
+    const float *shard_blocked_ell_fill_ratios;
+    const std::uint64_t *shard_execution_bytes;
+    const std::uint32_t *shard_preferred_pair_ids;
+
+    std::uint32_t preferred_base_format;
+};
+
 // Create/append helpers are whole-file synchronous HDF5 operations.
 int create_series_compressed_h5(const char *filename,
                                 const series_layout_view *layout,
                                 const series_dataset_table_view *datasets,
                                 const series_provenance_view *provenance);
+int create_series_blocked_ell_h5(const char *filename,
+                                 const series_layout_view *layout,
+                                 const series_dataset_table_view *datasets,
+                                 const series_provenance_view *provenance);
 
 int append_series_embedded_metadata_h5(const char *filename,
                                        const series_embedded_metadata_view *metadata);
@@ -136,9 +168,15 @@ int append_series_embedded_metadata_h5(const char *filename,
 int append_series_browse_cache_h5(const char *filename,
                                   const series_browse_cache_view *browse);
 
+int append_series_execution_h5(const char *filename,
+                               const series_execution_view *execution);
+
 int append_standard_csr_part_h5(const char *filename,
                                 unsigned long part_id,
                                 const sparse::compressed *part);
+int append_blocked_ell_part_h5(const char *filename,
+                               unsigned long part_id,
+                               const sparse::blocked_ell *part);
 
 // Header load binds a lazy shard_storage backend; fetch/prefetch calls are the
 // points that actually materialize part payloads or populate local caches.
@@ -147,6 +185,9 @@ int bind_series_h5_part_cache(shard_storage *s, const char *cache_dir);
 int load_series_compressed_h5_header(const char *filename,
                                      sharded<sparse::compressed> *m,
                                      shard_storage *s);
+int load_series_blocked_ell_h5_header(const char *filename,
+                                      sharded<sparse::blocked_ell> *m,
+                                      shard_storage *s);
 int prefetch_series_compressed_h5_part_to_cache(const sharded<sparse::compressed> *m,
                                                 const shard_storage *s,
                                                 unsigned long part_id);
@@ -159,5 +200,17 @@ int fetch_series_compressed_h5_part(sharded<sparse::compressed> *m,
 int fetch_series_compressed_h5_shard(sharded<sparse::compressed> *m,
                                      const shard_storage *s,
                                      unsigned long shard_id);
+int prefetch_series_blocked_ell_h5_part_to_cache(const sharded<sparse::blocked_ell> *m,
+                                                 const shard_storage *s,
+                                                 unsigned long part_id);
+int prefetch_series_blocked_ell_h5_shard_to_cache(const sharded<sparse::blocked_ell> *m,
+                                                  const shard_storage *s,
+                                                  unsigned long shard_id);
+int fetch_series_blocked_ell_h5_part(sharded<sparse::blocked_ell> *m,
+                                     const shard_storage *s,
+                                     unsigned long part_id);
+int fetch_series_blocked_ell_h5_shard(sharded<sparse::blocked_ell> *m,
+                                      const shard_storage *s,
+                                      unsigned long shard_id);
 
 } // namespace cellshard

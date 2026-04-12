@@ -7,6 +7,7 @@
 #include <cstring>
 
 #include "../formats/compressed.cuh"
+#include "../formats/blocked_ell.cuh"
 #include "../formats/dense.cuh"
 #include "../formats/diagonal.cuh"
 #include "../formats/triplet.cuh"
@@ -20,7 +21,8 @@ enum {
     disk_format_compressed = 2,
     disk_format_coo        = 3,
     disk_format_dia        = 4,
-    disk_format_ell        = 5
+    disk_format_ell        = 5,
+    disk_format_blocked_ell = 6
 };
 
 // Minimal fixed header stored at the front of every packed part.
@@ -56,6 +58,12 @@ template<>
 struct disk_format_code<sparse::compressed> {
     enum { value = disk_format_compressed };
     static inline const char *name() { return "compressed matrix"; }
+};
+
+template<>
+struct disk_format_code<sparse::blocked_ell> {
+    enum { value = disk_format_blocked_ell };
+    static inline const char *name() { return "blocked ell matrix"; }
 };
 
 template<>
@@ -108,6 +116,13 @@ std::size_t packed_dense_bytes(types::nnz_t nnz, std::size_t value_size);
 std::size_t packed_compressed_bytes(types::dim_t rows, types::dim_t cols, types::nnz_t nnz, types::u32 axis, std::size_t value_size);
 std::size_t packed_coo_bytes(types::nnz_t nnz, std::size_t value_size);
 std::size_t packed_dia_bytes(types::nnz_t nnz, types::idx_t num_diagonals, std::size_t value_size);
+inline std::size_t packed_blocked_ell_bytes(types::dim_t rows, types::u32 ell_cols, types::u32 block_size, std::size_t value_size) {
+    return sizeof(disk_header)
+        + sizeof(types::u32)
+        + sizeof(types::u32)
+        + (std::size_t) ((rows + block_size - 1u) / block_size) * (std::size_t) (ell_cols / block_size) * sizeof(types::idx_t)
+        + (std::size_t) rows * (std::size_t) ell_cols * value_size;
+}
 
 int store_dense_raw(const char *filename, types::dim_t rows, types::dim_t cols, types::nnz_t nnz, const void *val, std::size_t value_size);
 int load_dense_raw(const char *filename, std::size_t value_size, dense_load_result *out);
@@ -143,6 +158,10 @@ inline std::size_t packed_bytes(const sparse::coo *, types::dim_t, types::dim_t,
 
 inline std::size_t packed_bytes(const sparse::dia *, types::dim_t, types::dim_t, types::nnz_t nnz, unsigned long num_diagonals, std::size_t value_size) {
     return packed_dia_bytes(nnz, (types::idx_t) num_diagonals, value_size);
+}
+
+inline std::size_t packed_bytes(const sparse::blocked_ell *, types::dim_t rows, types::dim_t, types::nnz_t, unsigned long aux, std::size_t value_size) {
+    return packed_blocked_ell_bytes(rows, sparse::unpack_blocked_ell_cols(aux), sparse::unpack_blocked_ell_block_size(aux), value_size);
 }
 
 // FILE* variants let packfile code write/read many parts through one open file

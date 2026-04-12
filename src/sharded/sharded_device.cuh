@@ -73,6 +73,16 @@ struct alignas(16) compressed_view {
     __half *val;
 };
 
+struct alignas(16) blocked_ell_view {
+    unsigned int rows;
+    unsigned int cols;
+    unsigned int nnz;
+    unsigned int block_size;
+    unsigned int ell_cols;
+    unsigned int *blockColIdx;
+    __half *val;
+};
+
 struct alignas(16) coo_view {
     unsigned int rows;
     unsigned int cols;
@@ -427,6 +437,108 @@ fail:
     return err;
 }
 
+__host__ __forceinline__ cudaError_t upload(const ::cellshard::sparse::blocked_ell *src, part_record< ::cellshard::sparse::blocked_ell > *record) {
+    blocked_ell_view host;
+    const std::size_t row_blocks = (std::size_t) sparse::row_block_count(src);
+    const std::size_t ell_width = (std::size_t) sparse::ell_width_blocks(src);
+    const std::size_t idx_count = row_blocks * ell_width;
+    const std::size_t view_offset = 0;
+    const std::size_t idx_offset = align_up_bytes(sizeof(blocked_ell_view), alignof(unsigned int));
+    const std::size_t val_offset = align_up_bytes(idx_offset + idx_count * sizeof(unsigned int), alignof(__half));
+    const std::size_t total_bytes = val_offset + (std::size_t) src->rows * (std::size_t) src->ell_cols * sizeof(__half);
+    char *storage = 0;
+    cudaError_t err = cudaSuccess;
+
+    zero_record(record);
+    host.rows = src->rows;
+    host.cols = src->cols;
+    host.nnz = src->nnz;
+    host.block_size = src->block_size;
+    host.ell_cols = src->ell_cols;
+    host.blockColIdx = 0;
+    host.val = 0;
+
+    err = cudaMalloc((void **) &storage, total_bytes == 0 ? sizeof(blocked_ell_view) : total_bytes);
+    if (err != cudaSuccess) goto fail;
+    if (idx_count != 0u) {
+        host.blockColIdx = (unsigned int *) (storage + idx_offset);
+        err = cudaMemcpy(host.blockColIdx, src->blockColIdx, idx_count * sizeof(unsigned int), cudaMemcpyHostToDevice);
+        if (err != cudaSuccess) goto fail;
+    }
+    if (src->rows != 0u && src->ell_cols != 0u) {
+        host.val = (__half *) (storage + val_offset);
+        err = cudaMemcpy(host.val, src->val, (std::size_t) src->rows * (std::size_t) src->ell_cols * sizeof(__half), cudaMemcpyHostToDevice);
+        if (err != cudaSuccess) goto fail;
+    }
+    err = cudaMemcpy(storage + view_offset, &host, sizeof(host), cudaMemcpyHostToDevice);
+    if (err != cudaSuccess) goto fail;
+
+    record->allocation = storage;
+    record->allocation_bytes = total_bytes;
+    record->storage = storage;
+    record->view = storage + view_offset;
+    record->a0 = host.blockColIdx;
+    record->a1 = host.val;
+    return cudaSuccess;
+
+fail:
+    if (storage != 0) cudaFree(storage);
+    zero_record(record);
+    return err;
+}
+
+__host__ __forceinline__ cudaError_t upload_async(const ::cellshard::sparse::blocked_ell *src,
+                                                  part_record< ::cellshard::sparse::blocked_ell > *record,
+                                                  cudaStream_t stream) {
+    blocked_ell_view host;
+    const std::size_t row_blocks = (std::size_t) sparse::row_block_count(src);
+    const std::size_t ell_width = (std::size_t) sparse::ell_width_blocks(src);
+    const std::size_t idx_count = row_blocks * ell_width;
+    const std::size_t view_offset = 0;
+    const std::size_t idx_offset = align_up_bytes(sizeof(blocked_ell_view), alignof(unsigned int));
+    const std::size_t val_offset = align_up_bytes(idx_offset + idx_count * sizeof(unsigned int), alignof(__half));
+    const std::size_t total_bytes = val_offset + (std::size_t) src->rows * (std::size_t) src->ell_cols * sizeof(__half);
+    char *storage = 0;
+    cudaError_t err = cudaSuccess;
+
+    zero_record(record);
+    host.rows = src->rows;
+    host.cols = src->cols;
+    host.nnz = src->nnz;
+    host.block_size = src->block_size;
+    host.ell_cols = src->ell_cols;
+    host.blockColIdx = 0;
+    host.val = 0;
+
+    err = cudaMalloc((void **) &storage, total_bytes == 0 ? sizeof(blocked_ell_view) : total_bytes);
+    if (err != cudaSuccess) goto fail;
+    if (idx_count != 0u) {
+        host.blockColIdx = (unsigned int *) (storage + idx_offset);
+        err = cudaMemcpyAsync(host.blockColIdx, src->blockColIdx, idx_count * sizeof(unsigned int), cudaMemcpyHostToDevice, stream);
+        if (err != cudaSuccess) goto fail;
+    }
+    if (src->rows != 0u && src->ell_cols != 0u) {
+        host.val = (__half *) (storage + val_offset);
+        err = cudaMemcpyAsync(host.val, src->val, (std::size_t) src->rows * (std::size_t) src->ell_cols * sizeof(__half), cudaMemcpyHostToDevice, stream);
+        if (err != cudaSuccess) goto fail;
+    }
+    err = cudaMemcpyAsync(storage + view_offset, &host, sizeof(host), cudaMemcpyHostToDevice, stream);
+    if (err != cudaSuccess) goto fail;
+
+    record->allocation = storage;
+    record->allocation_bytes = total_bytes;
+    record->storage = storage;
+    record->view = storage + view_offset;
+    record->a0 = host.blockColIdx;
+    record->a1 = host.val;
+    return cudaSuccess;
+
+fail:
+    if (storage != 0) cudaFree(storage);
+    zero_record(record);
+    return err;
+}
+
 // COO upload is another full host->device materialization:
 // row index copy, column index copy, value copy, then descriptor copy.
 __host__ __forceinline__ cudaError_t upload(const ::cellshard::sparse::coo *src, part_record< ::cellshard::sparse::coo > *record) {
@@ -730,6 +842,15 @@ __host__ __forceinline__ std::size_t device_part_bytes(const ::cellshard::sharde
     return val_offset + (std::size_t) view->part_nnz[partId] * sizeof(__half);
 }
 
+__host__ __forceinline__ std::size_t device_part_bytes(const ::cellshard::sharded< ::cellshard::sparse::blocked_ell > *view, unsigned long partId) {
+    const unsigned long aux = view->part_aux[partId];
+    const types::u32 block_size = sparse::unpack_blocked_ell_block_size(aux);
+    const unsigned long ell_width = sparse::unpack_blocked_ell_ell_width(aux);
+    const std::size_t idx_offset = align_up_bytes(sizeof(blocked_ell_view), alignof(unsigned int));
+    const std::size_t val_offset = align_up_bytes(idx_offset + ((std::size_t) ((view->part_rows[partId] + block_size - 1u) / block_size) * ell_width * sizeof(unsigned int)), alignof(__half));
+    return val_offset + (std::size_t) view->part_rows[partId] * (std::size_t) (ell_width * block_size) * sizeof(__half);
+}
+
 __host__ __forceinline__ std::size_t device_part_bytes(const ::cellshard::sharded< ::cellshard::sparse::coo > *view, unsigned long partId) {
     const std::size_t row_offset = align_up_bytes(sizeof(coo_view), alignof(unsigned int));
     const std::size_t col_offset = align_up_bytes(row_offset + (std::size_t) view->part_nnz[partId] * sizeof(unsigned int), alignof(unsigned int));
@@ -976,6 +1097,110 @@ fail:
     return err;
 }
 
+__host__ __forceinline__ std::size_t blocked_ell_payload_bytes(const ::cellshard::sparse::blocked_ell *src) {
+    const std::size_t idx_count = (std::size_t) sparse::row_block_count(src) * (std::size_t) sparse::ell_width_blocks(src);
+    const std::size_t val_offset = align_up_bytes(idx_count * sizeof(unsigned int), alignof(__half));
+    return val_offset + (std::size_t) src->rows * (std::size_t) src->ell_cols * sizeof(__half);
+}
+
+__host__ __forceinline__ cudaError_t upload_blocked_ell_shard_current_device_async(
+    sharded_device< ::cellshard::sparse::blocked_ell > *state,
+    const ::cellshard::sharded< ::cellshard::sparse::blocked_ell > *view,
+    unsigned long shardId,
+    int deviceId,
+    cudaStream_t stream
+) {
+    unsigned long begin = 0;
+    unsigned long end = 0;
+    unsigned long part = 0;
+    std::size_t descriptor_bytes = 0;
+    std::size_t allocation_bytes = 0;
+    std::size_t total_bytes = 0;
+    char *allocation = 0;
+    char *descriptor_base = 0;
+    char *payload_base = 0;
+    std::vector<blocked_ell_view> host_views;
+    cudaError_t err = cudaSuccess;
+
+    if (shardId >= view->num_shards) return cudaErrorInvalidValue;
+    begin = ::cellshard::first_part_in_shard(view, shardId);
+    end = ::cellshard::last_part_in_shard(view, shardId);
+    if (begin >= end) return cudaSuccess;
+
+    for (part = begin; part < end; ++part) {
+        if (part >= state->capacity || view->parts[part] == 0) return cudaErrorInvalidValue;
+        if (state->parts[part].view == 0 || state->parts[part].device_id != deviceId) break;
+    }
+    if (part == end) return cudaSuccess;
+
+    for (part = begin; part < end; ++part) {
+        if (state->parts[part].view != 0) {
+            err = release_part(state, part);
+            if (err != cudaSuccess) return err;
+        }
+    }
+
+    host_views.resize((std::size_t) (end - begin));
+    descriptor_bytes = align_up_bytes(host_views.size() * sizeof(blocked_ell_view), alignof(unsigned int));
+    total_bytes = descriptor_bytes;
+    for (part = begin; part < end; ++part) {
+        total_bytes = align_up_bytes(total_bytes, alignof(unsigned int));
+        total_bytes += blocked_ell_payload_bytes(view->parts[part]);
+    }
+
+    allocation = (char *) take_cached_allocation(state, deviceId, total_bytes, &allocation_bytes);
+    if (allocation == 0) {
+        err = cudaMalloc((void **) &allocation, total_bytes);
+        if (err != cudaSuccess) return err;
+        allocation_bytes = total_bytes;
+    }
+
+    descriptor_base = allocation;
+    payload_base = allocation + descriptor_bytes;
+    for (part = begin; part < end; ++part) {
+        const ::cellshard::sparse::blocked_ell *src = view->parts[part];
+        const std::size_t part_payload_bytes = blocked_ell_payload_bytes(src);
+        const std::size_t idx_count = (std::size_t) sparse::row_block_count(src) * (std::size_t) sparse::ell_width_blocks(src);
+        const std::size_t val_offset = align_up_bytes(idx_count * sizeof(unsigned int), alignof(__half));
+        blocked_ell_view &dst = host_views[(std::size_t) (part - begin)];
+
+        payload_base = (char *) align_up_bytes((std::size_t) payload_base, alignof(unsigned int));
+        dst.rows = src->rows;
+        dst.cols = src->cols;
+        dst.nnz = src->nnz;
+        dst.block_size = src->block_size;
+        dst.ell_cols = src->ell_cols;
+        dst.blockColIdx = (unsigned int *) payload_base;
+        dst.val = (__half *) (payload_base + val_offset);
+
+        err = cudaMemcpyAsync(payload_base, src->storage, part_payload_bytes, cudaMemcpyHostToDevice, stream);
+        if (err != cudaSuccess) goto fail;
+        payload_base += part_payload_bytes;
+    }
+
+    err = cudaMemcpyAsync(descriptor_base, host_views.data(), host_views.size() * sizeof(blocked_ell_view), cudaMemcpyHostToDevice, stream);
+    if (err != cudaSuccess) goto fail;
+
+    for (part = begin; part < end; ++part) {
+        const unsigned long slot = part - begin;
+        state->parts[part].allocation = part == begin ? allocation : 0;
+        state->parts[part].allocation_bytes = part == begin ? allocation_bytes : 0;
+        state->parts[part].storage = part == begin ? allocation : 0;
+        state->parts[part].view = descriptor_base + slot * sizeof(blocked_ell_view);
+        state->parts[part].a0 = host_views[(std::size_t) slot].blockColIdx;
+        state->parts[part].a1 = host_views[(std::size_t) slot].val;
+        state->parts[part].group_begin = begin;
+        state->parts[part].group_end = end;
+        state->parts[part].device_id = deviceId;
+    }
+    return cudaSuccess;
+
+fail:
+    if (allocation != 0) cudaFree(allocation);
+    for (part = begin; part < end; ++part) zero_record(&state->parts[part]);
+    return err;
+}
+
 // Shard upload is a loop over per-part uploads. There is no packed multi-part
 // transfer yet, so launch/copy count is proportional to parts per shard.
 template<typename MatrixT>
@@ -1008,6 +1233,21 @@ __host__ __forceinline__ cudaError_t upload_shard(
     err = cudaSetDevice(deviceId);
     if (err != cudaSuccess) return err;
     err = upload_compressed_shard_current_device_async(state, view, shardId, deviceId, (cudaStream_t) 0);
+    if (err != cudaSuccess) return err;
+    return cudaStreamSynchronize((cudaStream_t) 0);
+}
+
+__host__ __forceinline__ cudaError_t upload_shard(
+    sharded_device< ::cellshard::sparse::blocked_ell > *state,
+    const ::cellshard::sharded< ::cellshard::sparse::blocked_ell > *view,
+    unsigned long shardId,
+    int deviceId
+) {
+    cudaError_t err = cudaSuccess;
+
+    err = cudaSetDevice(deviceId);
+    if (err != cudaSuccess) return err;
+    err = upload_blocked_ell_shard_current_device_async(state, view, shardId, deviceId, (cudaStream_t) 0);
     if (err != cudaSuccess) return err;
     return cudaStreamSynchronize((cudaStream_t) 0);
 }
@@ -1050,6 +1290,21 @@ __host__ __forceinline__ cudaError_t upload_shard_async(
     err = cudaSetDevice(deviceId);
     if (err != cudaSuccess) return err;
     return upload_compressed_shard_current_device_async(state, view, shardId, deviceId, stream);
+}
+
+__host__ __forceinline__ cudaError_t upload_shard_async(
+    sharded_device< ::cellshard::sparse::blocked_ell > *state,
+    const ::cellshard::sharded< ::cellshard::sparse::blocked_ell > *view,
+    unsigned long shardId,
+    int deviceId,
+    cudaStream_t stream
+) {
+    cudaError_t err = cudaSuccess;
+
+    if (shardId >= view->num_shards) return cudaErrorInvalidValue;
+    err = cudaSetDevice(deviceId);
+    if (err != cudaSuccess) return err;
+    return upload_blocked_ell_shard_current_device_async(state, view, shardId, deviceId, stream);
 }
 
 template<typename MatrixT>

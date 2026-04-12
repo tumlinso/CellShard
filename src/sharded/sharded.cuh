@@ -3,6 +3,7 @@
 #include "../offset_span.cuh"
 #include "../real.cuh"
 #include "../formats/compressed.cuh"
+#include "../formats/blocked_ell.cuh"
 #include "../formats/dense.cuh"
 #include "../formats/diagonal.cuh"
 #include "../formats/triplet.cuh"
@@ -84,6 +85,10 @@ __host__ __device__ __forceinline__ unsigned int part_aux(const sparse::dia *m) 
 // Compressed storage needs axis metadata when only the sharded header is live.
 __host__ __device__ __forceinline__ unsigned int part_aux(const sparse::compressed *m) {
     return m->axis;
+}
+
+__host__ __device__ __forceinline__ unsigned long part_aux(const sparse::blocked_ell *m) {
+    return sparse::pack_blocked_ell_aux(m->block_size, sparse::ell_width_blocks(m));
 }
 
 // Row -> part lookup over part_offsets[].
@@ -244,6 +249,17 @@ __host__ __device__ __forceinline__ std::size_t part_bytes(const sharded<sparse:
         + (std::size_t) (ptr_dim + 1) * sizeof(types::ptr_t)
         + (std::size_t) m->part_nnz[partId] * sizeof(types::idx_t)
         + (std::size_t) m->part_nnz[partId] * sizeof(real::storage_t);
+}
+
+__host__ __device__ __forceinline__ std::size_t part_bytes(const sharded<sparse::blocked_ell> *m, unsigned long partId) {
+    const unsigned long aux = m->part_aux[partId];
+    const types::u32 block_size = sparse::unpack_blocked_ell_block_size(aux);
+    const unsigned long ell_width = sparse::unpack_blocked_ell_ell_width(aux);
+    if (partId >= m->num_parts) return 0;
+    if (m->parts[partId] != 0) return bytes(m->parts[partId]);
+    return sizeof(sparse::blocked_ell)
+        + (std::size_t) ((m->part_rows[partId] + block_size - 1u) / block_size) * (std::size_t) ell_width * sizeof(types::idx_t)
+        + (std::size_t) m->part_rows[partId] * (std::size_t) (ell_width * block_size) * sizeof(real::storage_t);
 }
 
 __host__ __device__ __forceinline__ std::size_t part_bytes(const sharded<sparse::coo> *m, unsigned long partId) {

@@ -18,7 +18,7 @@ enum {
 enum {
     series_codec_family_none = 0u,
     series_codec_family_standard_csr = 1u,
-    series_codec_family_microscaled_csr = 2u
+    series_codec_family_quantized_csr = 2u
 };
 
 struct series_codec_descriptor {

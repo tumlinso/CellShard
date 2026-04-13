@@ -378,7 +378,7 @@ inline cudaError_t stage_shard_on_owner(device_fleet<MatrixT> *fleet,
     if (slot < 0 || (unsigned int) slot >= fleet->count || (unsigned int) slot >= ctx->device_count) return cudaErrorInvalidValue;
     if (ctx->streams != 0) stream = ctx->streams[slot];
     // This calls directly into stage_shard_async(), so it may trigger:
-    // - synchronous packfile fetch on host for cold parts
+    // - synchronous source-backed host fetch for cold parts
     // - device allocation
     // - H2D copy on the owner's stream
     return ::cellshard::device::stage_shard_async(fleet->states + slot,

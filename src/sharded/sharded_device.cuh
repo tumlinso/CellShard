@@ -1328,7 +1328,7 @@ __host__ __forceinline__ cudaError_t release_shard(sharded_device<MatrixT> *stat
 }
 
 // stage_part is the highest-risk convenience path in the file:
-// - if the part is absent on host, it performs synchronous packfile I/O
+// - if the part is absent on host, it performs synchronous source-backed fetch
 // - it materializes a host part object
 // - it allocates device memory
 // - it copies host payload to device

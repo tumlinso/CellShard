@@ -4,7 +4,7 @@
 // This intentionally pulls in:
 // - type/layout policy
 // - per-part matrix formats
-// - sharded metadata and packfile persistence
+// - sharded metadata and `.csh5` series persistence
 // - host fetch/drop helpers
 // - device staging helpers
 // - local multi-GPU helpers

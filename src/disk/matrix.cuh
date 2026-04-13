@@ -178,7 +178,7 @@ inline std::size_t packed_bytes(const sparse::blocked_ell *, types::dim_t rows, 
     return packed_blocked_ell_bytes(rows, sparse::unpack_blocked_ell_cols(aux), sparse::unpack_blocked_ell_block_size(aux), value_size);
 }
 
-// FILE* variants let packfile code write/read many parts through one open file
+// FILE* variants let shard-pack cache code write/read many parts through one open file
 // handle, which avoids reopen churn in sequential shard fetch/store loops.
 int store(std::FILE *fp, const dense *m);
 int load(std::FILE *fp, dense *m);

@@ -396,120 +396,41 @@ __host__ __forceinline__ int set_shards_by_part_bytes(sharded<MatrixT> * __restr
 }
 
 template<typename MatrixT>
-__host__ __forceinline__ int load_part_from_open_packfile(sharded<MatrixT> *m,
-                                                          shard_storage *s,
-                                                          unsigned long partId,
-                                                          std::uint64_t *cursor) {
-    MatrixT *part = 0;
-    int ok = 0;
-    const std::uint64_t offset = s->locators[partId].offset;
-
-    if (partId >= m->num_parts || s == 0 || partId >= s->capacity || s->packfile_fp == 0 || s->locators == 0) return 0;
-    if (m->parts[partId] != 0) destroy(m->parts[partId]);
-    m->parts[partId] = 0;
-
-    // This is the host-side fast path for staged reads:
-    // - reuse one open packfile handle
-    // - avoid reopening the packfile per part
-    // - avoid reseeking when shard parts were stored contiguously
-    // - keep the decode path identical once the file cursor is in place
-    part = new MatrixT;
-    init(part);
-    if (cursor == 0 || *cursor != offset) {
-        if (fseeko(s->packfile_fp, (off_t) offset, SEEK_SET) != 0) {
-            destroy(part);
-            return 0;
-        }
-        if (cursor != 0) *cursor = offset;
-    }
-    if (!load(s->packfile_fp, part)) {
-        destroy(part);
-        return 0;
-    }
-    if (cursor != 0) *cursor = offset + s->locators[partId].bytes;
-    if (part->rows != m->part_rows[partId]) goto fail;
-    if (::cellshard::part_nnz(part) != m->part_nnz[partId]) goto fail;
-    if (m->cols != 0 && part->cols != m->cols) goto fail;
-    if (::cellshard::part_aux(part) != m->part_aux[partId]) goto fail;
-    m->parts[partId] = part;
-    ok = 1;
-
-fail:
-    if (!ok) destroy(part);
-    return ok;
-}
-
-template<typename MatrixT>
 __host__ __forceinline__ int fetch_part(sharded<MatrixT> *m, const shard_storage *s, unsigned long partId) {
-    std::uint64_t cursor = 0;
-    shard_storage *storage = const_cast<shard_storage *>(s);
-    // Synchronous host materialization from packfile. This is explicit I/O and
-    // allocation work, not a cheap metadata operation.
-    if (partId >= m->num_parts || storage == 0 || partId >= storage->capacity || storage->packfile_path == 0 || storage->locators == 0) return 0;
-    if (!ensure_packfile_open(storage)) return 0;
-    return load_part_from_open_packfile(m, storage, partId, &cursor);
+    (void) m;
+    (void) s;
+    (void) partId;
+    return 0;
 }
 
 __host__ __forceinline__ int fetch_part(sharded<sparse::compressed> *m, const shard_storage *s, unsigned long partId) {
-    std::uint64_t cursor = 0;
     shard_storage *storage = const_cast<shard_storage *>(s);
 
-    if (partId >= m->num_parts || storage == 0 || storage->packfile_path == 0) return 0;
-    if (storage->backend == shard_storage_backend_series_h5) {
-        return fetch_series_compressed_h5_part(m, s, partId);
-    }
-    if (partId >= storage->capacity || storage->locators == 0) return 0;
-    if (!ensure_packfile_open(storage)) return 0;
-    return load_part_from_open_packfile(m, storage, partId, &cursor);
+    if (partId >= m->num_parts || storage == 0 || storage->backend != shard_storage_backend_series_h5) return 0;
+    return fetch_series_compressed_h5_part(m, s, partId);
 }
 
 __host__ __forceinline__ int fetch_part(sharded<sparse::blocked_ell> *m, const shard_storage *s, unsigned long partId) {
-    std::uint64_t cursor = 0;
     shard_storage *storage = const_cast<shard_storage *>(s);
 
-    if (partId >= m->num_parts || storage == 0 || storage->packfile_path == 0) return 0;
-    if (storage->backend == shard_storage_backend_series_h5) {
-        return fetch_series_blocked_ell_h5_part(m, s, partId);
-    }
-    if (partId >= storage->capacity || storage->locators == 0) return 0;
-    if (!ensure_packfile_open(storage)) return 0;
-    return load_part_from_open_packfile(m, storage, partId, &cursor);
+    if (partId >= m->num_parts || storage == 0 || storage->backend != shard_storage_backend_series_h5) return 0;
+    return fetch_series_blocked_ell_h5_part(m, s, partId);
 }
 
 template<typename MatrixT>
 __host__ __forceinline__ int fetch_all_parts(sharded<MatrixT> *m, const shard_storage *s) {
-    unsigned long i = 0;
-    std::uint64_t cursor = 0;
-    shard_storage *storage = const_cast<shard_storage *>(s);
-    if (storage == 0 || storage->packfile_path == 0 || storage->locators == 0) return 0;
-    if (!ensure_packfile_open(storage)) return 0;
-    for (i = 0; i < m->num_parts; ++i) {
-        if (!load_part_from_open_packfile(m, storage, i, &cursor)) return 0;
-    }
-    if (m->num_shards == 0) return set_shards_to_parts(m);
-    return 1;
+    (void) m;
+    (void) s;
+    return 0;
 }
 
 __host__ __forceinline__ int fetch_all_parts(sharded<sparse::compressed> *m, const shard_storage *s) {
     unsigned long i = 0;
     shard_storage *storage = const_cast<shard_storage *>(s);
 
-    if (storage == 0 || storage->packfile_path == 0) return 0;
-    if (storage->backend == shard_storage_backend_series_h5) {
-        for (i = 0; i < m->num_parts; ++i) {
-            if (!fetch_series_compressed_h5_part(m, s, i)) return 0;
-        }
-        if (m->num_shards == 0) return set_shards_to_parts(m);
-        return 1;
-    }
-
-    {
-        std::uint64_t cursor = 0;
-        if (storage->locators == 0) return 0;
-        if (!ensure_packfile_open(storage)) return 0;
-        for (i = 0; i < m->num_parts; ++i) {
-            if (!load_part_from_open_packfile(m, storage, i, &cursor)) return 0;
-        }
+    if (storage == 0 || storage->backend != shard_storage_backend_series_h5) return 0;
+    for (i = 0; i < m->num_parts; ++i) {
+        if (!fetch_series_compressed_h5_part(m, s, i)) return 0;
     }
     if (m->num_shards == 0) return set_shards_to_parts(m);
     return 1;
@@ -519,22 +440,9 @@ __host__ __forceinline__ int fetch_all_parts(sharded<sparse::blocked_ell> *m, co
     unsigned long i = 0;
     shard_storage *storage = const_cast<shard_storage *>(s);
 
-    if (storage == 0 || storage->packfile_path == 0) return 0;
-    if (storage->backend == shard_storage_backend_series_h5) {
-        for (i = 0; i < m->num_parts; ++i) {
-            if (!fetch_series_blocked_ell_h5_part(m, s, i)) return 0;
-        }
-        if (m->num_shards == 0) return set_shards_to_parts(m);
-        return 1;
-    }
-
-    {
-        std::uint64_t cursor = 0;
-        if (storage->locators == 0) return 0;
-        if (!ensure_packfile_open(storage)) return 0;
-        for (i = 0; i < m->num_parts; ++i) {
-            if (!load_part_from_open_packfile(m, storage, i, &cursor)) return 0;
-        }
+    if (storage == 0 || storage->backend != shard_storage_backend_series_h5) return 0;
+    for (i = 0; i < m->num_parts; ++i) {
+        if (!fetch_series_blocked_ell_h5_part(m, s, i)) return 0;
     }
     if (m->num_shards == 0) return set_shards_to_parts(m);
     return 1;
@@ -542,69 +450,24 @@ __host__ __forceinline__ int fetch_all_parts(sharded<sparse::blocked_ell> *m, co
 
 template<typename MatrixT>
 __host__ __forceinline__ int fetch_shard(sharded<MatrixT> *m, const shard_storage *s, unsigned long shardId) {
-    unsigned long begin = 0;
-    unsigned long end = 0;
-    unsigned long i = 0;
-    std::uint64_t cursor = 0;
-    shard_storage *storage = const_cast<shard_storage *>(s);
-
-    if (shardId >= m->num_shards || storage == 0 || storage->packfile_path == 0 || storage->locators == 0) return 0;
-    if (!ensure_packfile_open(storage)) return 0;
-    // Shard fetch is a simple loop over part fetches. Cost scales with parts
-    // per shard plus packfile seek/read behavior.
-    begin = first_part_in_shard(m, shardId);
-    end = last_part_in_shard(m, shardId);
-    for (i = begin; i < end; ++i) {
-        if (!load_part_from_open_packfile(m, storage, i, &cursor)) return 0;
-    }
-    return 1;
+    (void) m;
+    (void) s;
+    (void) shardId;
+    return 0;
 }
 
 __host__ __forceinline__ int fetch_shard(sharded<sparse::compressed> *m, const shard_storage *s, unsigned long shardId) {
-    unsigned long begin = 0;
-    unsigned long end = 0;
-    unsigned long i = 0;
-    std::uint64_t cursor = 0;
     shard_storage *storage = const_cast<shard_storage *>(s);
 
-    if (shardId >= m->num_shards || storage == 0 || storage->packfile_path == 0) return 0;
-    if (storage->backend == shard_storage_backend_series_h5) {
-        return fetch_series_compressed_h5_shard(m, s, shardId);
-    }
-    if (storage->locators == 0) return 0;
-    if (!ensure_packfile_open(storage)) return 0;
-    begin = first_part_in_shard(m, shardId);
-    end = last_part_in_shard(m, shardId);
-    for (i = begin; i < end; ++i) {
-        if (!load_part_from_open_packfile(m, storage, i, &cursor)) return 0;
-    }
-    return 1;
+    if (shardId >= m->num_shards || storage == 0 || storage->backend != shard_storage_backend_series_h5) return 0;
+    return fetch_series_compressed_h5_shard(m, s, shardId);
 }
 
 __host__ __forceinline__ int fetch_shard(sharded<sparse::blocked_ell> *m, const shard_storage *s, unsigned long shardId) {
-    unsigned long begin = 0;
-    unsigned long end = 0;
-    unsigned long i = 0;
-    std::uint64_t cursor = 0;
     shard_storage *storage = const_cast<shard_storage *>(s);
 
-    if (shardId >= m->num_shards || storage == 0 || storage->packfile_path == 0) return 0;
-    if (storage->backend == shard_storage_backend_series_h5) {
-        begin = first_part_in_shard(m, shardId);
-        end = last_part_in_shard(m, shardId);
-        for (i = begin; i < end; ++i) {
-            if (!fetch_series_blocked_ell_h5_part(m, s, i)) return 0;
-        }
-        return 1;
-    }
-    if (storage->locators == 0) return 0;
-    if (!ensure_packfile_open(storage)) return 0;
-    begin = first_part_in_shard(m, shardId);
-    end = last_part_in_shard(m, shardId);
-    for (i = begin; i < end; ++i) {
-        if (!load_part_from_open_packfile(m, storage, i, &cursor)) return 0;
-    }
-    return 1;
+    if (shardId >= m->num_shards || storage == 0 || storage->backend != shard_storage_backend_series_h5) return 0;
+    return fetch_series_blocked_ell_h5_shard(m, s, shardId);
 }
 
 template<typename MatrixT>

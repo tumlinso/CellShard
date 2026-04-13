@@ -112,7 +112,6 @@ endif()
 
 set(cellshard_inspect_sources
     src/disk/matrix.cu
-    src/sharded/disk.cu
     src/sharded/shard_paths.cu
     src/sharded/series_h5.cc
 )

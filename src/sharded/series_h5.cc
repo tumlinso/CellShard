@@ -25,6 +25,11 @@ namespace cellshard {
 
 namespace {
 
+inline int write_sharded_block(std::FILE *fp, const void *ptr, std::size_t elem_size, std::size_t count) {
+    if (count == 0u) return 1;
+    return std::fwrite(ptr, elem_size, count, fp) == count;
+}
+
 static const char series_magic[] = "CSH5S1";
 static const char root_group[] = "/";
 static const char matrix_group[] = "/matrix";
@@ -618,6 +623,7 @@ inline std::uint64_t build_source_fingerprint_u64(const char *source_path,
                                                   std::uint32_t matrix_family,
                                                   std::uint64_t num_parts,
                                                   std::uint64_t num_shards) {
+    const std::uint32_t schema_version = series_h5_schema_version;
     std::uint64_t h = 1469598103934665603ull;
     if (source_path != 0) h = fnv1a_mix(h, source_path, std::strlen(source_path));
     h = fnv1a_mix(h, &size_bytes, sizeof(size_bytes));
@@ -625,7 +631,7 @@ inline std::uint64_t build_source_fingerprint_u64(const char *source_path,
     h = fnv1a_mix(h, &matrix_family, sizeof(matrix_family));
     h = fnv1a_mix(h, &num_parts, sizeof(num_parts));
     h = fnv1a_mix(h, &num_shards, sizeof(num_shards));
-    h = fnv1a_mix(h, &series_h5_schema_version, sizeof(series_h5_schema_version));
+    h = fnv1a_mix(h, &schema_version, sizeof(schema_version));
     h = fnv1a_mix(h, series_magic, std::strlen(series_magic));
     return h;
 }
@@ -834,15 +840,15 @@ inline int ensure_series_cache_layout(shard_storage *s) {
     unsigned long shard_id = 0ul;
     struct statvfs vfs;
 
-    if (s == 0 || s->backend != shard_storage_backend_series_h5 || s->backend_state == 0 || s->packfile_path == 0) return 0;
+    if (s == 0 || s->backend != shard_storage_backend_series_h5 || s->backend_state == 0 || s->source_path == 0) return 0;
     state = (series_h5_state *) s->backend_state;
-    if (!refresh_series_source_stat(s->packfile_path, state)) return 0;
+    if (!refresh_series_source_stat(s->source_path, state)) return 0;
     if (state->cache_root == 0) {
-        if (!build_default_cache_root(s->packfile_path, path, sizeof(path))) return 0;
+        if (!build_default_cache_root(s->source_path, path, sizeof(path))) return 0;
         if (!assign_owned_string(&state->cache_root, path)) return 0;
     }
     if (!ensure_directory_exists(state->cache_root)) return 0;
-    fingerprint = build_source_fingerprint_u64(s->packfile_path,
+    fingerprint = build_source_fingerprint_u64(s->source_path,
                                                state->source_size_bytes,
                                                state->source_mtime_ns,
                                                state->matrix_family,
@@ -869,7 +875,7 @@ inline int ensure_series_cache_layout(shard_storage *s) {
             }
         }
     }
-    if (!write_series_cache_manifest(s->packfile_path, state)) return 0;
+    if (!write_series_cache_manifest(s->source_path, state)) return 0;
     if (!state->cache_budget_explicit) {
         std::uint64_t free_half = 0u;
         std::uint64_t estimated_total = 0u;
@@ -1686,10 +1692,10 @@ inline int ensure_cached_shard_ready(shard_storage *s, unsigned long shard_id) {
 
 int open_series_h5_backend(shard_storage *s) {
     series_h5_state *state = 0;
-    if (s == 0 || s->packfile_path == 0 || s->backend_state == 0) return 0;
+    if (s == 0 || s->source_path == 0 || s->backend_state == 0) return 0;
     state = (series_h5_state *) s->backend_state;
     if (state->file >= 0) return 1;
-    state->file = H5Fopen(s->packfile_path, H5F_ACC_RDONLY, H5P_DEFAULT);
+    state->file = H5Fopen(s->source_path, H5F_ACC_RDONLY, H5P_DEFAULT);
     return state->file >= 0;
 }
 
@@ -2655,12 +2661,8 @@ int bind_series_h5(shard_storage *s, const char *path) {
 
     if (s == 0) return 0;
     if (s->close_backend != 0) s->close_backend(s);
-    close_packfile(s);
-    std::free(s->packfile_path);
-    std::free(s->locators);
-    s->packfile_path = 0;
-    s->locators = 0;
-    s->capacity = 0;
+    std::free(s->source_path);
+    s->source_path = 0;
     if (path == 0) return 1;
 
     len = std::strlen(path);
@@ -2673,7 +2675,7 @@ int bind_series_h5(shard_storage *s, const char *path) {
     }
     std::memcpy(copy, path, len + 1u);
     series_h5_state_init(state);
-    s->packfile_path = copy;
+    s->source_path = copy;
     s->backend = shard_storage_backend_series_h5;
     s->backend_state = state;
     s->open_backend = open_series_h5_backend;
@@ -2866,7 +2868,6 @@ int load_series_compressed_h5_header(const char *filename,
     if (s != 0) {
         series_h5_state *state = 0;
         if (!bind_series_h5(s, filename)) goto done;
-        s->capacity = (unsigned int) num_parts;
         state = (series_h5_state *) s->backend_state;
         state->rows = rows;
         state->cols = cols;
@@ -3014,7 +3015,6 @@ int load_series_blocked_ell_h5_header(const char *filename,
     if (s != 0) {
         series_h5_state *state = 0;
         if (!bind_series_h5(s, filename)) goto done;
-        s->capacity = (unsigned int) num_parts;
         state = (series_h5_state *) s->backend_state;
         state->rows = rows;
         state->cols = cols;

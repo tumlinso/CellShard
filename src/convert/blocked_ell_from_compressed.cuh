@@ -464,9 +464,9 @@ inline int repack_sharded_compressed_to_blocked_ell(
         if (!row_ptr) return 0;
 
         for (unsigned long global_row = row_begin; global_row < row_end; ++global_row) {
-            const unsigned long part_id = find_part(src, global_row);
-            const sparse::compressed *src_part = part_id < src->num_parts ? src->parts[part_id] : 0;
-            const unsigned long local_row = global_row - src->part_offsets[part_id];
+            const unsigned long part_id = find_partition(src, global_row);
+            const sparse::compressed *src_part = part_id < src->num_partitions ? src->parts[part_id] : 0;
+            const unsigned long local_row = global_row - src->partition_offsets[part_id];
             if (src_part == 0 || src_part->axis != sparse::compressed_by_row) return 0;
             nnz += src_part->majorPtr[local_row + 1u] - src_part->majorPtr[local_row];
             row_ptr[(global_row - row_begin) + 1u] = nnz;
@@ -477,9 +477,9 @@ inline int repack_sharded_compressed_to_blocked_ell(
         if (nnz != 0u && (!col_idx || !values)) return 0;
 
         for (unsigned long global_row = row_begin; global_row < row_end; ++global_row) {
-            const unsigned long part_id = find_part(src, global_row);
-            const sparse::compressed *src_part = part_id < src->num_parts ? src->parts[part_id] : 0;
-            const unsigned long local_row = global_row - src->part_offsets[part_id];
+            const unsigned long part_id = find_partition(src, global_row);
+            const sparse::compressed *src_part = part_id < src->num_partitions ? src->parts[part_id] : 0;
+            const unsigned long local_row = global_row - src->partition_offsets[part_id];
             const types::ptr_t begin = src_part->majorPtr[local_row];
             const types::ptr_t end = src_part->majorPtr[local_row + 1u];
             const types::ptr_t out_begin = row_ptr[global_row - row_begin];
@@ -501,7 +501,7 @@ inline int repack_sharded_compressed_to_blocked_ell(
             delete part;
             return 0;
         }
-        if (!append_part(dst, part)) {
+        if (!append_partition(dst, part)) {
             destroy(part);
             return 0;
         }
@@ -533,7 +533,7 @@ inline int repack_sharded_compressed_to_blocked_ell_auto(
     values.reset(src->nnz != 0u ? new real::storage_t[src->nnz] : 0);
     if (!row_ptr || (src->nnz != 0u && (!col_idx || !values))) return 0;
     row_ptr[0] = 0u;
-    for (unsigned long part = 0; part < src->num_parts; ++part) {
+    for (unsigned long part = 0; part < src->num_partitions; ++part) {
         const sparse::compressed *p = src->parts[part];
         if (p == 0 || p->axis != sparse::compressed_by_row) return 0;
         for (types::u32 row = 0u; row < p->rows; ++row) {
@@ -545,7 +545,7 @@ inline int repack_sharded_compressed_to_blocked_ell_auto(
                 std::memcpy(values.get() + cursor, p->val + begin, (std::size_t) count * sizeof(real::storage_t));
             }
             cursor += count;
-            row_ptr[src->part_offsets[part] + row + 1u] = cursor;
+            row_ptr[src->partition_offsets[part] + row + 1u] = cursor;
         }
     }
     whole.majorPtr = row_ptr.get();

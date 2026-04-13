@@ -82,7 +82,7 @@ struct series_file_handle {
             cellshard::init(&view);
             cellshard::init(&storage);
             if (!cellshard::load_header(path.c_str(), &view, &storage)) throw std::runtime_error("failed to load compressed series header");
-            if (!cellshard::fetch_part(&view, &storage, partition_id)) {
+            if (!cellshard::fetch_partition(&view, &storage, partition_id)) {
                 cellshard::clear(&storage);
                 cellshard::clear(&view);
                 throw std::runtime_error("failed to fetch compressed partition");
@@ -112,7 +112,7 @@ struct series_file_handle {
             cellshard::init(&view);
             cellshard::init(&storage);
             if (!cellshard::load_header(path.c_str(), &view, &storage)) throw std::runtime_error("failed to load blocked-ELL series header");
-            if (!cellshard::fetch_part(&view, &storage, partition_id)) {
+            if (!cellshard::fetch_partition(&view, &storage, partition_id)) {
                 cellshard::clear(&storage);
                 cellshard::clear(&view);
                 throw std::runtime_error("failed to fetch blocked-ELL partition");

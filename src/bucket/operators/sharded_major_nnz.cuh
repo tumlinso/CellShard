@@ -154,8 +154,8 @@ __host__ __forceinline__ int build_bucketed_shard_major_view(
     if (state == 0 || view == 0 || ws == 0 || out == 0) return 0;
     if (shard_id >= view->num_shards) return 0;
 
-    part_begin = first_part_in_shard(view, shard_id);
-    part_end = last_part_in_shard(view, shard_id);
+    part_begin = first_partition_in_shard(view, shard_id);
+    part_end = last_partition_in_shard(view, shard_id);
     shard_rows = (types::dim_t) rows_in_shard(view, shard_id);
     shard_nnz = (types::nnz_t) nnz_in_shard(view, shard_id);
     bucket_count = clamp_bucket_count(shard_rows, requested_bucket_count);
@@ -169,9 +169,9 @@ __host__ __forceinline__ int build_bucketed_shard_major_view(
     }
     for (local_part = 0; part_begin + local_part < part_end; ++local_part) {
         const unsigned long part_id = part_begin + local_part;
-        const device::part_record<sparse::compressed> *record = state->parts + part_id;
+        const device::partition_record<sparse::compressed> *record = state->parts + part_id;
         if (part_id >= state->capacity || record->a0 == 0 || record->a1 == 0 || record->a2 == 0) return 0;
-        if (view->part_aux[part_id] != sparse::compressed_by_row) return 0;
+        if (view->partition_aux[part_id] != sparse::compressed_by_row) return 0;
         if (packed_views == 0 ||
             record->group_begin != part_begin ||
             record->group_end != part_end ||
@@ -182,7 +182,7 @@ __host__ __forceinline__ int build_bucketed_shard_major_view(
         ws->h_part_major_ptr[local_part] = (types::ptr_t *) record->a0;
         ws->h_part_minor_idx[local_part] = (types::idx_t *) record->a1;
         ws->h_part_val[local_part] = (real::storage_t *) record->a2;
-        ws->h_part_row_offsets[local_part + 1ul] = ws->h_part_row_offsets[local_part] + (types::idx_t) view->part_rows[part_id];
+        ws->h_part_row_offsets[local_part + 1ul] = ws->h_part_row_offsets[local_part] + (types::idx_t) view->partition_rows[part_id];
     }
 
     if (can_gather_direct) {

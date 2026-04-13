@@ -129,15 +129,15 @@ int main() {
         dataset_feature_to_global
     };
 
-    const std::uint64_t part_rows[] = { 2u };
-    const std::uint64_t part_nnz[] = { 4u };
-    const std::uint64_t part_aux[] = {
+    const std::uint64_t partition_rows[] = { 2u };
+    const std::uint64_t partition_nnz[] = { 4u };
+    const std::uint64_t partition_aux[] = {
         (std::uint64_t) cs::sparse::pack_blocked_ell_aux(2u, 2ul)
     };
-    const std::uint32_t part_axes[] = { 0u };
-    const std::uint64_t part_row_offsets[] = { 0u, 2u };
-    const std::uint32_t part_dataset_ids[] = { 0u };
-    const std::uint32_t part_codec_ids[] = { 0u };
+    const std::uint32_t partition_axes[] = { 0u };
+    const std::uint64_t partition_row_offsets[] = { 0u, 2u };
+    const std::uint32_t partition_dataset_ids[] = { 0u };
+    const std::uint32_t partition_codec_ids[] = { 0u };
     const std::uint64_t shard_offsets[] = { 0u, 2u };
     cs::series_codec_descriptor codec{};
     codec.codec_id = 0u;
@@ -153,13 +153,13 @@ int main() {
         4u,
         1u,
         1u,
-        part_rows,
-        part_nnz,
-        part_axes,
-        part_aux,
-        part_row_offsets,
-        part_dataset_ids,
-        part_codec_ids,
+        partition_rows,
+        partition_nnz,
+        partition_axes,
+        partition_aux,
+        partition_row_offsets,
+        partition_dataset_ids,
+        partition_codec_ids,
         shard_offsets,
         &codec,
         1u
@@ -180,7 +180,7 @@ int main() {
     fill_blocked_ell_part(&part);
 
     require(cs::create_series_blocked_ell_h5(path, &layout, &datasets, &provenance) != 0, "create_series_blocked_ell_h5 failed");
-    require(cs::append_blocked_ell_part_h5(path, 0ul, &part) != 0, "append_blocked_ell_part_h5 failed");
+    require(cs::append_blocked_ell_partition_h5(path, 0ul, &part) != 0, "append_blocked_ell_partition_h5 failed");
     require(cs::append_series_observation_metadata_h5(path, &obs_metadata) != 0, "append_series_observation_metadata_h5 failed");
 
     cse::series_summary summary;
@@ -191,7 +191,7 @@ int main() {
     require(summary.rows == 2u && summary.cols == 4u && summary.nnz == 4u, "summary shape mismatch");
     require(summary.datasets.size() == 1u, "summary dataset count mismatch");
     require(summary.datasets[0].dataset_id == "dataset0", "summary dataset id mismatch");
-    require(summary.partitions.size() == 1u && summary.partitions[0].aux == part_aux[0], "summary partition metadata mismatch");
+    require(summary.partitions.size() == 1u && summary.partitions[0].aux == partition_aux[0], "summary partition metadata mismatch");
     require(summary.shards.size() == 1u && summary.shards[0].row_end == 2u, "summary shard metadata mismatch");
     require(summary.obs_names.size() == 2u && summary.obs_names[1] == "cell_b", "summary obs names mismatch");
     require(summary.var_names.size() == 4u && summary.var_names[2] == "G2", "summary var names mismatch");

@@ -183,19 +183,19 @@ inline bool read_optional_text_column_strings(hid_t parent, const char *name, st
     return read_text_column_strings(parent, name, out);
 }
 
-inline unsigned long find_partition_index_for_row(const std::vector<std::uint64_t> &part_row_offsets,
+inline unsigned long find_partition_index_for_row(const std::vector<std::uint64_t> &partition_row_offsets,
                                                   std::uint64_t row_begin) {
-    if (part_row_offsets.size() < 2u) return 0ul;
-    const auto it = std::upper_bound(part_row_offsets.begin(), part_row_offsets.end(), row_begin);
-    if (it == part_row_offsets.begin()) return 0ul;
-    return (unsigned long) std::distance(part_row_offsets.begin(), it - 1);
+    if (partition_row_offsets.size() < 2u) return 0ul;
+    const auto it = std::upper_bound(partition_row_offsets.begin(), partition_row_offsets.end(), row_begin);
+    if (it == partition_row_offsets.begin()) return 0ul;
+    return (unsigned long) std::distance(partition_row_offsets.begin(), it - 1);
 }
 
-inline unsigned long find_partition_end_for_row(const std::vector<std::uint64_t> &part_row_offsets,
+inline unsigned long find_partition_end_for_row(const std::vector<std::uint64_t> &partition_row_offsets,
                                                 std::uint64_t row_end) {
-    if (part_row_offsets.size() < 2u || row_end == 0u) return 0ul;
-    const auto it = std::lower_bound(part_row_offsets.begin(), part_row_offsets.end(), row_end);
-    return (unsigned long) std::distance(part_row_offsets.begin(), it);
+    if (partition_row_offsets.size() < 2u || row_end == 0u) return 0ul;
+    const auto it = std::lower_bound(partition_row_offsets.begin(), partition_row_offsets.end(), row_end);
+    return (unsigned long) std::distance(partition_row_offsets.begin(), it);
 }
 
 inline bool load_observation_metadata(const char *path,
@@ -356,13 +356,13 @@ bool load_series_summary(const char *path, series_summary *out, std::string *err
     std::vector<std::uint64_t> dataset_rows;
     std::vector<std::uint64_t> dataset_cols;
     std::vector<std::uint64_t> dataset_nnz;
-    std::vector<std::uint64_t> part_rows;
-    std::vector<std::uint64_t> part_nnz;
-    std::vector<std::uint32_t> part_axes;
-    std::vector<std::uint64_t> part_aux;
-    std::vector<std::uint64_t> part_row_offsets;
-    std::vector<std::uint32_t> part_dataset_ids;
-    std::vector<std::uint32_t> part_codec_ids;
+    std::vector<std::uint64_t> partition_rows;
+    std::vector<std::uint64_t> partition_nnz;
+    std::vector<std::uint32_t> partition_axes;
+    std::vector<std::uint64_t> partition_aux;
+    std::vector<std::uint64_t> partition_row_offsets;
+    std::vector<std::uint32_t> partition_dataset_ids;
+    std::vector<std::uint32_t> partition_codec_ids;
     std::vector<std::uint64_t> shard_offsets;
     std::vector<std::uint32_t> codec_ids;
     std::vector<std::uint32_t> codec_families;
@@ -389,7 +389,7 @@ bool load_series_summary(const char *path, series_summary *out, std::string *err
         || !read_attr_u64(file, "rows", &out->rows)
         || !read_attr_u64(file, "cols", &out->cols)
         || !read_attr_u64(file, "nnz", &out->nnz)
-        || !read_attr_u64(file, "num_parts", &out->num_partitions)
+        || !read_attr_u64(file, "num_partitions", &out->num_partitions)
         || !read_attr_u64(file, "num_shards", &out->num_shards)
         || !read_attr_u64(file, "num_datasets", &out->num_datasets)) {
         H5Fclose(file);
@@ -434,13 +434,13 @@ bool load_series_summary(const char *path, series_summary *out, std::string *err
         }
     }
 
-    if (!read_dataset_vector(matrix, "part_rows", H5T_NATIVE_UINT64, &part_rows)
-        || !read_dataset_vector(matrix, "part_nnz", H5T_NATIVE_UINT64, &part_nnz)
-        || !read_optional_dataset_vector(matrix, "part_axes", H5T_NATIVE_UINT32, &part_axes)
-        || !read_dataset_vector(matrix, "part_aux", H5T_NATIVE_UINT64, &part_aux)
-        || !read_dataset_vector(matrix, "part_row_offsets", H5T_NATIVE_UINT64, &part_row_offsets)
-        || !read_dataset_vector(matrix, "part_dataset_ids", H5T_NATIVE_UINT32, &part_dataset_ids)
-        || !read_dataset_vector(matrix, "part_codec_ids", H5T_NATIVE_UINT32, &part_codec_ids)
+    if (!read_dataset_vector(matrix, "partition_rows", H5T_NATIVE_UINT64, &partition_rows)
+        || !read_dataset_vector(matrix, "partition_nnz", H5T_NATIVE_UINT64, &partition_nnz)
+        || !read_optional_dataset_vector(matrix, "partition_axes", H5T_NATIVE_UINT32, &partition_axes)
+        || !read_dataset_vector(matrix, "partition_aux", H5T_NATIVE_UINT64, &partition_aux)
+        || !read_dataset_vector(matrix, "partition_row_offsets", H5T_NATIVE_UINT64, &partition_row_offsets)
+        || !read_dataset_vector(matrix, "partition_dataset_ids", H5T_NATIVE_UINT32, &partition_dataset_ids)
+        || !read_dataset_vector(matrix, "partition_codec_ids", H5T_NATIVE_UINT32, &partition_codec_ids)
         || !read_dataset_vector(matrix, "shard_offsets", H5T_NATIVE_UINT64, &shard_offsets)) {
         if (codecs >= 0) H5Gclose(codecs);
         if (provenance >= 0) H5Gclose(provenance);
@@ -468,18 +468,18 @@ bool load_series_summary(const char *path, series_summary *out, std::string *err
         });
     }
 
-    out->partitions.reserve(part_rows.size());
-    for (std::size_t i = 0; i < part_rows.size(); ++i) {
+    out->partitions.reserve(partition_rows.size());
+    for (std::size_t i = 0; i < partition_rows.size(); ++i) {
         out->partitions.push_back(series_partition_summary{
             (std::uint64_t) i,
-            i < part_row_offsets.size() ? part_row_offsets[i] : 0u,
-            i + 1u < part_row_offsets.size() ? part_row_offsets[i + 1u] : 0u,
-            i < part_rows.size() ? part_rows[i] : 0u,
-            i < part_nnz.size() ? part_nnz[i] : 0u,
-            i < part_aux.size() ? part_aux[i] : 0u,
-            i < part_dataset_ids.size() ? part_dataset_ids[i] : 0u,
-            i < part_axes.size() ? part_axes[i] : 0u,
-            i < part_codec_ids.size() ? part_codec_ids[i] : 0u
+            i < partition_row_offsets.size() ? partition_row_offsets[i] : 0u,
+            i + 1u < partition_row_offsets.size() ? partition_row_offsets[i + 1u] : 0u,
+            i < partition_rows.size() ? partition_rows[i] : 0u,
+            i < partition_nnz.size() ? partition_nnz[i] : 0u,
+            i < partition_aux.size() ? partition_aux[i] : 0u,
+            i < partition_dataset_ids.size() ? partition_dataset_ids[i] : 0u,
+            i < partition_axes.size() ? partition_axes[i] : 0u,
+            i < partition_codec_ids.size() ? partition_codec_ids[i] : 0u
         });
     }
 
@@ -489,12 +489,12 @@ bool load_series_summary(const char *path, series_summary *out, std::string *err
         const std::uint64_t row_end = shard_offsets[i + 1u];
         out->shards.push_back(series_shard_summary{
             (std::uint64_t) i,
-            (std::uint64_t) find_partition_index_for_row(part_row_offsets, row_begin),
+            (std::uint64_t) find_partition_index_for_row(partition_row_offsets, row_begin),
             (std::uint64_t) (row_end == row_begin
-                ? find_partition_index_for_row(part_row_offsets, row_begin)
+                ? find_partition_index_for_row(partition_row_offsets, row_begin)
                 : std::max<unsigned long>(
-                    find_partition_index_for_row(part_row_offsets, row_begin),
-                    find_partition_end_for_row(part_row_offsets, row_end))),
+                    find_partition_index_for_row(partition_row_offsets, row_begin),
+                    find_partition_end_for_row(partition_row_offsets, row_end))),
             row_begin,
             row_end
         });
@@ -565,15 +565,15 @@ bool load_series_as_csr(const char *path, csr_matrix_export *out, std::string *e
         out->indices.reserve(view.nnz);
         out->data.reserve(view.nnz);
 
-        for (unsigned long part_id = 0; part_id < view.num_parts; ++part_id) {
+        for (unsigned long partition_id = 0; partition_id < view.num_partitions; ++partition_id) {
             const cellshard::sparse::compressed *part = nullptr;
-            if (!cellshard::fetch_part(&view, &storage, part_id)) {
+            if (!cellshard::fetch_partition(&view, &storage, partition_id)) {
                 cellshard::clear(&storage);
                 cellshard::clear(&view);
                 set_error(error, "failed to materialize compressed series part");
                 return false;
             }
-            part = view.parts[part_id];
+            part = view.parts[partition_id];
             if (part == nullptr || part->axis != cellshard::sparse::compressed_by_row) {
                 cellshard::clear(&storage);
                 cellshard::clear(&view);
@@ -588,7 +588,7 @@ bool load_series_as_csr(const char *path, csr_matrix_export *out, std::string *e
                 ++global_row;
                 out->indptr[global_row] = (std::int64_t) out->data.size();
             }
-            if (!cellshard::drop_part(&view, part_id)) {
+            if (!cellshard::drop_partition(&view, partition_id)) {
                 cellshard::clear(&storage);
                 cellshard::clear(&view);
                 set_error(error, "failed to release compressed series part");
@@ -618,15 +618,15 @@ bool load_series_as_csr(const char *path, csr_matrix_export *out, std::string *e
         out->indices.reserve(view.nnz);
         out->data.reserve(view.nnz);
 
-        for (unsigned long part_id = 0; part_id < view.num_parts; ++part_id) {
+        for (unsigned long partition_id = 0; partition_id < view.num_partitions; ++partition_id) {
             const cellshard::sparse::blocked_ell *part = nullptr;
-            if (!cellshard::fetch_part(&view, &storage, part_id)) {
+            if (!cellshard::fetch_partition(&view, &storage, partition_id)) {
                 cellshard::clear(&storage);
                 cellshard::clear(&view);
                 set_error(error, "failed to materialize blocked-ELL series part");
                 return false;
             }
-            part = view.parts[part_id];
+            part = view.parts[partition_id];
             if (part == nullptr) {
                 cellshard::clear(&storage);
                 cellshard::clear(&view);
@@ -638,7 +638,7 @@ bool load_series_as_csr(const char *path, csr_matrix_export *out, std::string *e
                 ++global_row;
                 out->indptr[global_row] = (std::int64_t) out->data.size();
             }
-            if (!cellshard::drop_part(&view, part_id)) {
+            if (!cellshard::drop_partition(&view, partition_id)) {
                 cellshard::clear(&storage);
                 cellshard::clear(&view);
                 set_error(error, "failed to release blocked-ELL series part");

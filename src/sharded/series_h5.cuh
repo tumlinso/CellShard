@@ -128,27 +128,27 @@ struct series_browse_cache_view {
     std::uint32_t shard_count;
     const float *shard_feature_mean;
 
-    std::uint32_t part_count;
-    std::uint32_t sample_rows_per_part;
-    const std::uint32_t *part_sample_row_offsets;
-    const std::uint64_t *part_sample_global_rows;
-    const float *part_sample_values;
+    std::uint32_t partition_count;
+    std::uint32_t sample_rows_per_partition;
+    const std::uint32_t *partition_sample_row_offsets;
+    const std::uint64_t *partition_sample_global_rows;
+    const float *partition_sample_values;
 };
 
 struct series_layout_view {
     std::uint64_t rows;
     std::uint64_t cols;
     std::uint64_t nnz;
-    std::uint64_t num_parts;
+    std::uint64_t num_partitions;
     std::uint64_t num_shards;
 
-    const std::uint64_t *part_rows;
-    const std::uint64_t *part_nnz;
-    const std::uint32_t *part_axes;
-    const std::uint64_t *part_aux;
-    const std::uint64_t *part_row_offsets;
-    const std::uint32_t *part_dataset_ids;
-    const std::uint32_t *part_codec_ids;
+    const std::uint64_t *partition_rows;
+    const std::uint64_t *partition_nnz;
+    const std::uint32_t *partition_axes;
+    const std::uint64_t *partition_aux;
+    const std::uint64_t *partition_row_offsets;
+    const std::uint32_t *partition_dataset_ids;
+    const std::uint32_t *partition_codec_ids;
     const std::uint64_t *shard_offsets;
 
     const series_codec_descriptor *codecs;
@@ -156,12 +156,12 @@ struct series_layout_view {
 };
 
 struct series_execution_view {
-    std::uint32_t part_count;
-    const std::uint32_t *part_execution_formats;
-    const std::uint32_t *part_blocked_ell_block_sizes;
-    const float *part_blocked_ell_fill_ratios;
-    const std::uint64_t *part_execution_bytes;
-    const std::uint64_t *part_blocked_ell_bytes;
+    std::uint32_t partition_count;
+    const std::uint32_t *partition_execution_formats;
+    const std::uint32_t *partition_blocked_ell_block_sizes;
+    const float *partition_blocked_ell_fill_ratios;
+    const std::uint64_t *partition_execution_bytes;
+    const std::uint64_t *partition_blocked_ell_bytes;
 
     std::uint32_t shard_count;
     const std::uint32_t *shard_execution_formats;
@@ -195,11 +195,11 @@ int append_series_browse_cache_h5(const char *filename,
 int append_series_execution_h5(const char *filename,
                                const series_execution_view *execution);
 
-int append_standard_csr_part_h5(const char *filename,
-                                unsigned long part_id,
+int append_standard_csr_partition_h5(const char *filename,
+                                unsigned long partition_id,
                                 const sparse::compressed *part);
-int append_blocked_ell_part_h5(const char *filename,
-                               unsigned long part_id,
+int append_blocked_ell_partition_h5(const char *filename,
+                               unsigned long partition_id,
                                const sparse::blocked_ell *part);
 
 // Header load binds a lazy shard_storage backend; fetch/prefetch calls are the
@@ -218,41 +218,41 @@ int load_series_compressed_h5_header(const char *filename,
 int load_series_blocked_ell_h5_header(const char *filename,
                                       sharded<sparse::blocked_ell> *m,
                                       shard_storage *s);
-int prefetch_series_compressed_h5_part_cache(const sharded<sparse::compressed> *m,
+int prefetch_series_compressed_h5_partition_cache(const sharded<sparse::compressed> *m,
                                              shard_storage *s,
-                                             unsigned long part_id);
+                                             unsigned long partition_id);
 int prefetch_series_compressed_h5_shard_cache(const sharded<sparse::compressed> *m,
                                               shard_storage *s,
                                               unsigned long shard_id);
-int fetch_series_compressed_h5_part(sharded<sparse::compressed> *m,
+int fetch_series_compressed_h5_partition(sharded<sparse::compressed> *m,
                                     const shard_storage *s,
-                                    unsigned long part_id);
+                                    unsigned long partition_id);
 int fetch_series_compressed_h5_shard(sharded<sparse::compressed> *m,
                                      const shard_storage *s,
                                      unsigned long shard_id);
-int prefetch_series_blocked_ell_h5_part_cache(const sharded<sparse::blocked_ell> *m,
+int prefetch_series_blocked_ell_h5_partition_cache(const sharded<sparse::blocked_ell> *m,
                                               shard_storage *s,
-                                              unsigned long part_id);
+                                              unsigned long partition_id);
 int prefetch_series_blocked_ell_h5_shard_cache(const sharded<sparse::blocked_ell> *m,
                                                shard_storage *s,
                                                unsigned long shard_id);
-int fetch_series_blocked_ell_h5_part(sharded<sparse::blocked_ell> *m,
+int fetch_series_blocked_ell_h5_partition(sharded<sparse::blocked_ell> *m,
                                      const shard_storage *s,
-                                     unsigned long part_id);
+                                     unsigned long partition_id);
 int fetch_series_blocked_ell_h5_shard(sharded<sparse::blocked_ell> *m,
                                       const shard_storage *s,
                                       unsigned long shard_id);
 
 // Temporary compatibility wrappers for repo-internal callers while the new
 // cache manager surface propagates through the tree.
-inline int bind_series_h5_part_cache(shard_storage *s, const char *cache_dir) {
+inline int bind_series_h5_partition_cache(shard_storage *s, const char *cache_dir) {
     return bind_series_h5_cache(s, cache_dir);
 }
 
-inline int prefetch_series_compressed_h5_part_to_cache(const sharded<sparse::compressed> *m,
+inline int prefetch_series_compressed_h5_partition_to_cache(const sharded<sparse::compressed> *m,
                                                        const shard_storage *s,
-                                                       unsigned long part_id) {
-    return prefetch_series_compressed_h5_part_cache(m, const_cast<shard_storage *>(s), part_id);
+                                                       unsigned long partition_id) {
+    return prefetch_series_compressed_h5_partition_cache(m, const_cast<shard_storage *>(s), partition_id);
 }
 
 inline int prefetch_series_compressed_h5_shard_to_cache(const sharded<sparse::compressed> *m,
@@ -261,10 +261,10 @@ inline int prefetch_series_compressed_h5_shard_to_cache(const sharded<sparse::co
     return prefetch_series_compressed_h5_shard_cache(m, const_cast<shard_storage *>(s), shard_id);
 }
 
-inline int prefetch_series_blocked_ell_h5_part_to_cache(const sharded<sparse::blocked_ell> *m,
+inline int prefetch_series_blocked_ell_h5_partition_to_cache(const sharded<sparse::blocked_ell> *m,
                                                         const shard_storage *s,
-                                                        unsigned long part_id) {
-    return prefetch_series_blocked_ell_h5_part_cache(m, const_cast<shard_storage *>(s), part_id);
+                                                        unsigned long partition_id) {
+    return prefetch_series_blocked_ell_h5_partition_cache(m, const_cast<shard_storage *>(s), partition_id);
 }
 
 inline int prefetch_series_blocked_ell_h5_shard_to_cache(const sharded<sparse::blocked_ell> *m,

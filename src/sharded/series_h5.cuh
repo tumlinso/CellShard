@@ -11,7 +11,7 @@
 namespace cellshard {
 
 enum {
-    series_h5_schema_version = 1u
+    series_h5_schema_version = 2u
 };
 
 // Codec families describe how one stored part payload should be interpreted
@@ -94,6 +94,27 @@ struct series_embedded_metadata_view {
     const series_metadata_table_view *tables;
 };
 
+enum {
+    series_observation_metadata_type_none = 0u,
+    series_observation_metadata_type_text = 1u,
+    series_observation_metadata_type_float32 = 2u,
+    series_observation_metadata_type_uint8 = 3u
+};
+
+struct series_observation_metadata_column_view {
+    const char *name;
+    std::uint32_t type;
+    series_text_column_view text_values;
+    const float *float32_values;
+    const std::uint8_t *uint8_values;
+};
+
+struct series_observation_metadata_view {
+    std::uint64_t rows;
+    std::uint32_t cols;
+    const series_observation_metadata_column_view *columns;
+};
+
 struct series_browse_cache_view {
     std::uint32_t selected_feature_count;
     const std::uint32_t *selected_feature_indices;
@@ -165,6 +186,9 @@ int create_series_blocked_ell_h5(const char *filename,
 int append_series_embedded_metadata_h5(const char *filename,
                                        const series_embedded_metadata_view *metadata);
 
+int append_series_observation_metadata_h5(const char *filename,
+                                          const series_observation_metadata_view *metadata);
+
 int append_series_browse_cache_h5(const char *filename,
                                   const series_browse_cache_view *browse);
 
@@ -179,38 +203,74 @@ int append_blocked_ell_part_h5(const char *filename,
                                const sparse::blocked_ell *part);
 
 // Header load binds a lazy shard_storage backend; fetch/prefetch calls are the
-// points that actually materialize part payloads or populate local caches.
+// points that actually materialize partition payloads or populate local caches.
 int bind_series_h5(shard_storage *s, const char *path);
-int bind_series_h5_part_cache(shard_storage *s, const char *cache_dir);
+int bind_series_h5_cache(shard_storage *s, const char *cache_root);
+int set_series_h5_cache_budget_bytes(shard_storage *s, std::uint64_t bytes);
+int set_series_h5_cache_predictor_enabled(shard_storage *s, int enabled);
+int pin_series_h5_cache_shard(shard_storage *s, unsigned long shard_id);
+int unpin_series_h5_cache_shard(shard_storage *s, unsigned long shard_id);
+int evict_series_h5_cache_shard(shard_storage *s, unsigned long shard_id);
+int invalidate_series_h5_cache(shard_storage *s);
 int load_series_compressed_h5_header(const char *filename,
                                      sharded<sparse::compressed> *m,
                                      shard_storage *s);
 int load_series_blocked_ell_h5_header(const char *filename,
                                       sharded<sparse::blocked_ell> *m,
                                       shard_storage *s);
-int prefetch_series_compressed_h5_part_to_cache(const sharded<sparse::compressed> *m,
-                                                const shard_storage *s,
-                                                unsigned long part_id);
-int prefetch_series_compressed_h5_shard_to_cache(const sharded<sparse::compressed> *m,
-                                                 const shard_storage *s,
-                                                 unsigned long shard_id);
+int prefetch_series_compressed_h5_part_cache(const sharded<sparse::compressed> *m,
+                                             shard_storage *s,
+                                             unsigned long part_id);
+int prefetch_series_compressed_h5_shard_cache(const sharded<sparse::compressed> *m,
+                                              shard_storage *s,
+                                              unsigned long shard_id);
 int fetch_series_compressed_h5_part(sharded<sparse::compressed> *m,
                                     const shard_storage *s,
                                     unsigned long part_id);
 int fetch_series_compressed_h5_shard(sharded<sparse::compressed> *m,
                                      const shard_storage *s,
                                      unsigned long shard_id);
-int prefetch_series_blocked_ell_h5_part_to_cache(const sharded<sparse::blocked_ell> *m,
-                                                 const shard_storage *s,
-                                                 unsigned long part_id);
-int prefetch_series_blocked_ell_h5_shard_to_cache(const sharded<sparse::blocked_ell> *m,
-                                                  const shard_storage *s,
-                                                  unsigned long shard_id);
+int prefetch_series_blocked_ell_h5_part_cache(const sharded<sparse::blocked_ell> *m,
+                                              shard_storage *s,
+                                              unsigned long part_id);
+int prefetch_series_blocked_ell_h5_shard_cache(const sharded<sparse::blocked_ell> *m,
+                                               shard_storage *s,
+                                               unsigned long shard_id);
 int fetch_series_blocked_ell_h5_part(sharded<sparse::blocked_ell> *m,
                                      const shard_storage *s,
                                      unsigned long part_id);
 int fetch_series_blocked_ell_h5_shard(sharded<sparse::blocked_ell> *m,
                                       const shard_storage *s,
                                       unsigned long shard_id);
+
+// Temporary compatibility wrappers for repo-internal callers while the new
+// cache manager surface propagates through the tree.
+inline int bind_series_h5_part_cache(shard_storage *s, const char *cache_dir) {
+    return bind_series_h5_cache(s, cache_dir);
+}
+
+inline int prefetch_series_compressed_h5_part_to_cache(const sharded<sparse::compressed> *m,
+                                                       const shard_storage *s,
+                                                       unsigned long part_id) {
+    return prefetch_series_compressed_h5_part_cache(m, const_cast<shard_storage *>(s), part_id);
+}
+
+inline int prefetch_series_compressed_h5_shard_to_cache(const sharded<sparse::compressed> *m,
+                                                        const shard_storage *s,
+                                                        unsigned long shard_id) {
+    return prefetch_series_compressed_h5_shard_cache(m, const_cast<shard_storage *>(s), shard_id);
+}
+
+inline int prefetch_series_blocked_ell_h5_part_to_cache(const sharded<sparse::blocked_ell> *m,
+                                                        const shard_storage *s,
+                                                        unsigned long part_id) {
+    return prefetch_series_blocked_ell_h5_part_cache(m, const_cast<shard_storage *>(s), part_id);
+}
+
+inline int prefetch_series_blocked_ell_h5_shard_to_cache(const sharded<sparse::blocked_ell> *m,
+                                                         const shard_storage *s,
+                                                         unsigned long shard_id) {
+    return prefetch_series_blocked_ell_h5_shard_cache(m, const_cast<shard_storage *>(s), shard_id);
+}
 
 } // namespace cellshard

@@ -3,7 +3,6 @@
 #include "../types.cuh"
 
 #include <cstdlib>
-#include <cuda_runtime.h>
 
 namespace cellshard {
 namespace sparse {

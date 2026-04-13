@@ -1,0 +1,21 @@
+[build-system]
+requires = ["scikit-build-core>=0.10", "pybind11>=2.13"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "cellshard"
+version = "0.1.0"
+description = "Optional Python bindings and H5AD export surface for CellShard."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.24"]
+
+[project.optional-dependencies]
+h5ad = ["anndata>=0.10", "h5py>=3.10", "pandas>=2.2", "scipy>=1.11"]
+
+[tool.scikit-build]
+cmake.source-dir = "."
+wheel.packages = ["python/cellshard"]
+cmake.define.CELLSHARD_BUILD_EXPORT = "ON"
+cmake.define.CELLSHARD_ENABLE_PYTHON = "ON"
+cmake.define.CELLSHARD_BUILD_APPS = "ON"

@@ -8,7 +8,20 @@ version = "0.1.0"
 description = "Optional Python bindings and H5AD export surface for CellShard."
 readme = "README.md"
 requires-python = ">=3.10"
+license = "Apache-2.0"
 dependencies = ["numpy>=1.24"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: GPU :: NVIDIA CUDA",
+    "Intended Audience :: Science/Research",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Bio-Informatics"
+]
 
 [project.optional-dependencies]
 h5ad = ["anndata>=0.10", "h5py>=3.10", "pandas>=2.2", "scipy>=1.11"]
@@ -18,4 +31,4 @@ cmake.source-dir = "."
 wheel.packages = ["python/cellshard"]
 cmake.define.CELLSHARD_BUILD_EXPORT = "ON"
 cmake.define.CELLSHARD_ENABLE_PYTHON = "ON"
-cmake.define.CELLSHARD_BUILD_APPS = "ON"
+cmake.define.CELLSHARD_BUILD_APPS = "OFF"

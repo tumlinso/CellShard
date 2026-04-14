@@ -1,0 +1,68 @@
+name: cellshard-ci
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  cpu-packaging:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install native dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libhdf5-dev
+
+      - name: Build CPU-only standalone checks
+        run: |
+          cmake -S . -B build-cpu \
+            -DCELLSHARD_ENABLE_CUDA=OFF \
+            -DCELLSHARD_BUILD_TESTS=ON \
+            -DCELLSHARD_ENABLE_PYTHON=OFF \
+            -DCELLSHARD_BUILD_APPS=OFF
+          cmake --build build-cpu -j 2 --target cellShardExportRuntimeTest cellShardInspectPackageTest
+          ./build-cpu/cellShardExportRuntimeTest
+
+      - name: Build CPU-only wheel
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip wheel . --no-deps \
+            --config-settings=cmake.define.CELLSHARD_ENABLE_CUDA=OFF \
+            --config-settings=cmake.define.CELLSHARD_BUILD_APPS=OFF \
+            -w dist
+
+      - name: Install and import wheel
+        run: |
+          python -m pip install dist/cellshard-*.whl
+          python -c "import cellshard; print(cellshard.__version__); assert hasattr(cellshard, 'write_h5ad')"
+
+  cuda-runtime:
+    runs-on: [self-hosted, linux, x64, cuda]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build CUDA standalone checks
+        run: |
+          cmake -S . -B build-cuda \
+            -DCELLSHARD_BUILD_TESTS=ON \
+            -DCELLSHARD_ENABLE_PYTHON=OFF \
+            -DCELLSHARD_BUILD_APPS=OFF
+          cmake --build build-cuda -j 4 --target cellShardExportRuntimeTest cellShardInspectPackageTest
+          ./build-cuda/cellShardExportRuntimeTest
+
+      - name: Build Python wheel
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip wheel . --no-deps -w dist

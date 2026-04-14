@@ -13,13 +13,13 @@ __global__ static void csExpandToCoo(
     while (c < cDim) {
         const unsigned int begin = cAxPtr[c];
         const unsigned int end = cAxPtr[c + 1];
-        unsigned int i = begin + (unsigned int) threadIdx.x;
+        unsigned int i = ::cellshard::ptx::add_u32(begin, (unsigned int) threadIdx.x);
 
         while (i < end) {
             out_cAxIdx[i] = c;
             out_uAxIdx[i] = uAxIdx[i];
             out_val[i] = val[i];
-            i += (unsigned int) blockDim.x;
+            i = ::cellshard::ptx::add_u32(i, (unsigned int) blockDim.x);
         }
         c += cStride;
     }

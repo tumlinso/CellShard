@@ -1,4 +1,4 @@
-#include "matrix.cuh"
+#include "packfile.cuh"
 
 #include <cstdio>
 #include <cstdlib>
@@ -82,6 +82,22 @@ inline void free_blocked_ell_result(blocked_ell_load_result *out) {
     out->ell_cols = 0u;
 }
 
+inline void free_sliced_ell_result(sliced_ell_load_result *out) {
+    if (out->storage != 0) std::free(out->storage);
+    else {
+        std::free(out->slice_row_offsets);
+        std::free(out->slice_widths);
+        std::free(out->col_idx);
+        std::free(out->val);
+    }
+    out->storage = 0;
+    out->slice_row_offsets = 0;
+    out->slice_widths = 0;
+    out->col_idx = 0;
+    out->val = 0;
+    out->slice_count = 0u;
+}
+
 inline void free_coo_result(coo_load_result *out) {
     if (out->storage != 0) std::free(out->storage);
     else {
@@ -134,6 +150,17 @@ std::size_t packed_dia_bytes(types::nnz_t nnz, types::idx_t num_diagonals, std::
         + sizeof(types::idx_t)
         + (std::size_t) num_diagonals * sizeof(int)
         + (std::size_t) nnz * value_size;
+}
+
+std::size_t packed_sliced_ell_bytes(types::u32 slice_count, types::u32 total_slots, std::size_t value_size) {
+    const std::size_t offsets_bytes = ((std::size_t) slice_count + 1u) * sizeof(types::u32);
+    const std::size_t widths_bytes = (std::size_t) slice_count * sizeof(types::u32);
+    return header_bytes()
+        + sizeof(types::u32)
+        + offsets_bytes
+        + widths_bytes
+        + (std::size_t) total_slots * sizeof(types::idx_t)
+        + (std::size_t) total_slots * value_size;
 }
 
 // Standalone filename helpers are full synchronous host I/O operations.
@@ -373,6 +400,132 @@ done:
     return ok;
 }
 
+int store_sliced_ell_raw(const char *filename,
+                         types::dim_t rows,
+                         types::dim_t cols,
+                         types::nnz_t nnz,
+                         types::u32 slice_count,
+                         const types::u32 *slice_row_offsets,
+                         const types::u32 *slice_widths,
+                         const types::idx_t *col_idx,
+                         const void *val,
+                         std::size_t value_size) {
+    std::FILE *fp = 0;
+    int ok = 0;
+
+    fp = std::fopen(filename, "wb");
+    if (fp == 0) return 0;
+    configure_stream(fp);
+    ok = store_sliced_ell_raw(fp, rows, cols, nnz, slice_count, slice_row_offsets, slice_widths, col_idx, val, value_size);
+
+done:
+    std::fclose(fp);
+    return ok;
+}
+
+int store_sliced_ell_raw(std::FILE *fp,
+                         types::dim_t rows,
+                         types::dim_t cols,
+                         types::nnz_t nnz,
+                         types::u32 slice_count,
+                         const types::u32 *slice_row_offsets,
+                         const types::u32 *slice_widths,
+                         const types::idx_t *col_idx,
+                         const void *val,
+                         std::size_t value_size) {
+    types::u32 total_slots = 0u;
+    types::u32 slice = 0u;
+
+    if (!write_header(fp, disk_format_sliced_ell, rows, cols, nnz)) return 0;
+    if (!write_block(fp, &slice_count, sizeof(slice_count), 1)) return 0;
+    if (slice_count != 0u && (slice_row_offsets == 0 || slice_widths == 0)) return 0;
+    for (slice = 0u; slice < slice_count; ++slice) {
+        total_slots += (slice_row_offsets[slice + 1u] - slice_row_offsets[slice]) * slice_widths[slice];
+    }
+    if (!write_block(fp, slice_row_offsets, sizeof(types::u32), (std::size_t) slice_count + 1u)) return 0;
+    if (!write_block(fp, slice_widths, sizeof(types::u32), slice_count)) return 0;
+    if (!write_block(fp, col_idx, sizeof(types::idx_t), total_slots)) return 0;
+    if (!write_block(fp, val, value_size, total_slots)) return 0;
+    return 1;
+}
+
+int load_sliced_ell_raw(const char *filename, std::size_t value_size, sliced_ell_load_result *out) {
+    std::FILE *fp = 0;
+    int ok = 0;
+
+    out->slice_count = 0u;
+    out->storage = 0;
+    out->slice_row_offsets = 0;
+    out->slice_widths = 0;
+    out->col_idx = 0;
+    out->val = 0;
+    fp = std::fopen(filename, "rb");
+    if (fp == 0) return 0;
+    configure_stream(fp);
+    ok = load_sliced_ell_raw(fp, value_size, out);
+
+done:
+    std::fclose(fp);
+    return ok;
+}
+
+int load_sliced_ell_raw(std::FILE *fp, std::size_t value_size, sliced_ell_load_result *out) {
+    int ok = 0;
+    types::u32 total_slots = 0u;
+    types::u32 slice = 0u;
+    std::size_t offsets_bytes = 0u;
+    std::size_t widths_offset = 0u;
+    std::size_t widths_bytes = 0u;
+    std::size_t col_offset = 0u;
+    std::size_t col_bytes = 0u;
+    std::size_t val_offset = 0u;
+    std::size_t total_bytes = 0u;
+
+    out->slice_count = 0u;
+    out->storage = 0;
+    out->slice_row_offsets = 0;
+    out->slice_widths = 0;
+    out->col_idx = 0;
+    out->val = 0;
+    if (!read_header(fp, &out->h)) goto done;
+    if (!check_disk_format(disk_format_sliced_ell, out->h.format, "sliced ell matrix")) goto done;
+    if (!read_block(fp, &out->slice_count, sizeof(out->slice_count), 1)) goto done;
+    offsets_bytes = ((std::size_t) out->slice_count + 1u) * sizeof(types::u32);
+    widths_offset = align_up_bytes(offsets_bytes, alignof(types::u32));
+    widths_bytes = (std::size_t) out->slice_count * sizeof(types::u32);
+    total_bytes = align_up_bytes(widths_offset + widths_bytes, alignof(types::idx_t));
+    out->storage = alloc_bytes(total_bytes);
+    if (total_bytes != 0u && out->storage == 0) goto done;
+    out->slice_row_offsets = out->slice_count != 0u || out->h.rows == 0u ? (types::u32 *) out->storage : 0;
+    out->slice_widths = out->slice_count != 0u ? (types::u32 *) ((char *) out->storage + widths_offset) : 0;
+    if (!read_block(fp, out->slice_row_offsets, sizeof(types::u32), (std::size_t) out->slice_count + 1u)) goto done;
+    if (!read_block(fp, out->slice_widths, sizeof(types::u32), out->slice_count)) goto done;
+    if (out->slice_count != 0u && out->slice_row_offsets[out->slice_count] != out->h.rows) goto done;
+    for (slice = 0u; slice < out->slice_count; ++slice) {
+        total_slots += (out->slice_row_offsets[slice + 1u] - out->slice_row_offsets[slice]) * out->slice_widths[slice];
+    }
+    col_offset = align_up_bytes(widths_offset + widths_bytes, alignof(types::idx_t));
+    col_bytes = (std::size_t) total_slots * sizeof(types::idx_t);
+    val_offset = align_up_bytes(col_offset + col_bytes, alignof(real::storage_t));
+    total_bytes = val_offset + (std::size_t) total_slots * value_size;
+    if (total_bytes != 0u) {
+        void *storage = std::realloc(out->storage, total_bytes);
+        if (storage == 0) goto done;
+        out->storage = storage;
+    }
+    out->slice_row_offsets = (types::u32 *) out->storage;
+    out->slice_widths = (types::u32 *) ((char *) out->storage + widths_offset);
+    out->col_idx = total_slots != 0u ? (types::idx_t *) ((char *) out->storage + col_offset) : 0;
+    out->val = total_slots != 0u ? (void *) ((char *) out->storage + val_offset) : 0;
+    if (!read_block(fp, out->col_idx, sizeof(types::idx_t), total_slots)) goto done;
+    if (!read_block(fp, out->val, value_size, total_slots)) goto done;
+    ok = 1;
+
+done:
+    if (!ok) free_sliced_ell_result(out);
+    return ok;
+}
+
 int store_coo_raw(const char *filename, types::dim_t rows, types::dim_t cols, types::nnz_t nnz, const types::idx_t *rowIdx, const types::idx_t *colIdx, const void *val, std::size_t value_size) {
     std::FILE *fp = 0;
     int ok = 0;
@@ -572,6 +725,40 @@ int load(std::FILE *fp, sparse::blocked_ell *m) {
     sparse::init(m, tmp.h.rows, tmp.h.cols, tmp.h.nnz, tmp.block_size, tmp.ell_cols);
     m->storage = tmp.storage;
     m->blockColIdx = tmp.blockColIdx;
+    m->val = (real::storage_t *) tmp.val;
+    return 1;
+}
+
+int store(std::FILE *fp, const sparse::sliced_ell *m) {
+    return store_sliced_ell_raw(fp,
+                                m->rows,
+                                m->cols,
+                                m->nnz,
+                                m->slice_count,
+                                m->slice_row_offsets,
+                                m->slice_widths,
+                                m->col_idx,
+                                m->val,
+                                sizeof(real::storage_t));
+}
+
+int load(std::FILE *fp, sparse::sliced_ell *m) {
+    sliced_ell_load_result tmp;
+
+    tmp.slice_count = 0u;
+    tmp.storage = 0;
+    tmp.slice_row_offsets = 0;
+    tmp.slice_widths = 0;
+    tmp.col_idx = 0;
+    tmp.val = 0;
+    if (!load_sliced_ell_raw(fp, sizeof(real::storage_t), &tmp)) return 0;
+    sparse::clear(m);
+    sparse::init(m, tmp.h.rows, tmp.h.cols, tmp.h.nnz);
+    m->slice_count = tmp.slice_count;
+    m->storage = tmp.storage;
+    m->slice_row_offsets = tmp.slice_row_offsets;
+    m->slice_widths = tmp.slice_widths;
+    m->col_idx = tmp.col_idx;
     m->val = (real::storage_t *) tmp.val;
     return 1;
 }

@@ -38,11 +38,47 @@ endif()
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
+set(CELLSHARD_VERSION 0.1.0)
+
 option(CELLSHARD_BUILD_EXPORT "Build the CellShard export helpers." ON)
 option(CELLSHARD_ENABLE_PYTHON "Build the optional CellShard Python bindings and H5AD export app." OFF)
 option(CELLSHARD_BUILD_APPS "Build optional CellShard applications." ON)
 option(CELLSHARD_BUILD_TESTS "Build CellShard-local test targets." OFF)
 option(CELLSHARD_ENABLE_CUDA_LINEINFO "Emit CUDA line mapping for Nsight profiling." OFF)
+set(CELLSHARD_CUDA_MODE "portable" CACHE STRING
+    "CellShard CUDA optimization mode: portable or extreme")
+set_property(CACHE CELLSHARD_CUDA_MODE PROPERTY STRINGS portable extreme)
+
+if(NOT CELLSHARD_CUDA_MODE STREQUAL "portable" AND NOT CELLSHARD_CUDA_MODE STREQUAL "extreme")
+    message(FATAL_ERROR "CELLSHARD_CUDA_MODE must be one of: portable, extreme")
+endif()
+
+if(CELLSHARD_ENABLE_CUDA AND CELLSHARD_CUDA_MODE STREQUAL "extreme")
+    set(cellshard_extreme_arch_count 0)
+    foreach(cellshard_cuda_arch IN LISTS CMAKE_CUDA_ARCHITECTURES)
+        math(EXPR cellshard_extreme_arch_count "${cellshard_extreme_arch_count} + 1")
+        string(STRIP "${cellshard_cuda_arch}" cellshard_cuda_arch_clean)
+        if(NOT cellshard_cuda_arch_clean MATCHES "^(70|7\\.0)(-real|-virtual)?$")
+            message(FATAL_ERROR
+                "CELLSHARD_CUDA_MODE=extreme is a Volta-only path and currently requires "
+                "CMAKE_CUDA_ARCHITECTURES to contain only sm_70 entries.")
+        endif()
+    endforeach()
+    if(cellshard_extreme_arch_count EQUAL 0)
+        message(FATAL_ERROR
+            "CELLSHARD_CUDA_MODE=extreme requires at least one explicit sm_70 architecture entry.")
+    endif()
+endif()
+
+if(CELLSHARD_CUDA_MODE STREQUAL "portable")
+    set(CELLSHARD_CUDA_MODE_PORTABLE 1)
+    set(CELLSHARD_CUDA_MODE_EXTREME 0)
+else()
+    set(CELLSHARD_CUDA_MODE_PORTABLE 0)
+    set(CELLSHARD_CUDA_MODE_EXTREME 1)
+endif()
+
+message(STATUS "CellShard CUDA mode: ${CELLSHARD_CUDA_MODE}")
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
@@ -109,11 +145,15 @@ if(CELLSHARD_ENABLE_CUDA)
 else()
     target_compile_definitions(cellshard_headers INTERFACE CELLSHARD_ENABLE_CUDA=0)
 endif()
+target_compile_definitions(cellshard_headers INTERFACE
+    CELLSHARD_CUDA_MODE_PORTABLE=${CELLSHARD_CUDA_MODE_PORTABLE}
+    CELLSHARD_CUDA_MODE_EXTREME=${CELLSHARD_CUDA_MODE_EXTREME}
+)
 
 set(cellshard_inspect_sources
-    src/disk/matrix.cu
+    src/disk/packfile.cu
+    src/disk/csh5.cc
     src/sharded/shard_paths.cu
-    src/sharded/series_h5.cc
 )
 set_source_files_properties(${cellshard_inspect_sources} PROPERTIES LANGUAGE CXX)
 
@@ -136,6 +176,9 @@ target_link_libraries(cellshard_inspect
         cellshard_headers
         ${HDF5_LIBRARIES}
 )
+if(CELLSHARD_ENABLE_CUDA)
+    target_link_libraries(cellshard_inspect PUBLIC CUDA::cudart)
+endif()
 set_target_properties(cellshard_inspect PROPERTIES
     CXX_STANDARD 17
     CXX_STANDARD_REQUIRED YES
@@ -171,7 +214,7 @@ endif()
 
 if(CELLSHARD_BUILD_EXPORT)
     add_library(cellshard_export STATIC
-        export/series_export.cc
+        export/dataset_export.cc
     )
     add_library(CellShard::export ALIAS cellshard_export)
     set_target_properties(cellshard_export PROPERTIES EXPORT_NAME export)
@@ -202,6 +245,19 @@ endif()
 if(CELLSHARD_ENABLE_PYTHON)
     find_package(Python3 REQUIRED COMPONENTS Interpreter Development.Module Development.Embed)
     find_package(pybind11 CONFIG QUIET)
+    if(NOT pybind11_FOUND)
+        execute_process(
+            COMMAND ${Python3_EXECUTABLE} -c "import pybind11; print(pybind11.get_cmake_dir())"
+            OUTPUT_VARIABLE CELLSHARD_PYBIND11_CMAKE_DIR
+            RESULT_VARIABLE CELLSHARD_PYBIND11_CMAKE_DIR_STATUS
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            ERROR_QUIET
+        )
+        if(CELLSHARD_PYBIND11_CMAKE_DIR_STATUS EQUAL 0 AND NOT "${CELLSHARD_PYBIND11_CMAKE_DIR}" STREQUAL "")
+            list(PREPEND CMAKE_PREFIX_PATH "${CELLSHARD_PYBIND11_CMAKE_DIR}")
+            find_package(pybind11 CONFIG QUIET)
+        endif()
+    endif()
     if(NOT pybind11_FOUND)
         include(FetchContent)
         FetchContent_Declare(
@@ -238,9 +294,6 @@ if(CELLSHARD_ENABLE_PYTHON)
             pybind11::embed
             Python3::Python
     )
-    if(Python3_LIBRARY_DIRS)
-        target_link_directories(cellshard_h5ad_python PRIVATE ${Python3_LIBRARY_DIRS})
-    endif()
     set_target_properties(cellshard_h5ad_python PROPERTIES
         CXX_STANDARD 17
         CXX_STANDARD_REQUIRED YES
@@ -260,22 +313,12 @@ if(CELLSHARD_ENABLE_PYTHON)
         cellshard_export
         cellshard_h5ad_python
     )
-    if(Python3_LIBRARY_DIRS)
-        target_link_directories(_cellshard PRIVATE ${Python3_LIBRARY_DIRS})
-    endif()
     set_target_properties(_cellshard PROPERTIES
         OUTPUT_NAME _cellshard
         CXX_STANDARD 17
         CXX_STANDARD_REQUIRED YES
     )
     cellshard_assert_no_torch_dependency(_cellshard)
-    install(TARGETS _cellshard
-        LIBRARY DESTINATION cellshard
-    )
-    install(DIRECTORY python/cellshard/
-        DESTINATION cellshard
-        FILES_MATCHING PATTERN "*.py"
-    )
 
     if(CELLSHARD_BUILD_APPS)
         add_executable(cellshardH5adExport
@@ -291,17 +334,11 @@ if(CELLSHARD_ENABLE_PYTHON)
             cellshard_h5ad_python
             pybind11::embed
         )
-        if(Python3_LIBRARY_DIRS)
-            target_link_directories(cellshardH5adExport PRIVATE ${Python3_LIBRARY_DIRS})
-        endif()
         set_target_properties(cellshardH5adExport PROPERTIES
             CXX_STANDARD 17
             CXX_STANDARD_REQUIRED YES
         )
         cellshard_assert_no_torch_dependency(cellshardH5adExport)
-        install(TARGETS cellshardH5adExport
-            RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-        )
     endif()
 endif()
 
@@ -357,6 +394,9 @@ if(CELLSHARD_BUILD_TESTS)
             -B ${cellshard_package_test_build}
             -DCMAKE_PREFIX_PATH=${cellshard_package_test_stage}
             -DCELLSHARD_EXPECT_RUNTIME=${cellshard_package_test_expect_runtime}
+            -DCMAKE_CUDA_COMPILER=${CMAKE_CUDA_COMPILER}
+            -DCMAKE_CUDA_HOST_COMPILER=${CMAKE_CUDA_HOST_COMPILER}
+            -DCMAKE_CUDA_ARCHITECTURES=${CMAKE_CUDA_ARCHITECTURES}
         COMMAND ${CMAKE_COMMAND} --build ${cellshard_package_test_build} -j 1
         USES_TERMINAL
     )
@@ -419,7 +459,7 @@ install(EXPORT CellShardTargets
 
 write_basic_package_version_file(
     ${CMAKE_CURRENT_BINARY_DIR}/CellShardConfigVersion.cmake
-    VERSION 0.1.0
+    VERSION ${CELLSHARD_VERSION}
     COMPATIBILITY SameMajorVersion
 )
 

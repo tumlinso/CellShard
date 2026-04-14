@@ -31,3 +31,7 @@ Testing/
 *.ipdb
 *.out
 *.exe
+
+# Python cache / bytecode
+__pycache__/
+*.py[cod]

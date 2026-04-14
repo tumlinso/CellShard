@@ -15,7 +15,7 @@ namespace device {
 // Device residency state is deliberately blunt:
 // - one record per logical host partition
 // - one device-side descriptor pointer
-// - up to three device payload pointers
+// - up to four device payload pointers
 //
 // These records do not alias host memory. Any upload/stage path below allocates
 // fresh device memory and copies payload into it.
@@ -28,6 +28,7 @@ struct alignas(16) partition_record {
     void *a0;
     void *a1;
     void *a2;
+    void *a3;
     unsigned long group_begin;
     unsigned long group_end;
     int device_id;
@@ -80,6 +81,19 @@ struct alignas(16) blocked_ell_view {
     unsigned int block_size;
     unsigned int ell_cols;
     unsigned int *blockColIdx;
+    __half *val;
+};
+
+struct alignas(16) sliced_ell_view {
+    unsigned int rows;
+    unsigned int cols;
+    unsigned int nnz;
+    unsigned int slice_count;
+    unsigned int slice_rows;
+    unsigned int *slice_row_offsets;
+    unsigned int *slice_widths;
+    unsigned int *slice_slot_offsets;
+    unsigned int *col_idx;
     __half *val;
 };
 
@@ -164,6 +178,7 @@ __host__ __forceinline__ void zero_record(partition_record<MatrixT> *record) {
     record->a0 = 0;
     record->a1 = 0;
     record->a2 = 0;
+    record->a3 = 0;
     record->group_begin = 0;
     record->group_end = 0;
     record->device_id = -1;
@@ -539,6 +554,205 @@ fail:
     return err;
 }
 
+__host__ __forceinline__ cudaError_t upload(const ::cellshard::sparse::sliced_ell *src,
+                                            partition_record< ::cellshard::sparse::sliced_ell > *record) {
+    sliced_ell_view host;
+    const std::size_t slice_offsets_bytes = src != 0 ? (std::size_t) (src->slice_count + 1u) * sizeof(unsigned int) : 0u;
+    const std::size_t widths_offset = align_up_bytes(slice_offsets_bytes, alignof(unsigned int));
+    const std::size_t widths_bytes = src != 0 ? (std::size_t) src->slice_count * sizeof(unsigned int) : 0u;
+    const std::size_t slot_offsets_offset = align_up_bytes(widths_offset + widths_bytes, alignof(unsigned int));
+    const std::size_t slot_offsets_bytes = src != 0 ? (std::size_t) src->slice_count * sizeof(unsigned int) : 0u;
+    const std::size_t total_slots = src != 0 ? (std::size_t) sparse::total_slots(src) : 0u;
+    const std::size_t col_offset = align_up_bytes(slot_offsets_offset + slot_offsets_bytes, alignof(unsigned int));
+    const std::size_t col_bytes = total_slots * sizeof(unsigned int);
+    const std::size_t val_offset = align_up_bytes(col_offset + col_bytes, alignof(__half));
+    const std::size_t val_bytes = total_slots * sizeof(__half);
+    const std::size_t view_offset = 0u;
+    const std::size_t payload_offset = align_up_bytes(sizeof(sliced_ell_view), alignof(unsigned int));
+    const std::size_t payload_bytes = val_offset + val_bytes;
+    const std::size_t total_bytes = payload_offset + payload_bytes;
+    char *storage = 0;
+    char *payload = 0;
+    unsigned int *slot_offsets_host = 0;
+    cudaError_t err = cudaSuccess;
+
+    zero_record(record);
+    host.rows = src != 0 ? src->rows : 0u;
+    host.cols = src != 0 ? src->cols : 0u;
+    host.nnz = src != 0 ? src->nnz : 0u;
+    host.slice_count = src != 0 ? src->slice_count : 0u;
+    host.slice_rows = 0u;
+    host.slice_row_offsets = 0;
+    host.slice_widths = 0;
+    host.slice_slot_offsets = 0;
+    host.col_idx = 0;
+    host.val = 0;
+
+    err = cudaMalloc((void **) &storage, total_bytes == 0 ? sizeof(sliced_ell_view) : total_bytes);
+    if (err != cudaSuccess) goto fail;
+    payload = storage + payload_offset;
+
+    if (payload_bytes != 0u) {
+        if (slice_offsets_bytes != 0u) {
+            err = cudaMemcpy(payload, src->slice_row_offsets, slice_offsets_bytes, cudaMemcpyHostToDevice);
+            if (err != cudaSuccess) goto fail;
+        }
+        if (widths_bytes != 0u) {
+            err = cudaMemcpy(payload + widths_offset, src->slice_widths, widths_bytes, cudaMemcpyHostToDevice);
+            if (err != cudaSuccess) goto fail;
+        }
+        slot_offsets_host = src->slice_count != 0u ? (unsigned int *) std::malloc(slot_offsets_bytes) : 0;
+        if (src->slice_count != 0u && slot_offsets_host == 0) {
+            err = cudaErrorMemoryAllocation;
+            goto fail;
+        }
+        if (src->slice_count != 0u) {
+            unsigned int running = 0u;
+            unsigned int slice = 0u;
+            for (slice = 0u; slice < src->slice_count; ++slice) {
+                slot_offsets_host[slice] = running;
+                running += (src->slice_row_offsets[slice + 1u] - src->slice_row_offsets[slice]) * src->slice_widths[slice];
+            }
+            err = cudaMemcpy(payload + slot_offsets_offset, slot_offsets_host, slot_offsets_bytes, cudaMemcpyHostToDevice);
+            if (err != cudaSuccess) goto fail;
+            host.slice_rows = src->slice_count != 0u ? (src->slice_row_offsets[1u] - src->slice_row_offsets[0u]) : 0u;
+            host.slice_slot_offsets = (unsigned int *) (payload + slot_offsets_offset);
+        }
+        if (col_bytes != 0u) {
+            err = cudaMemcpy(payload + col_offset, src->col_idx, col_bytes, cudaMemcpyHostToDevice);
+            if (err != cudaSuccess) goto fail;
+        }
+        if (val_bytes != 0u) {
+            err = cudaMemcpy(payload + val_offset, src->val, val_bytes, cudaMemcpyHostToDevice);
+            if (err != cudaSuccess) goto fail;
+        }
+        host.slice_row_offsets = src->slice_row_offsets != 0 ? (unsigned int *) payload : 0;
+        host.slice_widths = src->slice_widths != 0 ? (unsigned int *) (payload + widths_offset) : 0;
+        host.col_idx = src->col_idx != 0 ? (unsigned int *) (payload + col_offset) : 0;
+        host.val = src->val != 0 ? (__half *) (payload + val_offset) : 0;
+    }
+
+    err = cudaMemcpy(storage + view_offset, &host, sizeof(host), cudaMemcpyHostToDevice);
+    if (err != cudaSuccess) goto fail;
+
+    record->allocation = storage;
+    record->allocation_bytes = total_bytes;
+    record->storage = payload;
+    record->view = storage + view_offset;
+    record->a0 = host.slice_row_offsets;
+    record->a1 = host.slice_widths;
+    record->a2 = host.col_idx;
+    record->a3 = host.val;
+    std::free(slot_offsets_host);
+    return cudaSuccess;
+
+fail:
+    std::free(slot_offsets_host);
+    if (storage != 0) cudaFree(storage);
+    zero_record(record);
+    return err;
+}
+
+__host__ __forceinline__ cudaError_t upload_async(const ::cellshard::sparse::sliced_ell *src,
+                                                  partition_record< ::cellshard::sparse::sliced_ell > *record,
+                                                  cudaStream_t stream) {
+    sliced_ell_view host;
+    const std::size_t slice_offsets_bytes = src != 0 ? (std::size_t) (src->slice_count + 1u) * sizeof(unsigned int) : 0u;
+    const std::size_t widths_offset = align_up_bytes(slice_offsets_bytes, alignof(unsigned int));
+    const std::size_t widths_bytes = src != 0 ? (std::size_t) src->slice_count * sizeof(unsigned int) : 0u;
+    const std::size_t slot_offsets_offset = align_up_bytes(widths_offset + widths_bytes, alignof(unsigned int));
+    const std::size_t slot_offsets_bytes = src != 0 ? (std::size_t) src->slice_count * sizeof(unsigned int) : 0u;
+    const std::size_t total_slots = src != 0 ? (std::size_t) sparse::total_slots(src) : 0u;
+    const std::size_t col_offset = align_up_bytes(slot_offsets_offset + slot_offsets_bytes, alignof(unsigned int));
+    const std::size_t col_bytes = total_slots * sizeof(unsigned int);
+    const std::size_t val_offset = align_up_bytes(col_offset + col_bytes, alignof(__half));
+    const std::size_t val_bytes = total_slots * sizeof(__half);
+    const std::size_t view_offset = 0u;
+    const std::size_t payload_offset = align_up_bytes(sizeof(sliced_ell_view), alignof(unsigned int));
+    const std::size_t payload_bytes = val_offset + val_bytes;
+    const std::size_t total_bytes = payload_offset + payload_bytes;
+    char *storage = 0;
+    char *payload = 0;
+    unsigned int *slot_offsets_host = 0;
+    cudaError_t err = cudaSuccess;
+
+    zero_record(record);
+    host.rows = src != 0 ? src->rows : 0u;
+    host.cols = src != 0 ? src->cols : 0u;
+    host.nnz = src != 0 ? src->nnz : 0u;
+    host.slice_count = src != 0 ? src->slice_count : 0u;
+    host.slice_rows = 0u;
+    host.slice_row_offsets = 0;
+    host.slice_widths = 0;
+    host.slice_slot_offsets = 0;
+    host.col_idx = 0;
+    host.val = 0;
+
+    err = cudaMalloc((void **) &storage, total_bytes == 0 ? sizeof(sliced_ell_view) : total_bytes);
+    if (err != cudaSuccess) goto fail;
+    payload = storage + payload_offset;
+
+    if (payload_bytes != 0u) {
+        if (slice_offsets_bytes != 0u) {
+            err = cudaMemcpyAsync(payload, src->slice_row_offsets, slice_offsets_bytes, cudaMemcpyHostToDevice, stream);
+            if (err != cudaSuccess) goto fail;
+        }
+        if (widths_bytes != 0u) {
+            err = cudaMemcpyAsync(payload + widths_offset, src->slice_widths, widths_bytes, cudaMemcpyHostToDevice, stream);
+            if (err != cudaSuccess) goto fail;
+        }
+        slot_offsets_host = src->slice_count != 0u ? (unsigned int *) std::malloc(slot_offsets_bytes) : 0;
+        if (src->slice_count != 0u && slot_offsets_host == 0) {
+            err = cudaErrorMemoryAllocation;
+            goto fail;
+        }
+        if (src->slice_count != 0u) {
+            unsigned int running = 0u;
+            unsigned int slice = 0u;
+            for (slice = 0u; slice < src->slice_count; ++slice) {
+                slot_offsets_host[slice] = running;
+                running += (src->slice_row_offsets[slice + 1u] - src->slice_row_offsets[slice]) * src->slice_widths[slice];
+            }
+            err = cudaMemcpy(payload + slot_offsets_offset, slot_offsets_host, slot_offsets_bytes, cudaMemcpyHostToDevice);
+            if (err != cudaSuccess) goto fail;
+            host.slice_rows = src->slice_count != 0u ? (src->slice_row_offsets[1u] - src->slice_row_offsets[0u]) : 0u;
+            host.slice_slot_offsets = (unsigned int *) (payload + slot_offsets_offset);
+        }
+        if (col_bytes != 0u) {
+            err = cudaMemcpyAsync(payload + col_offset, src->col_idx, col_bytes, cudaMemcpyHostToDevice, stream);
+            if (err != cudaSuccess) goto fail;
+        }
+        if (val_bytes != 0u) {
+            err = cudaMemcpyAsync(payload + val_offset, src->val, val_bytes, cudaMemcpyHostToDevice, stream);
+            if (err != cudaSuccess) goto fail;
+        }
+        host.slice_row_offsets = src->slice_row_offsets != 0 ? (unsigned int *) payload : 0;
+        host.slice_widths = src->slice_widths != 0 ? (unsigned int *) (payload + widths_offset) : 0;
+        host.col_idx = src->col_idx != 0 ? (unsigned int *) (payload + col_offset) : 0;
+        host.val = src->val != 0 ? (__half *) (payload + val_offset) : 0;
+    }
+
+    err = cudaMemcpyAsync(storage + view_offset, &host, sizeof(host), cudaMemcpyHostToDevice, stream);
+    if (err != cudaSuccess) goto fail;
+
+    record->allocation = storage;
+    record->allocation_bytes = total_bytes;
+    record->storage = payload;
+    record->view = storage + view_offset;
+    record->a0 = host.slice_row_offsets;
+    record->a1 = host.slice_widths;
+    record->a2 = host.col_idx;
+    record->a3 = host.val;
+    std::free(slot_offsets_host);
+    return cudaSuccess;
+
+fail:
+    std::free(slot_offsets_host);
+    if (storage != 0) cudaFree(storage);
+    zero_record(record);
+    return err;
+}
+
 // COO upload is another full host->device materialization:
 // row index copy, column index copy, value copy, then descriptor copy.
 __host__ __forceinline__ cudaError_t upload(const ::cellshard::sparse::coo *src, partition_record< ::cellshard::sparse::coo > *record) {
@@ -755,6 +969,10 @@ __host__ __forceinline__ cudaError_t release(partition_record<MatrixT> *record) 
         err = cudaFree(record->a2);
         if (err != cudaSuccess) return err;
     }
+    if (record->a3 != 0) {
+        err = cudaFree(record->a3);
+        if (err != cudaSuccess) return err;
+    }
     if (record->a1 != 0) {
         err = cudaFree(record->a1);
         if (err != cudaSuccess) return err;
@@ -849,6 +1067,18 @@ __host__ __forceinline__ std::size_t device_partition_bytes(const ::cellshard::s
     const std::size_t idx_offset = align_up_bytes(sizeof(blocked_ell_view), alignof(unsigned int));
     const std::size_t val_offset = align_up_bytes(idx_offset + ((std::size_t) ((view->partition_rows[partId] + block_size - 1u) / block_size) * ell_width * sizeof(unsigned int)), alignof(__half));
     return val_offset + (std::size_t) view->partition_rows[partId] * (std::size_t) (ell_width * block_size) * sizeof(__half);
+}
+
+__host__ __forceinline__ std::size_t device_partition_bytes(const ::cellshard::sharded< ::cellshard::sparse::sliced_ell > *view, unsigned long partId) {
+    const unsigned long aux = view->partition_aux[partId];
+    const std::size_t payload_bytes =
+        (std::size_t) sparse::unpack_sliced_ell_slice_count(aux) * sizeof(unsigned int)
+        + (std::size_t) (sparse::unpack_sliced_ell_slice_count(aux) + 1u) * sizeof(unsigned int)
+        + (std::size_t) sparse::unpack_sliced_ell_slice_count(aux) * sizeof(unsigned int)
+        + (std::size_t) sparse::unpack_sliced_ell_total_slots(aux) * sizeof(unsigned int)
+        + (std::size_t) sparse::unpack_sliced_ell_total_slots(aux) * sizeof(__half);
+    const std::size_t payload_offset = align_up_bytes(sizeof(sliced_ell_view), alignof(unsigned int));
+    return payload_offset + payload_bytes;
 }
 
 __host__ __forceinline__ std::size_t device_partition_bytes(const ::cellshard::sharded< ::cellshard::sparse::coo > *view, unsigned long partId) {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../../offset_span.cuh"
+#include "../../extreme_ptx_primitives.cuh"
 #include "../../types.cuh"
 
 #include <cuda_runtime.h>

@@ -4,7 +4,7 @@
 // This intentionally pulls in:
 // - type/layout policy
 // - per-part matrix formats
-// - sharded metadata and `.csh5` series persistence
+// - sharded metadata and `.csh5` dataset persistence
 // - host fetch/drop helpers
 // - device staging helpers
 // - local multi-GPU helpers
@@ -21,19 +21,22 @@
 #include "formats/dense.cuh"
 #include "formats/compressed.cuh"
 #include "formats/blocked_ell.cuh"
+#include "formats/sliced_ell.cuh"
 #include "formats/triplet.cuh"
 #include "formats/diagonal.cuh"
 #include "sharded/sharded.cuh"
 #include "sharded/sharded_host.cuh"
 #include "sharded/shard_paths.cuh"
-#include "sharded/series_h5.cuh"
-#include "disk/matrix.cuh"
+#include "disk/csh5.cuh"
+#include "disk/packfile.cuh"
 #include "sharded/disk.cuh"
 
 #if CELLSHARD_ENABLE_CUDA
 #include "convert/blocked_ell_from_compressed.cuh"
+#include "convert/filtered_blocked_ell_to_compressed.cuh"
 #include "sharded/sharded_device.cuh"
 #include "sharded/distributed.cuh"
 #include "bucket/routes/compressed_major_nnz.cuh"
 #include "bucket/routes/sharded_major_nnz.cuh"
+#include "repack/routes/sharded_blocked_ell.cuh"
 #endif

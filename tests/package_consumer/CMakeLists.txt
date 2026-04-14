@@ -10,6 +10,7 @@ if(CELLSHARD_EXPECT_RUNTIME)
     if(NOT TARGET CellShard::runtime)
         message(FATAL_ERROR "Expected CellShard::runtime in this installed package.")
     endif()
+    enable_language(CUDA)
 else()
     if(TARGET CellShard::runtime)
         message(FATAL_ERROR "Did not expect CellShard::runtime in this installed package.")
@@ -24,3 +25,14 @@ set_target_properties(cellshard_inspect_consumer PROPERTIES
     CXX_STANDARD 17
     CXX_STANDARD_REQUIRED YES
 )
+
+if(CELLSHARD_EXPECT_RUNTIME)
+    add_executable(cellshard_runtime_consumer
+        runtime_consumer.cu
+    )
+    target_link_libraries(cellshard_runtime_consumer PRIVATE CellShard::runtime)
+    set_target_properties(cellshard_runtime_consumer PROPERTIES
+        CUDA_STANDARD 17
+        CUDA_STANDARD_REQUIRED YES
+    )
+endif()

@@ -20,8 +20,8 @@ __global__ static void gather_half_by_permutation(
     const __half * __restrict__ src_val,
     __half * __restrict__ dst_val
 ) {
-    const unsigned int tid = (unsigned int) (blockIdx.x * blockDim.x + threadIdx.x);
-    const unsigned int stride = (unsigned int) (gridDim.x * blockDim.x);
+    const unsigned int tid = (unsigned int) ::cellshard::ptx::global_tid_1d();
+    const unsigned int stride = (unsigned int) ::cellshard::ptx::global_stride_1d();
     unsigned int i = tid;
 
     while (i < nnz) {

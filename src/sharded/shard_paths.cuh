@@ -10,7 +10,7 @@ typedef void (*shard_storage_close_fn)(shard_storage *s);
 
 enum {
     shard_storage_backend_none = 0,
-    shard_storage_backend_series_h5 = 1
+    shard_storage_backend_dataset_h5 = 1
 };
 
 // shard_storage owns the durable source path plus backend-specific state for

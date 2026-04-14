@@ -8,8 +8,8 @@ __global__ static void transpose_coo_entries(
     types::idx_t * __restrict__ dst_colIdx,
     ValueT * __restrict__ dst_val
 ) {
-    const types::nnz_t tid = (types::nnz_t) (blockIdx.x * blockDim.x + threadIdx.x);
-    const types::nnz_t stride = (types::nnz_t) (gridDim.x * blockDim.x);
+    const types::nnz_t tid = (types::nnz_t) ::cellshard::ptx::global_tid_1d();
+    const types::nnz_t stride = (types::nnz_t) ::cellshard::ptx::global_stride_1d();
     types::nnz_t i = tid;
 
     while (i < nnz) {

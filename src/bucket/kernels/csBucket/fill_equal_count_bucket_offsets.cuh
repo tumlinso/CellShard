@@ -20,7 +20,7 @@ __global__ static void fill_equal_count_bucket_offsets(
     remainder = (types::idx_t) (major_dim % bucket_count);
     for (bucket = 0; bucket < bucket_count; ++bucket) {
         bucket_offsets[bucket] = offset;
-        offset += bucket_size + (bucket < remainder ? 1u : 0u);
+        offset = ::cellshard::ptx::add_u32(offset, bucket_size + (bucket < remainder ? 1u : 0u));
     }
     bucket_offsets[bucket_count] = (types::idx_t) major_dim;
 }

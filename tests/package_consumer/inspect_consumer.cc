@@ -1,7 +1,8 @@
-#include "CellShard/src/CellShard.hh"
+#include "src/cuda_compat.cuh"
+#include "src/sharded/sharded.cuh"
 
 int main() {
-    ::cellshard::sharded::matrix matrix;
-    ::cellshard::sharded::init(&matrix);
+    ::cellshard::sharded<::cellshard::sparse::compressed> matrix;
+    ::cellshard::init(&matrix);
     return 0;
 }

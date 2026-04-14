@@ -4,6 +4,7 @@
 #include "../real.cuh"
 #include "../formats/compressed.cuh"
 #include "../formats/blocked_ell.cuh"
+#include "../formats/sliced_ell.cuh"
 #include "../formats/dense.cuh"
 #include "../formats/diagonal.cuh"
 #include "../formats/triplet.cuh"
@@ -89,6 +90,10 @@ __host__ __device__ __forceinline__ unsigned int partition_aux(const sparse::com
 
 __host__ __device__ __forceinline__ unsigned long partition_aux(const sparse::blocked_ell *m) {
     return sparse::pack_blocked_ell_aux(m->block_size, sparse::ell_width_blocks(m));
+}
+
+__host__ __device__ __forceinline__ unsigned long partition_aux(const sparse::sliced_ell *m) {
+    return sparse::pack_sliced_ell_aux(m->slice_count, sparse::total_slots(m));
 }
 
 // Row -> part lookup over partition_offsets[].
@@ -260,6 +265,19 @@ __host__ __device__ __forceinline__ std::size_t partition_bytes(const sharded<sp
     return sizeof(sparse::blocked_ell)
         + (std::size_t) ((m->partition_rows[partId] + block_size - 1u) / block_size) * (std::size_t) ell_width * sizeof(types::idx_t)
         + (std::size_t) m->partition_rows[partId] * (std::size_t) (ell_width * block_size) * sizeof(real::storage_t);
+}
+
+__host__ __device__ __forceinline__ std::size_t partition_bytes(const sharded<sparse::sliced_ell> *m, unsigned long partId) {
+    const unsigned long aux = m->partition_aux[partId];
+    const types::u32 slice_count = sparse::unpack_sliced_ell_slice_count(aux);
+    const types::u32 total_slot_count = sparse::unpack_sliced_ell_total_slots(aux);
+    if (partId >= m->num_partitions) return 0;
+    if (m->parts[partId] != 0) return bytes(m->parts[partId]);
+    return sizeof(sparse::sliced_ell)
+        + (std::size_t) (slice_count + 1u) * sizeof(types::u32)
+        + (std::size_t) slice_count * sizeof(types::u32)
+        + (std::size_t) total_slot_count * sizeof(types::idx_t)
+        + (std::size_t) total_slot_count * sizeof(real::storage_t);
 }
 
 __host__ __device__ __forceinline__ std::size_t partition_bytes(const sharded<sparse::coo> *m, unsigned long partId) {

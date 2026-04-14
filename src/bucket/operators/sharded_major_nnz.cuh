@@ -18,8 +18,8 @@ __global__ static void gather_compressed_part_pointers(
     types::idx_t ** __restrict__ out_minor_idx,
     real::storage_t ** __restrict__ out_val
 ) {
-    const types::idx_t tid = (types::idx_t) (blockIdx.x * blockDim.x + threadIdx.x);
-    const types::idx_t stride = (types::idx_t) (gridDim.x * blockDim.x);
+    const types::idx_t tid = (types::idx_t) ::cellshard::ptx::global_tid_1d();
+    const types::idx_t stride = (types::idx_t) ::cellshard::ptx::global_stride_1d();
     types::idx_t i = tid;
 
     while (i < part_count) {

@@ -1,6 +1,6 @@
 #include "h5ad_writer.hh"
 
-#include "../src/sharded/series_h5.cuh"
+#include "../src/disk/csh5.cuh"
 
 #include <pybind11/embed.h>
 #include <pybind11/numpy.h>
@@ -43,11 +43,11 @@ inline py::object build_obs_dataframe(const anndata_export &input, py::module_ &
         : input.summary.obs_names;
 
     for (const observation_metadata_column &column : input.obs_columns) {
-        if (column.type == cellshard::series_observation_metadata_type_text) {
+        if (column.type == cellshard::dataset_observation_metadata_type_text) {
             columns[py::str(column.name)] = py::cast(column.text_values);
-        } else if (column.type == cellshard::series_observation_metadata_type_float32) {
+        } else if (column.type == cellshard::dataset_observation_metadata_type_float32) {
             columns[py::str(column.name)] = copy_1d_array(column.float32_values);
-        } else if (column.type == cellshard::series_observation_metadata_type_uint8) {
+        } else if (column.type == cellshard::dataset_observation_metadata_type_uint8) {
             columns[py::str(column.name)] = copy_1d_array(column.uint8_values);
         }
     }
@@ -84,7 +84,7 @@ inline py::dict build_uns_dict(const anndata_export &input) {
     cellshard_dict[py::str("num_shards")] = py::int_(input.summary.num_shards);
     cellshard_dict[py::str("num_datasets")] = py::int_(input.summary.num_datasets);
 
-    for (const series_dataset_summary &dataset : input.summary.datasets) {
+    for (const source_dataset_summary &dataset : input.summary.datasets) {
         py::dict entry;
         entry[py::str("dataset_id")] = py::str(dataset.dataset_id);
         entry[py::str("matrix_path")] = py::str(dataset.matrix_path);
@@ -100,7 +100,7 @@ inline py::dict build_uns_dict(const anndata_export &input) {
         datasets.append(entry);
     }
 
-    for (const series_codec_summary &codec : input.summary.codecs) {
+    for (const dataset_codec_summary &codec : input.summary.codecs) {
         py::dict entry;
         entry[py::str("codec_id")] = py::int_(codec.codec_id);
         entry[py::str("family")] = py::int_(codec.family);
@@ -170,9 +170,9 @@ bool write_h5ad_with_python(const anndata_export &input, const char *path, std::
     return write_h5ad_impl(input, path, error);
 }
 
-bool write_series_file_to_h5ad_with_python(const char *series_path, const char *path, std::string *error) {
+bool write_dataset_file_to_h5ad_with_python(const char *dataset_path, const char *path, std::string *error) {
     anndata_export snapshot;
-    if (!load_series_for_anndata(series_path, &snapshot, error)) return false;
+    if (!load_dataset_for_anndata(dataset_path, &snapshot, error)) return false;
     return write_h5ad_with_python(snapshot, path, error);
 }
 

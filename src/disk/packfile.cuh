@@ -8,6 +8,7 @@
 
 #include "../formats/compressed.cuh"
 #include "../formats/blocked_ell.cuh"
+#include "../formats/sliced_ell.cuh"
 #include "../formats/dense.cuh"
 #include "../formats/diagonal.cuh"
 #include "../formats/triplet.cuh"
@@ -22,7 +23,8 @@ enum {
     disk_format_coo        = 3,
     disk_format_dia        = 4,
     disk_format_ell        = 5,
-    disk_format_blocked_ell = 6
+    disk_format_blocked_ell = 6,
+    disk_format_sliced_ell = 7
 };
 
 // Minimal fixed header stored at the front of every packed part.
@@ -67,6 +69,12 @@ struct disk_format_code<sparse::blocked_ell> {
 };
 
 template<>
+struct disk_format_code<sparse::sliced_ell> {
+    enum { value = disk_format_sliced_ell };
+    static inline const char *name() { return "sliced ell matrix"; }
+};
+
+template<>
 struct disk_format_code<sparse::coo> {
     enum { value = disk_format_coo };
     static inline const char *name() { return "coo matrix"; }
@@ -104,6 +112,16 @@ struct blocked_ell_load_result {
     void *val;
 };
 
+struct sliced_ell_load_result {
+    disk_header h;
+    types::u32 slice_count;
+    void *storage;
+    types::u32 *slice_row_offsets;
+    types::u32 *slice_widths;
+    types::idx_t *col_idx;
+    void *val;
+};
+
 struct coo_load_result {
     disk_header h;
     void *storage;
@@ -125,6 +143,7 @@ std::size_t packed_dense_bytes(types::nnz_t nnz, std::size_t value_size);
 std::size_t packed_compressed_bytes(types::dim_t rows, types::dim_t cols, types::nnz_t nnz, types::u32 axis, std::size_t value_size);
 std::size_t packed_coo_bytes(types::nnz_t nnz, std::size_t value_size);
 std::size_t packed_dia_bytes(types::nnz_t nnz, types::idx_t num_diagonals, std::size_t value_size);
+std::size_t packed_sliced_ell_bytes(types::u32 slice_count, types::u32 total_slots, std::size_t value_size);
 inline std::size_t packed_blocked_ell_bytes(types::dim_t rows, types::u32 ell_cols, types::u32 block_size, std::size_t value_size) {
     return sizeof(disk_header)
         + sizeof(types::u32)
@@ -147,6 +166,29 @@ int store_blocked_ell_raw(const char *filename, types::dim_t rows, types::dim_t 
 int load_blocked_ell_raw(const char *filename, std::size_t value_size, blocked_ell_load_result *out);
 int store_blocked_ell_raw(std::FILE *fp, types::dim_t rows, types::dim_t cols, types::nnz_t nnz, types::u32 block_size, types::u32 ell_cols, const types::idx_t *blockColIdx, const void *val, std::size_t value_size);
 int load_blocked_ell_raw(std::FILE *fp, std::size_t value_size, blocked_ell_load_result *out);
+
+int store_sliced_ell_raw(const char *filename,
+                         types::dim_t rows,
+                         types::dim_t cols,
+                         types::nnz_t nnz,
+                         types::u32 slice_count,
+                         const types::u32 *slice_row_offsets,
+                         const types::u32 *slice_widths,
+                         const types::idx_t *col_idx,
+                         const void *val,
+                         std::size_t value_size);
+int load_sliced_ell_raw(const char *filename, std::size_t value_size, sliced_ell_load_result *out);
+int store_sliced_ell_raw(std::FILE *fp,
+                         types::dim_t rows,
+                         types::dim_t cols,
+                         types::nnz_t nnz,
+                         types::u32 slice_count,
+                         const types::u32 *slice_row_offsets,
+                         const types::u32 *slice_widths,
+                         const types::idx_t *col_idx,
+                         const void *val,
+                         std::size_t value_size);
+int load_sliced_ell_raw(std::FILE *fp, std::size_t value_size, sliced_ell_load_result *out);
 
 int store_coo_raw(const char *filename, types::dim_t rows, types::dim_t cols, types::nnz_t nnz, const types::idx_t *rowIdx, const types::idx_t *colIdx, const void *val, std::size_t value_size);
 int load_coo_raw(const char *filename, std::size_t value_size, coo_load_result *out);
@@ -178,6 +220,10 @@ inline std::size_t packed_bytes(const sparse::blocked_ell *, types::dim_t rows, 
     return packed_blocked_ell_bytes(rows, sparse::unpack_blocked_ell_cols(aux), sparse::unpack_blocked_ell_block_size(aux), value_size);
 }
 
+inline std::size_t packed_bytes(const sparse::sliced_ell *, types::dim_t, types::dim_t, types::nnz_t, unsigned long aux, std::size_t value_size) {
+    return packed_sliced_ell_bytes(sparse::unpack_sliced_ell_slice_count(aux), sparse::unpack_sliced_ell_total_slots(aux), value_size);
+}
+
 // FILE* variants let shard-pack cache code write/read many parts through one open file
 // handle, which avoids reopen churn in sequential shard fetch/store loops.
 int store(std::FILE *fp, const dense *m);
@@ -186,6 +232,8 @@ int store(std::FILE *fp, const sparse::compressed *m);
 int load(std::FILE *fp, sparse::compressed *m);
 int store(std::FILE *fp, const sparse::blocked_ell *m);
 int load(std::FILE *fp, sparse::blocked_ell *m);
+int store(std::FILE *fp, const sparse::sliced_ell *m);
+int load(std::FILE *fp, sparse::sliced_ell *m);
 int store(std::FILE *fp, const sparse::coo *m);
 int load(std::FILE *fp, sparse::coo *m);
 int store(std::FILE *fp, const sparse::dia *m);
@@ -277,6 +325,40 @@ inline int load(const char *filename, sparse::blocked_ell *m) {
     sparse::init(m, tmp.h.rows, tmp.h.cols, tmp.h.nnz, tmp.block_size, tmp.ell_cols);
     m->storage = tmp.storage;
     m->blockColIdx = tmp.blockColIdx;
+    m->val = (real::storage_t *) tmp.val;
+    return 1;
+}
+
+inline int store(const char *filename, const sparse::sliced_ell *m) {
+    return store_sliced_ell_raw(filename,
+                                m->rows,
+                                m->cols,
+                                m->nnz,
+                                m->slice_count,
+                                m->slice_row_offsets,
+                                m->slice_widths,
+                                m->col_idx,
+                                m->val,
+                                sizeof(real::storage_t));
+}
+
+inline int load(const char *filename, sparse::sliced_ell *m) {
+    sliced_ell_load_result tmp;
+
+    tmp.slice_count = 0u;
+    tmp.storage = 0;
+    tmp.slice_row_offsets = 0;
+    tmp.slice_widths = 0;
+    tmp.col_idx = 0;
+    tmp.val = 0;
+    if (!load_sliced_ell_raw(filename, sizeof(real::storage_t), &tmp)) return 0;
+    sparse::clear(m);
+    sparse::init(m, tmp.h.rows, tmp.h.cols, tmp.h.nnz);
+    m->slice_count = tmp.slice_count;
+    m->storage = tmp.storage;
+    m->slice_row_offsets = tmp.slice_row_offsets;
+    m->slice_widths = tmp.slice_widths;
+    m->col_idx = tmp.col_idx;
     m->val = (real::storage_t *) tmp.val;
     return 1;
 }

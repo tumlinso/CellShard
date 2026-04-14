@@ -17,12 +17,14 @@ __global__ static void reorder_compressed_major_segments(
         const types::ptr_t src_begin = src_major_ptr[src_major];
         const types::ptr_t src_end = src_major_ptr[src_major + 1u];
         const types::ptr_t dst_begin = dst_major_ptr[dst_major];
-        const types::ptr_t len = src_end - src_begin;
+        const types::ptr_t len = ::cellshard::ptx::sub_u32(src_end, src_begin);
         types::ptr_t j = (types::ptr_t) threadIdx.x;
 
         while (j < len) {
-            dst_minor_idx[dst_begin + j] = src_minor_idx[src_begin + j];
-            dst_val[dst_begin + j] = src_val[src_begin + j];
+            const types::ptr_t src_offset = ::cellshard::ptx::add_u32(src_begin, j);
+            const types::ptr_t dst_offset = ::cellshard::ptx::add_u32(dst_begin, j);
+            dst_minor_idx[dst_offset] = src_minor_idx[src_offset];
+            dst_val[dst_offset] = src_val[src_offset];
             j += (types::ptr_t) blockDim.x;
         }
 

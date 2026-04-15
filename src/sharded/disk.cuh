@@ -42,15 +42,11 @@ inline int load_header(const char *filename, sharded<MatrixT> *m, shard_storage 
 }
 
 inline int load_header(const char *filename, sharded<sparse::compressed> *m, shard_storage *s) {
-    const char *ext = std::strrchr(filename != 0 ? filename : "", '.');
-    if (ext != 0) {
-        if (std::strcmp(ext, ".csh5") == 0 || std::strcmp(ext, ".h5") == 0 || std::strcmp(ext, ".hdf5") == 0) {
-            return load_dataset_compressed_h5_header(filename, m, s);
-        }
-    }
     std::fprintf(stderr,
-                 "Error: compressed sharded load_header requires a .csh5/.h5/.hdf5 dataset file: %s\n",
+                 "Error: legacy compressed .csh5 dataset loading is no longer supported: %s\n",
                  filename != 0 ? filename : "(null)");
+    (void) m;
+    (void) s;
     return 0;
 }
 

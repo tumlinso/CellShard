@@ -404,10 +404,11 @@ __host__ __forceinline__ int fetch_partition(sharded<MatrixT> *m, const shard_st
 }
 
 __host__ __forceinline__ int fetch_partition(sharded<sparse::compressed> *m, const shard_storage *s, unsigned long partId) {
-    shard_storage *storage = const_cast<shard_storage *>(s);
-
-    if (partId >= m->num_partitions || storage == 0 || storage->backend != shard_storage_backend_dataset_h5) return 0;
-    return fetch_dataset_compressed_h5_partition(m, s, partId);
+    (void) m;
+    (void) s;
+    (void) partId;
+    std::fprintf(stderr, "Error: legacy compressed .csh5 partition fetch is no longer supported\n");
+    return 0;
 }
 
 __host__ __forceinline__ int fetch_partition(sharded<sparse::blocked_ell> *m, const shard_storage *s, unsigned long partId) {
@@ -432,15 +433,10 @@ __host__ __forceinline__ int fetch_all_partitions(sharded<MatrixT> *m, const sha
 }
 
 __host__ __forceinline__ int fetch_all_partitions(sharded<sparse::compressed> *m, const shard_storage *s) {
-    unsigned long i = 0;
-    shard_storage *storage = const_cast<shard_storage *>(s);
-
-    if (storage == 0 || storage->backend != shard_storage_backend_dataset_h5) return 0;
-    for (i = 0; i < m->num_partitions; ++i) {
-        if (!fetch_dataset_compressed_h5_partition(m, s, i)) return 0;
-    }
-    if (m->num_shards == 0) return set_shards_to_partitions(m);
-    return 1;
+    (void) m;
+    (void) s;
+    std::fprintf(stderr, "Error: legacy compressed .csh5 partition fetch is no longer supported\n");
+    return 0;
 }
 
 __host__ __forceinline__ int fetch_all_partitions(sharded<sparse::blocked_ell> *m, const shard_storage *s) {
@@ -476,10 +472,11 @@ __host__ __forceinline__ int fetch_shard(sharded<MatrixT> *m, const shard_storag
 }
 
 __host__ __forceinline__ int fetch_shard(sharded<sparse::compressed> *m, const shard_storage *s, unsigned long shardId) {
-    shard_storage *storage = const_cast<shard_storage *>(s);
-
-    if (shardId >= m->num_shards || storage == 0 || storage->backend != shard_storage_backend_dataset_h5) return 0;
-    return fetch_dataset_compressed_h5_shard(m, s, shardId);
+    (void) m;
+    (void) s;
+    (void) shardId;
+    std::fprintf(stderr, "Error: legacy compressed .csh5 shard fetch is no longer supported\n");
+    return 0;
 }
 
 __host__ __forceinline__ int fetch_shard(sharded<sparse::blocked_ell> *m, const shard_storage *s, unsigned long shardId) {

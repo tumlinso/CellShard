@@ -339,6 +339,42 @@ int main() {
     require(!cse::validate_client_snapshot_ref(owner_snapshot, stale_ref, &error), "stale request ref unexpectedly validated");
     require(error.find("pack_generation") != std::string::npos, "stale request ref error mismatch");
 
+    cse::runtime_service_metadata staged_runtime;
+    error.clear();
+    require(cse::stage_append_only_runtime_service(owner_snapshot.runtime_service, &staged_runtime, &error), error.c_str());
+    require(staged_runtime.canonical_generation == 17u, "staged canonical generation mismatch");
+    require(staged_runtime.execution_plan_generation == 17u, "staged execution-plan generation mismatch");
+    require(staged_runtime.pack_generation == 17u, "staged pack generation mismatch");
+    require(staged_runtime.staged_write_generation == 17u, "staged write generation mismatch");
+    require(staged_runtime.active_read_generation == owner_snapshot.runtime_service.active_read_generation,
+            "staged active read generation should not change before publish");
+
+    cse::runtime_service_metadata published_runtime;
+    error.clear();
+    require(cse::publish_runtime_service_cutover(owner_snapshot.runtime_service, staged_runtime, &published_runtime, &error),
+            error.c_str());
+    require(published_runtime.active_read_generation == 17u, "published active read generation mismatch");
+    require(published_runtime.staged_write_generation == 17u, "published staged write generation mismatch");
+    require(published_runtime.service_epoch == 15u, "published service epoch mismatch");
+
+    cse::pack_delivery_request delivery_request;
+    delivery_request.request = request_ref;
+    delivery_request.shard_id = 0u;
+    delivery_request.prefer_execution_pack = 1u;
+    cse::pack_delivery_descriptor delivery;
+    error.clear();
+    require(cse::describe_pack_delivery(owner_snapshot, delivery_request, &delivery, &error), error.c_str());
+    require(delivery.snapshot_id == owner_snapshot.snapshot_id, "delivery snapshot id mismatch");
+    require(delivery.owner_node_id == 7u && delivery.owner_rank_id == 3u, "delivery owner route mismatch");
+    require(delivery.relative_pack_path == "packs/execution/shard.0.exec.pack", "execution delivery path mismatch");
+    require(delivery.pack_kind == "execution", "execution delivery kind mismatch");
+
+    delivery_request.prefer_execution_pack = 0u;
+    error.clear();
+    require(cse::describe_pack_delivery(owner_snapshot, delivery_request, &delivery, &error), error.c_str());
+    require(delivery.relative_pack_path == "packs/canonical/shard.0.pack", "canonical delivery path mismatch");
+    require(delivery.pack_kind == "canonical", "canonical delivery kind mismatch");
+
     std::vector<std::uint8_t> serialized_snapshot;
     cse::global_metadata_snapshot decoded_snapshot;
     error.clear();

@@ -16,8 +16,10 @@ enum {
     dataset_h5_schema_version = 3u
 };
 
-// Codec families describe how one stored part payload should be interpreted
-// after the lightweight dataset metadata has already been loaded.
+// Codec families describe how one stored partition payload should be
+// interpreted after the lightweight dataset metadata has already been loaded.
+// Values 1 and 2 are reserved for unsupported legacy compressed `.csh5`
+// datasets; new forward `.csh5` output is Blocked-ELL-first.
 enum {
     dataset_codec_family_none = 0u,
     dataset_codec_family_standard_csr = 1u,
@@ -28,6 +30,7 @@ enum {
 
 enum {
     dataset_execution_format_unknown = 0u,
+    // Reserved legacy value for unsupported compressed `.csh5` datasets.
     dataset_execution_format_compressed = 1u,
     dataset_execution_format_blocked_ell = 2u,
     dataset_execution_format_mixed = 3u,
@@ -427,10 +430,6 @@ inline void clear(bucketed_sliced_ell_shard *shard) {
 }
 
 // Create/append helpers are whole-file synchronous HDF5 operations.
-int create_dataset_compressed_h5(const char *filename,
-                                const dataset_layout_view *layout,
-                                const dataset_dataset_table_view *datasets,
-                                const dataset_provenance_view *provenance);
 int create_dataset_blocked_ell_h5(const char *filename,
                                  const dataset_layout_view *layout,
                                  const dataset_dataset_table_view *datasets,
@@ -457,9 +456,6 @@ int append_dataset_execution_h5(const char *filename,
 int append_dataset_runtime_service_h5(const char *filename,
                                      const dataset_runtime_service_view *runtime_service);
 
-int append_standard_csr_partition_h5(const char *filename,
-                                unsigned long partition_id,
-                                const sparse::compressed *part);
 int append_blocked_ell_partition_h5(const char *filename,
                                unsigned long partition_id,
                                const sparse::blocked_ell *part);
@@ -487,27 +483,12 @@ int pin_dataset_h5_cache_shard(shard_storage *s, unsigned long shard_id);
 int unpin_dataset_h5_cache_shard(shard_storage *s, unsigned long shard_id);
 int evict_dataset_h5_cache_shard(shard_storage *s, unsigned long shard_id);
 int invalidate_dataset_h5_cache(shard_storage *s);
-int load_dataset_compressed_h5_header(const char *filename,
-                                     sharded<sparse::compressed> *m,
-                                     shard_storage *s);
 int load_dataset_blocked_ell_h5_header(const char *filename,
                                       sharded<sparse::blocked_ell> *m,
                                       shard_storage *s);
 int load_dataset_sliced_ell_h5_header(const char *filename,
                                       sharded<sparse::sliced_ell> *m,
                                       shard_storage *s);
-int prefetch_dataset_compressed_h5_partition_cache(const sharded<sparse::compressed> *m,
-                                             shard_storage *s,
-                                             unsigned long partition_id);
-int prefetch_dataset_compressed_h5_shard_cache(const sharded<sparse::compressed> *m,
-                                              shard_storage *s,
-                                              unsigned long shard_id);
-int fetch_dataset_compressed_h5_partition(sharded<sparse::compressed> *m,
-                                    const shard_storage *s,
-                                    unsigned long partition_id);
-int fetch_dataset_compressed_h5_shard(sharded<sparse::compressed> *m,
-                                     const shard_storage *s,
-                                     unsigned long shard_id);
 int prefetch_dataset_blocked_ell_h5_partition_cache(const sharded<sparse::blocked_ell> *m,
                                               shard_storage *s,
                                               unsigned long partition_id);
@@ -559,18 +540,6 @@ int build_bucketed_sliced_ell_partition(bucketed_sliced_ell_partition *out,
 // cache manager surface propagates through the tree.
 inline int bind_dataset_h5_partition_cache(shard_storage *s, const char *cache_dir) {
     return bind_dataset_h5_cache(s, cache_dir);
-}
-
-inline int prefetch_dataset_compressed_h5_partition_to_cache(const sharded<sparse::compressed> *m,
-                                                       const shard_storage *s,
-                                                       unsigned long partition_id) {
-    return prefetch_dataset_compressed_h5_partition_cache(m, const_cast<shard_storage *>(s), partition_id);
-}
-
-inline int prefetch_dataset_compressed_h5_shard_to_cache(const sharded<sparse::compressed> *m,
-                                                        const shard_storage *s,
-                                                        unsigned long shard_id) {
-    return prefetch_dataset_compressed_h5_shard_cache(m, const_cast<shard_storage *>(s), shard_id);
 }
 
 inline int prefetch_dataset_blocked_ell_h5_partition_to_cache(const sharded<sparse::blocked_ell> *m,

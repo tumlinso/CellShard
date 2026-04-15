@@ -129,6 +129,27 @@ struct client_snapshot_ref {
     std::uint64_t service_epoch = 0u;
 };
 
+struct pack_delivery_request {
+    client_snapshot_ref request;
+    std::uint64_t shard_id = 0u;
+    std::uint32_t prefer_execution_pack = 1u;
+};
+
+struct pack_delivery_descriptor {
+    std::uint64_t snapshot_id = 0u;
+    std::uint64_t shard_id = 0u;
+    std::uint64_t canonical_generation = 0u;
+    std::uint64_t execution_plan_generation = 0u;
+    std::uint64_t pack_generation = 0u;
+    std::uint64_t service_epoch = 0u;
+    std::uint32_t owner_node_id = 0u;
+    std::uint32_t owner_rank_id = 0u;
+    std::uint32_t execution_format = 0u;
+    std::uint32_t prefer_execution_pack = 0u;
+    std::string pack_kind;
+    std::string relative_pack_path;
+};
+
 struct dataset_summary {
     std::string path;
     std::string matrix_format;
@@ -187,6 +208,17 @@ client_snapshot_ref make_client_snapshot_ref(const global_metadata_snapshot &sna
 bool validate_client_snapshot_ref(const global_metadata_snapshot &owner_snapshot,
                                   const client_snapshot_ref &request,
                                   std::string *error = nullptr);
+bool stage_append_only_runtime_service(const runtime_service_metadata &current,
+                                       runtime_service_metadata *staged,
+                                       std::string *error = nullptr);
+bool publish_runtime_service_cutover(const runtime_service_metadata &current,
+                                     const runtime_service_metadata &staged,
+                                     runtime_service_metadata *published,
+                                     std::string *error = nullptr);
+bool describe_pack_delivery(const global_metadata_snapshot &owner_snapshot,
+                            const pack_delivery_request &request,
+                            pack_delivery_descriptor *out,
+                            std::string *error = nullptr);
 bool serialize_global_metadata_snapshot(const global_metadata_snapshot &snapshot,
                                         std::vector<std::uint8_t> *out,
                                         std::string *error = nullptr);

@@ -75,8 +75,8 @@ Useful `src/disk/` waypoint:
 
 - `partition`: one stored matrix chunk with explicit row bounds
 - `shard`: a group of partitions used as the higher-level fetch/staging unit
-- `blocked_ell`: the preferred sparse execution and persistence layout
-- `compressed`: the fallback row-compressed path used where CSR-style semantics are still needed
+- `blocked_ell`: the native sparse execution and persistence layout for new `.csh5` output
+- `compressed`: a legacy row-compressed compatibility and interop path, not the forward `.csh5` write format
 - `sharded<T>`: metadata plus optional loaded payload pointers for a partitioned matrix collection
 - `shard_storage`: the bound storage backend used for lazy fetch/materialization
 - `.csh5`: the canonical CellShard dataset container and archive format

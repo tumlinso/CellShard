@@ -4195,6 +4195,7 @@ int create_dataset_blocked_ell_h5(const char *filename,
     std::uint64_t total_block_idx = 0;
     std::uint64_t total_values = 0;
     std::uint64_t *partition_aux = 0;
+    std::uint32_t *partition_axes = 0;
     std::uint64_t *partition_block_idx_offsets = 0;
     std::uint64_t *partition_value_offsets = 0;
     std::uint64_t *shard_block_idx_offsets = 0;
@@ -4218,11 +4219,12 @@ int create_dataset_blocked_ell_h5(const char *filename,
     }
 
     partition_aux = (std::uint64_t *) std::calloc((std::size_t) layout->num_partitions, sizeof(std::uint64_t));
+    partition_axes = (std::uint32_t *) std::calloc((std::size_t) layout->num_partitions, sizeof(std::uint32_t));
     partition_block_idx_offsets = (std::uint64_t *) std::calloc((std::size_t) layout->num_partitions, sizeof(std::uint64_t));
     partition_value_offsets = (std::uint64_t *) std::calloc((std::size_t) layout->num_partitions, sizeof(std::uint64_t));
     shard_block_idx_offsets = (std::uint64_t *) std::calloc((std::size_t) layout->num_shards + 1u, sizeof(std::uint64_t));
     shard_value_offsets = (std::uint64_t *) std::calloc((std::size_t) layout->num_shards + 1u, sizeof(std::uint64_t));
-    if ((layout->num_partitions != 0) && (partition_aux == 0 || partition_block_idx_offsets == 0 || partition_value_offsets == 0)) goto done;
+    if ((layout->num_partitions != 0) && (partition_aux == 0 || partition_axes == 0 || partition_block_idx_offsets == 0 || partition_value_offsets == 0)) goto done;
     if (layout->num_shards != 0 && (shard_block_idx_offsets == 0 || shard_value_offsets == 0)) goto done;
 
     for (i = 0; i < layout->num_partitions; ++i) {
@@ -4245,6 +4247,7 @@ int create_dataset_blocked_ell_h5(const char *filename,
             goto done;
         }
         partition_aux[i] = layout->partition_aux[i];
+        partition_axes[i] = layout->partition_axes != 0 ? layout->partition_axes[i] : 0u;
         partition_block_idx_offsets[i] = total_block_idx;
         partition_value_offsets[i] = total_values;
         total_block_idx += part_block_idx;
@@ -4277,9 +4280,7 @@ int create_dataset_blocked_ell_h5(const char *filename,
 
     if (!write_dataset_1d(matrix, "partition_rows", H5T_NATIVE_UINT64, (hsize_t) layout->num_partitions, layout->partition_rows)) goto done;
     if (!write_dataset_1d(matrix, "partition_nnz", H5T_NATIVE_UINT64, (hsize_t) layout->num_partitions, layout->partition_nnz)) goto done;
-    if (layout->partition_axes != 0) {
-        if (!write_dataset_1d(matrix, "partition_axes", H5T_NATIVE_UINT32, (hsize_t) layout->num_partitions, layout->partition_axes)) goto done;
-    }
+    if (!write_dataset_1d(matrix, "partition_axes", H5T_NATIVE_UINT32, (hsize_t) layout->num_partitions, partition_axes)) goto done;
     if (!write_dataset_1d(matrix, "partition_aux", H5T_NATIVE_UINT64, (hsize_t) layout->num_partitions, partition_aux)) goto done;
     if (!write_dataset_1d(matrix, "partition_row_offsets", H5T_NATIVE_UINT64, (hsize_t) layout->num_partitions + 1u, layout->partition_row_offsets)) goto done;
     if (!write_dataset_1d(matrix, "partition_dataset_ids", H5T_NATIVE_UINT32, (hsize_t) layout->num_partitions, layout->partition_dataset_ids)) goto done;
@@ -4408,6 +4409,7 @@ int create_dataset_blocked_ell_h5(const char *filename,
 
 done:
     std::free(partition_aux);
+    std::free(partition_axes);
     std::free(partition_block_idx_offsets);
     std::free(partition_value_offsets);
     std::free(shard_block_idx_offsets);
@@ -4434,6 +4436,7 @@ int create_dataset_sliced_ell_h5(const char *filename,
     hid_t payload_root = (hid_t) -1;
     hid_t payload = (hid_t) -1;
     std::uint64_t *partition_aux = 0;
+    std::uint32_t *partition_axes = 0;
     std::uint32_t i = 0;
     int ok = 0;
     const std::uint64_t dim_limit = local_dim_limit();
@@ -4452,7 +4455,8 @@ int create_dataset_sliced_ell_h5(const char *filename,
     }
 
     partition_aux = (std::uint64_t *) std::calloc((std::size_t) layout->num_partitions, sizeof(std::uint64_t));
-    if (layout->num_partitions != 0u && partition_aux == 0) goto done;
+    partition_axes = (std::uint32_t *) std::calloc((std::size_t) layout->num_partitions, sizeof(std::uint32_t));
+    if (layout->num_partitions != 0u && (partition_aux == 0 || partition_axes == 0)) goto done;
     for (i = 0; i < layout->num_partitions; ++i) {
         const std::uint64_t total_slots = sparse::unpack_sliced_ell_total_slots((unsigned long) layout->partition_aux[i]);
         if (layout->partition_rows[i] > dim_limit) {
@@ -4468,6 +4472,7 @@ int create_dataset_sliced_ell_h5(const char *filename,
             goto done;
         }
         partition_aux[i] = layout->partition_aux[i];
+        partition_axes[i] = layout->partition_axes != 0 ? layout->partition_axes[i] : 0u;
     }
 
     file = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
@@ -4494,9 +4499,7 @@ int create_dataset_sliced_ell_h5(const char *filename,
 
     if (!write_dataset_1d(matrix, "partition_rows", H5T_NATIVE_UINT64, (hsize_t) layout->num_partitions, layout->partition_rows)) goto done;
     if (!write_dataset_1d(matrix, "partition_nnz", H5T_NATIVE_UINT64, (hsize_t) layout->num_partitions, layout->partition_nnz)) goto done;
-    if (layout->partition_axes != 0) {
-        if (!write_dataset_1d(matrix, "partition_axes", H5T_NATIVE_UINT32, (hsize_t) layout->num_partitions, layout->partition_axes)) goto done;
-    }
+    if (!write_dataset_1d(matrix, "partition_axes", H5T_NATIVE_UINT32, (hsize_t) layout->num_partitions, partition_axes)) goto done;
     if (!write_dataset_1d(matrix, "partition_aux", H5T_NATIVE_UINT64, (hsize_t) layout->num_partitions, partition_aux)) goto done;
     if (!write_dataset_1d(matrix, "partition_row_offsets", H5T_NATIVE_UINT64, (hsize_t) layout->num_partitions + 1u, layout->partition_row_offsets)) goto done;
     if (!write_dataset_1d(matrix, "partition_dataset_ids", H5T_NATIVE_UINT32, (hsize_t) layout->num_partitions, layout->partition_dataset_ids)) goto done;
@@ -4574,6 +4577,7 @@ int create_dataset_sliced_ell_h5(const char *filename,
 
 done:
     std::free(partition_aux);
+    std::free(partition_axes);
     if (payload >= 0) H5Gclose(payload);
     if (payload_root >= 0) H5Gclose(payload_root);
     if (codecs >= 0) H5Gclose(codecs);

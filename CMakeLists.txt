@@ -45,37 +45,42 @@ option(CELLSHARD_ENABLE_PYTHON "Build the optional CellShard Python bindings and
 option(CELLSHARD_BUILD_APPS "Build optional CellShard applications." ON)
 option(CELLSHARD_BUILD_TESTS "Build CellShard-local test targets." OFF)
 option(CELLSHARD_ENABLE_CUDA_LINEINFO "Emit CUDA line mapping for Nsight profiling." OFF)
-set(CELLSHARD_CUDA_MODE "portable" CACHE STRING
-    "CellShard CUDA optimization mode: portable or extreme")
-set_property(CACHE CELLSHARD_CUDA_MODE PROPERTY STRINGS portable extreme)
+set(CELLSHARD_CUDA_MODE "generic" CACHE STRING
+    "CellShard CUDA optimization mode: generic, native, or native-extreme")
+set_property(CACHE CELLSHARD_CUDA_MODE PROPERTY STRINGS generic native native-extreme)
 
-if(NOT CELLSHARD_CUDA_MODE STREQUAL "portable" AND NOT CELLSHARD_CUDA_MODE STREQUAL "extreme")
-    message(FATAL_ERROR "CELLSHARD_CUDA_MODE must be one of: portable, extreme")
+if(NOT CELLSHARD_CUDA_MODE STREQUAL "generic"
+   AND NOT CELLSHARD_CUDA_MODE STREQUAL "native"
+   AND NOT CELLSHARD_CUDA_MODE STREQUAL "native-extreme")
+    message(FATAL_ERROR "CELLSHARD_CUDA_MODE must be one of: generic, native, native-extreme")
 endif()
 
-if(CELLSHARD_ENABLE_CUDA AND CELLSHARD_CUDA_MODE STREQUAL "extreme")
+if(CELLSHARD_ENABLE_CUDA AND CELLSHARD_CUDA_MODE STREQUAL "native-extreme")
     set(cellshard_extreme_arch_count 0)
     foreach(cellshard_cuda_arch IN LISTS CMAKE_CUDA_ARCHITECTURES)
         math(EXPR cellshard_extreme_arch_count "${cellshard_extreme_arch_count} + 1")
         string(STRIP "${cellshard_cuda_arch}" cellshard_cuda_arch_clean)
         if(NOT cellshard_cuda_arch_clean MATCHES "^(70|7\\.0)(-real|-virtual)?$")
             message(FATAL_ERROR
-                "CELLSHARD_CUDA_MODE=extreme is a Volta-only path and currently requires "
+                "CELLSHARD_CUDA_MODE=native-extreme is a Volta-only path and currently requires "
                 "CMAKE_CUDA_ARCHITECTURES to contain only sm_70 entries.")
         endif()
     endforeach()
     if(cellshard_extreme_arch_count EQUAL 0)
         message(FATAL_ERROR
-            "CELLSHARD_CUDA_MODE=extreme requires at least one explicit sm_70 architecture entry.")
+            "CELLSHARD_CUDA_MODE=native-extreme requires at least one explicit sm_70 architecture entry.")
     endif()
 endif()
 
-if(CELLSHARD_CUDA_MODE STREQUAL "portable")
-    set(CELLSHARD_CUDA_MODE_PORTABLE 1)
-    set(CELLSHARD_CUDA_MODE_EXTREME 0)
+set(CELLSHARD_CUDA_MODE_GENERIC 0)
+set(CELLSHARD_CUDA_MODE_NATIVE 0)
+set(CELLSHARD_CUDA_MODE_NATIVE_EXTREME 0)
+if(CELLSHARD_CUDA_MODE STREQUAL "generic")
+    set(CELLSHARD_CUDA_MODE_GENERIC 1)
+elseif(CELLSHARD_CUDA_MODE STREQUAL "native")
+    set(CELLSHARD_CUDA_MODE_NATIVE 1)
 else()
-    set(CELLSHARD_CUDA_MODE_PORTABLE 0)
-    set(CELLSHARD_CUDA_MODE_EXTREME 1)
+    set(CELLSHARD_CUDA_MODE_NATIVE_EXTREME 1)
 endif()
 
 message(STATUS "CellShard CUDA mode: ${CELLSHARD_CUDA_MODE}")
@@ -146,8 +151,9 @@ else()
     target_compile_definitions(cellshard_headers INTERFACE CELLSHARD_ENABLE_CUDA=0)
 endif()
 target_compile_definitions(cellshard_headers INTERFACE
-    CELLSHARD_CUDA_MODE_PORTABLE=${CELLSHARD_CUDA_MODE_PORTABLE}
-    CELLSHARD_CUDA_MODE_EXTREME=${CELLSHARD_CUDA_MODE_EXTREME}
+    CELLSHARD_CUDA_MODE_GENERIC=${CELLSHARD_CUDA_MODE_GENERIC}
+    CELLSHARD_CUDA_MODE_NATIVE=${CELLSHARD_CUDA_MODE_NATIVE}
+    CELLSHARD_CUDA_MODE_NATIVE_EXTREME=${CELLSHARD_CUDA_MODE_NATIVE_EXTREME}
 )
 
 set(cellshard_inspect_sources

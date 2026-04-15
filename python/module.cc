@@ -171,36 +171,6 @@ struct dataset_file_handle {
         if (partition_id >= info.partitions.size()) throw std::out_of_range("partition_id is out of range");
         warn_cpu_materialize_once("partition materialization");
 
-        if (info.matrix_format == "compressed") {
-            cellshard::sharded<cellshard::sparse::compressed> view;
-            cellshard::shard_storage storage;
-            py::dict out;
-            cellshard::init(&view);
-            cellshard::init(&storage);
-            if (!cellshard::load_header(path.c_str(), &view, &storage)) throw std::runtime_error("failed to load compressed dataset header");
-            if (!cellshard::fetch_partition(&view, &storage, partition_id)) {
-                cellshard::clear(&storage);
-                cellshard::clear(&view);
-                throw std::runtime_error("failed to fetch compressed partition");
-            }
-            const cellshard::sparse::compressed *partition = view.parts[partition_id];
-            std::vector<std::uint32_t> major_ptr((std::size_t) partition->rows + 1u, 0u);
-            std::vector<std::uint32_t> minor_idx((std::size_t) partition->nnz, 0u);
-            for (std::uint32_t i = 0u; i <= partition->rows; ++i) major_ptr[i] = partition->majorPtr[i];
-            for (std::uint32_t i = 0u; i < partition->nnz; ++i) minor_idx[i] = partition->minorIdx[i];
-            out[py::str("format")] = py::str("compressed");
-            out[py::str("rows")] = py::int_(partition->rows);
-            out[py::str("cols")] = py::int_(partition->cols);
-            out[py::str("nnz")] = py::int_(partition->nnz);
-            out[py::str("axis")] = py::int_(partition->axis);
-            out[py::str("major_ptr")] = copy_1d_array(major_ptr);
-            out[py::str("minor_idx")] = copy_1d_array(minor_idx);
-            out[py::str("values")] = copy_half_values(partition->val, partition->nnz);
-            cellshard::clear(&storage);
-            cellshard::clear(&view);
-            return out;
-        }
-
         if (info.matrix_format == "blocked_ell") {
             cellshard::sharded<cellshard::sparse::blocked_ell> view;
             cellshard::shard_storage storage;
@@ -237,7 +207,7 @@ struct dataset_file_handle {
             return out;
         }
 
-        throw std::runtime_error("unsupported matrix_format in dataset file");
+        throw std::runtime_error("unsupported matrix_format for partition materialization; supported native format is blocked_ell");
     }
 
     void write_h5ad(const std::string &output_path) const {
@@ -280,10 +250,38 @@ struct dataset_owner_handle {
         return cse::make_client_snapshot_ref(snapshot());
     }
 
+    cse::runtime_service_metadata stage_append_runtime_service() const {
+        cse::runtime_service_metadata staged;
+        std::string error;
+        const cse::global_metadata_snapshot current = snapshot();
+        if (!cse::stage_append_only_runtime_service(current.runtime_service, &staged, &error)) {
+            throw std::runtime_error(error);
+        }
+        return staged;
+    }
+
+    cse::runtime_service_metadata publish_runtime_service_cutover(const cse::runtime_service_metadata &staged) const {
+        cse::runtime_service_metadata published;
+        std::string error;
+        const cse::global_metadata_snapshot current = snapshot();
+        if (!cse::publish_runtime_service_cutover(current.runtime_service, staged, &published, &error)) {
+            throw std::runtime_error(error);
+        }
+        return published;
+    }
+
     void validate_request(const cse::client_snapshot_ref &request) const {
         std::string error;
         const cse::global_metadata_snapshot current = snapshot();
         if (!cse::validate_client_snapshot_ref(current, request, &error)) throw std::runtime_error(error);
+    }
+
+    cse::pack_delivery_descriptor describe_pack_delivery(const cse::pack_delivery_request &request) const {
+        cse::pack_delivery_descriptor out;
+        std::string error;
+        const cse::global_metadata_snapshot current = snapshot();
+        if (!cse::describe_pack_delivery(current, request, &out, &error)) throw std::runtime_error(error);
+        return out;
     }
 
     cse::csr_matrix_export materialize_csr(const cse::client_snapshot_ref &request) const {
@@ -457,6 +455,26 @@ PYBIND11_MODULE(_cellshard, m) {
         .def_readonly("pack_generation", &cse::client_snapshot_ref::pack_generation)
         .def_readonly("service_epoch", &cse::client_snapshot_ref::service_epoch);
 
+    py::class_<cse::pack_delivery_request>(m, "PackDeliveryRequest")
+        .def(py::init<>())
+        .def_readwrite("request", &cse::pack_delivery_request::request)
+        .def_readwrite("shard_id", &cse::pack_delivery_request::shard_id)
+        .def_readwrite("prefer_execution_pack", &cse::pack_delivery_request::prefer_execution_pack);
+
+    py::class_<cse::pack_delivery_descriptor>(m, "PackDeliveryDescriptor")
+        .def_readonly("snapshot_id", &cse::pack_delivery_descriptor::snapshot_id)
+        .def_readonly("shard_id", &cse::pack_delivery_descriptor::shard_id)
+        .def_readonly("canonical_generation", &cse::pack_delivery_descriptor::canonical_generation)
+        .def_readonly("execution_plan_generation", &cse::pack_delivery_descriptor::execution_plan_generation)
+        .def_readonly("pack_generation", &cse::pack_delivery_descriptor::pack_generation)
+        .def_readonly("service_epoch", &cse::pack_delivery_descriptor::service_epoch)
+        .def_readonly("owner_node_id", &cse::pack_delivery_descriptor::owner_node_id)
+        .def_readonly("owner_rank_id", &cse::pack_delivery_descriptor::owner_rank_id)
+        .def_readonly("execution_format", &cse::pack_delivery_descriptor::execution_format)
+        .def_readonly("prefer_execution_pack", &cse::pack_delivery_descriptor::prefer_execution_pack)
+        .def_readonly("pack_kind", &cse::pack_delivery_descriptor::pack_kind)
+        .def_readonly("relative_pack_path", &cse::pack_delivery_descriptor::relative_pack_path);
+
     py::class_<cse::global_metadata_snapshot>(m, "GlobalMetadataSnapshot")
         .def_readonly("snapshot_id", &cse::global_metadata_snapshot::snapshot_id)
         .def_readonly("summary", &cse::global_metadata_snapshot::summary)
@@ -495,7 +513,10 @@ PYBIND11_MODULE(_cellshard, m) {
         .def("snapshot", &dataset_owner_handle::snapshot)
         .def("serialized_snapshot", &dataset_owner_handle::serialized_snapshot)
         .def("current_request_ref", &dataset_owner_handle::current_request_ref)
+        .def("stage_append_runtime_service", &dataset_owner_handle::stage_append_runtime_service)
+        .def("publish_runtime_service_cutover", &dataset_owner_handle::publish_runtime_service_cutover)
         .def("validate_request", &dataset_owner_handle::validate_request)
+        .def("describe_pack_delivery", &dataset_owner_handle::describe_pack_delivery)
         .def("materialize_csr", &dataset_owner_handle::materialize_csr)
         .def("materialize_rows_csr", [](const dataset_owner_handle &self,
                                         const cse::client_snapshot_ref &request,
@@ -579,6 +600,26 @@ PYBIND11_MODULE(_cellshard, m) {
         std::string error;
         if (!cse::validate_client_snapshot_ref(owner_snapshot, request, &error)) throw std::runtime_error(error);
         return true;
+    });
+    m.def("stage_append_only_runtime_service", [](const cse::runtime_service_metadata &current) {
+        cse::runtime_service_metadata staged;
+        std::string error;
+        if (!cse::stage_append_only_runtime_service(current, &staged, &error)) throw std::runtime_error(error);
+        return staged;
+    });
+    m.def("publish_runtime_service_cutover", [](const cse::runtime_service_metadata &current,
+                                                const cse::runtime_service_metadata &staged) {
+        cse::runtime_service_metadata published;
+        std::string error;
+        if (!cse::publish_runtime_service_cutover(current, staged, &published, &error)) throw std::runtime_error(error);
+        return published;
+    });
+    m.def("describe_pack_delivery", [](const cse::global_metadata_snapshot &owner_snapshot,
+                                       const cse::pack_delivery_request &request) {
+        cse::pack_delivery_descriptor out;
+        std::string error;
+        if (!cse::describe_pack_delivery(owner_snapshot, request, &out, &error)) throw std::runtime_error(error);
+        return out;
     });
     m.def("write_h5ad", [](const std::string &dataset_path, const std::string &output_path) {
         std::string error;

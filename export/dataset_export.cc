@@ -578,6 +578,29 @@ inline void append_compressed_row(const cellshard::sparse::compressed *part,
     }
 }
 
+inline void append_sliced_ell_row(const cellshard::sparse::sliced_ell *part,
+                                  std::uint32_t row,
+                                  std::vector<std::int64_t> *indices,
+                                  std::vector<float> *data) {
+    if (part == nullptr || indices == nullptr || data == nullptr || row >= part->rows) return;
+
+    const std::uint32_t slice = cellshard::sparse::find_slice(part, row);
+    if (slice >= part->slice_count) return;
+    const std::uint32_t row_begin = part->slice_row_offsets[slice];
+    const std::uint32_t width = part->slice_widths[slice];
+    const std::size_t slot_base = cellshard::sparse::slice_slot_base(part, slice)
+        + (std::size_t) (row - row_begin) * (std::size_t) width;
+
+    for (std::uint32_t slot = 0u; slot < width; ++slot) {
+        const std::uint32_t col = part->col_idx[slot_base + slot];
+        const float value = __half2float(part->val[slot_base + slot]);
+        if (col == cellshard::sparse::sliced_ell_invalid_col || col >= part->cols) continue;
+        if (value == 0.0f) continue;
+        indices->push_back((std::int64_t) col);
+        data->push_back(value);
+    }
+}
+
 inline bool load_matrix_format(const char *path, std::string *matrix_format, std::string *error) {
     hid_t file = (hid_t) -1;
     bool ok = false;
@@ -1274,59 +1297,6 @@ bool load_dataset_as_csr(const char *path, csr_matrix_export *out, std::string *
 
     if (!load_matrix_format(path, &matrix_format, error)) return false;
 
-    if (matrix_format == "compressed") {
-        cellshard::sharded<cellshard::sparse::compressed> view;
-        cellshard::shard_storage storage;
-        unsigned long global_row = 0ul;
-        cellshard::init(&view);
-        cellshard::init(&storage);
-        if (!cellshard::load_header(path, &view, &storage)) {
-            set_error(error, "failed to load compressed dataset header");
-            return false;
-        }
-
-        out->rows = view.rows;
-        out->cols = view.cols;
-        out->indptr.assign((std::size_t) view.rows + 1u, 0);
-        out->indices.reserve(view.nnz);
-        out->data.reserve(view.nnz);
-
-        for (unsigned long partition_id = 0; partition_id < view.num_partitions; ++partition_id) {
-            const cellshard::sparse::compressed *part = nullptr;
-            if (!cellshard::fetch_partition(&view, &storage, partition_id)) {
-                cellshard::clear(&storage);
-                cellshard::clear(&view);
-                set_error(error, "failed to materialize compressed dataset part");
-                return false;
-            }
-            part = view.parts[partition_id];
-            if (part == nullptr || part->axis != cellshard::sparse::compressed_by_row) {
-                cellshard::clear(&storage);
-                cellshard::clear(&view);
-                set_error(error, "compressed dataset export requires row-compressed parts");
-                return false;
-            }
-            for (std::uint32_t row = 0u; row < part->rows; ++row) {
-                for (cellshard::types::ptr_t i = part->majorPtr[row]; i < part->majorPtr[row + 1u]; ++i) {
-                    out->indices.push_back((std::int64_t) part->minorIdx[i]);
-                    out->data.push_back(__half2float(part->val[i]));
-                }
-                ++global_row;
-                out->indptr[global_row] = (std::int64_t) out->data.size();
-            }
-            if (!cellshard::drop_partition(&view, partition_id)) {
-                cellshard::clear(&storage);
-                cellshard::clear(&view);
-                set_error(error, "failed to release compressed dataset part");
-                return false;
-            }
-        }
-
-        cellshard::clear(&storage);
-        cellshard::clear(&view);
-        return true;
-    }
-
     if (matrix_format == "blocked_ell") {
         cellshard::sharded<cellshard::sparse::blocked_ell> view;
         cellshard::shard_storage storage;
@@ -1377,6 +1347,56 @@ bool load_dataset_as_csr(const char *path, csr_matrix_export *out, std::string *
         return true;
     }
 
+    if (matrix_format == "sliced_ell") {
+        cellshard::sharded<cellshard::sparse::sliced_ell> view;
+        cellshard::shard_storage storage;
+        unsigned long global_row = 0ul;
+        cellshard::init(&view);
+        cellshard::init(&storage);
+        if (!cellshard::load_header(path, &view, &storage)) {
+            set_error(error, "failed to load sliced-ELL dataset header");
+            return false;
+        }
+
+        out->rows = view.rows;
+        out->cols = view.cols;
+        out->indptr.assign((std::size_t) view.rows + 1u, 0);
+        out->indices.reserve(view.nnz);
+        out->data.reserve(view.nnz);
+
+        for (unsigned long partition_id = 0; partition_id < view.num_partitions; ++partition_id) {
+            const cellshard::sparse::sliced_ell *part = nullptr;
+            if (!cellshard::fetch_partition(&view, &storage, partition_id)) {
+                cellshard::clear(&storage);
+                cellshard::clear(&view);
+                set_error(error, "failed to materialize sliced-ELL dataset partition");
+                return false;
+            }
+            part = view.parts[partition_id];
+            if (part == nullptr) {
+                cellshard::clear(&storage);
+                cellshard::clear(&view);
+                set_error(error, "sliced-ELL dataset partition is null after fetch");
+                return false;
+            }
+            for (std::uint32_t row = 0u; row < part->rows; ++row) {
+                append_sliced_ell_row(part, row, &out->indices, &out->data);
+                ++global_row;
+                out->indptr[global_row] = (std::int64_t) out->data.size();
+            }
+            if (!cellshard::drop_partition(&view, partition_id)) {
+                cellshard::clear(&storage);
+                cellshard::clear(&view);
+                set_error(error, "failed to release sliced-ELL dataset partition");
+                return false;
+            }
+        }
+
+        cellshard::clear(&storage);
+        cellshard::clear(&view);
+        return true;
+    }
+
     set_error(error, "unsupported matrix_format for CSR export: " + matrix_format);
     return false;
 }
@@ -1400,92 +1420,6 @@ bool load_dataset_rows_as_csr(const char *path,
     warn_cpu_materialize_once("row-subset CSR materialization");
 
     if (!load_matrix_format(path, &matrix_format, error)) return false;
-
-    if (matrix_format == "compressed") {
-        cellshard::sharded<cellshard::sparse::compressed> view;
-        cellshard::shard_storage storage;
-        std::vector<unsigned long> fetched_partitions;
-        cellshard::init(&view);
-        cellshard::init(&storage);
-        if (!cellshard::load_header(path, &view, &storage)) {
-            set_error(error, "failed to load compressed dataset header");
-            return false;
-        }
-
-        out->rows = (std::uint64_t) row_count;
-        out->cols = view.cols;
-        out->indptr.assign(row_count + 1u, 0);
-        fetched_partitions.reserve(std::min<std::size_t>(row_count, (std::size_t) view.num_partitions));
-
-        for (std::size_t i = 0; i < row_count; ++i) {
-            const std::uint64_t global_row = row_indices[i];
-            const cellshard::sparse::compressed *part = nullptr;
-            unsigned long partition_id = 0ul;
-            unsigned long partition_row_begin = 0ul;
-            std::uint64_t local_row = 0u;
-
-            if (global_row >= view.rows) {
-                for (unsigned long fetched : fetched_partitions) (void) cellshard::drop_partition(&view, fetched);
-                cellshard::clear(&storage);
-                cellshard::clear(&view);
-                set_error(error, "row index is out of range");
-                return false;
-            }
-
-            partition_id = cellshard::find_partition(&view, (unsigned long) global_row);
-            if (partition_id >= view.num_partitions) {
-                for (unsigned long fetched : fetched_partitions) (void) cellshard::drop_partition(&view, fetched);
-                cellshard::clear(&storage);
-                cellshard::clear(&view);
-                set_error(error, "failed to resolve row index to a partition");
-                return false;
-            }
-            if (!cellshard::partition_loaded(&view, partition_id)) {
-                if (!cellshard::fetch_partition(&view, &storage, partition_id)) {
-                    for (unsigned long fetched : fetched_partitions) (void) cellshard::drop_partition(&view, fetched);
-                    cellshard::clear(&storage);
-                    cellshard::clear(&view);
-                    set_error(error, "failed to fetch compressed partition for row subset");
-                    return false;
-                }
-                fetched_partitions.push_back(partition_id);
-            }
-
-            part = view.parts[partition_id];
-            if (part == nullptr || part->axis != cellshard::sparse::compressed_by_row) {
-                for (unsigned long fetched : fetched_partitions) (void) cellshard::drop_partition(&view, fetched);
-                cellshard::clear(&storage);
-                cellshard::clear(&view);
-                set_error(error, "compressed row subset export requires row-compressed parts");
-                return false;
-            }
-
-            partition_row_begin = cellshard::first_row_in_partition(&view, partition_id);
-            local_row = global_row - (std::uint64_t) partition_row_begin;
-            if (local_row >= part->rows) {
-                for (unsigned long fetched : fetched_partitions) (void) cellshard::drop_partition(&view, fetched);
-                cellshard::clear(&storage);
-                cellshard::clear(&view);
-                set_error(error, "resolved local row is outside the fetched compressed partition");
-                return false;
-            }
-
-            append_compressed_row(part, (std::uint32_t) local_row, &out->indices, &out->data);
-            out->indptr[i + 1u] = (std::int64_t) out->data.size();
-        }
-
-        for (unsigned long fetched : fetched_partitions) {
-            if (!cellshard::drop_partition(&view, fetched)) {
-                cellshard::clear(&storage);
-                cellshard::clear(&view);
-                set_error(error, "failed to release compressed partition after row subset export");
-                return false;
-            }
-        }
-        cellshard::clear(&storage);
-        cellshard::clear(&view);
-        return true;
-    }
 
     if (matrix_format == "blocked_ell") {
         cellshard::sharded<cellshard::sparse::blocked_ell> view;
@@ -1573,6 +1507,92 @@ bool load_dataset_rows_as_csr(const char *path,
         return true;
     }
 
+    if (matrix_format == "sliced_ell") {
+        cellshard::sharded<cellshard::sparse::sliced_ell> view;
+        cellshard::shard_storage storage;
+        std::vector<unsigned long> fetched_partitions;
+        cellshard::init(&view);
+        cellshard::init(&storage);
+        if (!cellshard::load_header(path, &view, &storage)) {
+            set_error(error, "failed to load sliced-ELL dataset header");
+            return false;
+        }
+
+        out->rows = (std::uint64_t) row_count;
+        out->cols = view.cols;
+        out->indptr.assign(row_count + 1u, 0);
+        fetched_partitions.reserve(std::min<std::size_t>(row_count, (std::size_t) view.num_partitions));
+
+        for (std::size_t i = 0; i < row_count; ++i) {
+            const std::uint64_t global_row = row_indices[i];
+            const cellshard::sparse::sliced_ell *part = nullptr;
+            unsigned long partition_id = 0ul;
+            unsigned long partition_row_begin = 0ul;
+            std::uint64_t local_row = 0u;
+
+            if (global_row >= view.rows) {
+                for (unsigned long fetched : fetched_partitions) (void) cellshard::drop_partition(&view, fetched);
+                cellshard::clear(&storage);
+                cellshard::clear(&view);
+                set_error(error, "row index is out of range");
+                return false;
+            }
+
+            partition_id = cellshard::find_partition(&view, (unsigned long) global_row);
+            if (partition_id >= view.num_partitions) {
+                for (unsigned long fetched : fetched_partitions) (void) cellshard::drop_partition(&view, fetched);
+                cellshard::clear(&storage);
+                cellshard::clear(&view);
+                set_error(error, "failed to resolve row index to a partition");
+                return false;
+            }
+            if (!cellshard::partition_loaded(&view, partition_id)) {
+                if (!cellshard::fetch_partition(&view, &storage, partition_id)) {
+                    for (unsigned long fetched : fetched_partitions) (void) cellshard::drop_partition(&view, fetched);
+                    cellshard::clear(&storage);
+                    cellshard::clear(&view);
+                    set_error(error, "failed to fetch sliced-ELL partition for row subset");
+                    return false;
+                }
+                fetched_partitions.push_back(partition_id);
+            }
+
+            part = view.parts[partition_id];
+            if (part == nullptr) {
+                for (unsigned long fetched : fetched_partitions) (void) cellshard::drop_partition(&view, fetched);
+                cellshard::clear(&storage);
+                cellshard::clear(&view);
+                set_error(error, "sliced-ELL partition is null after row subset fetch");
+                return false;
+            }
+
+            partition_row_begin = cellshard::first_row_in_partition(&view, partition_id);
+            local_row = global_row - (std::uint64_t) partition_row_begin;
+            if (local_row >= part->rows) {
+                for (unsigned long fetched : fetched_partitions) (void) cellshard::drop_partition(&view, fetched);
+                cellshard::clear(&storage);
+                cellshard::clear(&view);
+                set_error(error, "resolved local row is outside the fetched sliced-ELL partition");
+                return false;
+            }
+
+            append_sliced_ell_row(part, (std::uint32_t) local_row, &out->indices, &out->data);
+            out->indptr[i + 1u] = (std::int64_t) out->data.size();
+        }
+
+        for (unsigned long fetched : fetched_partitions) {
+            if (!cellshard::drop_partition(&view, fetched)) {
+                cellshard::clear(&storage);
+                cellshard::clear(&view);
+                set_error(error, "failed to release sliced-ELL partition after row subset export");
+                return false;
+            }
+        }
+        cellshard::clear(&storage);
+        cellshard::clear(&view);
+        return true;
+    }
+
     set_error(error, "unsupported matrix_format for row-subset CSR export: " + matrix_format);
     return false;
 }
@@ -1601,27 +1621,7 @@ bool load_dataset_global_metadata_snapshot(const char *path,
     if (!load_embedded_metadata_tables(path, &out->embedded_metadata, error)) return false;
     if (!load_observation_metadata_table(path, &out->observation_metadata_rows, &out->observation_metadata, error)) return false;
 
-    if (out->summary.matrix_format == "compressed") {
-        cellshard::sharded<cellshard::sparse::compressed> matrix;
-        cellshard::shard_storage storage;
-        cellshard::dataset_execution_view execution{};
-        cellshard::dataset_runtime_service_view runtime{};
-        cellshard::init(&matrix);
-        cellshard::init(&storage);
-        if (!cellshard::load_header(path, &matrix, &storage)
-            || !cellshard::get_dataset_h5_execution_metadata(&storage, &execution)
-            || !cellshard::get_dataset_h5_runtime_service(&storage, &runtime)) {
-            cellshard::clear(&storage);
-            cellshard::clear(&matrix);
-            set_error(error, "failed to load compressed owner metadata");
-            return false;
-        }
-        copy_execution_partition_metadata(out->summary, execution, &out->execution_partitions);
-        copy_execution_shard_metadata(out->summary, execution, &out->execution_shards);
-        copy_runtime_service_metadata(runtime, &out->runtime_service);
-        cellshard::clear(&storage);
-        cellshard::clear(&matrix);
-    } else if (out->summary.matrix_format == "blocked_ell") {
+    if (out->summary.matrix_format == "blocked_ell") {
         cellshard::sharded<cellshard::sparse::blocked_ell> matrix;
         cellshard::shard_storage storage;
         cellshard::dataset_execution_view execution{};
@@ -1634,6 +1634,26 @@ bool load_dataset_global_metadata_snapshot(const char *path,
             cellshard::clear(&storage);
             cellshard::clear(&matrix);
             set_error(error, "failed to load blocked-ELL owner metadata");
+            return false;
+        }
+        copy_execution_partition_metadata(out->summary, execution, &out->execution_partitions);
+        copy_execution_shard_metadata(out->summary, execution, &out->execution_shards);
+        copy_runtime_service_metadata(runtime, &out->runtime_service);
+        cellshard::clear(&storage);
+        cellshard::clear(&matrix);
+    } else if (out->summary.matrix_format == "sliced_ell") {
+        cellshard::sharded<cellshard::sparse::sliced_ell> matrix;
+        cellshard::shard_storage storage;
+        cellshard::dataset_execution_view execution{};
+        cellshard::dataset_runtime_service_view runtime{};
+        cellshard::init(&matrix);
+        cellshard::init(&storage);
+        if (!cellshard::load_header(path, &matrix, &storage)
+            || !cellshard::get_dataset_h5_execution_metadata(&storage, &execution)
+            || !cellshard::get_dataset_h5_runtime_service(&storage, &runtime)) {
+            cellshard::clear(&storage);
+            cellshard::clear(&matrix);
+            set_error(error, "failed to load sliced-ELL owner metadata");
             return false;
         }
         copy_execution_partition_metadata(out->summary, execution, &out->execution_partitions);
@@ -1677,6 +1697,103 @@ bool validate_client_snapshot_ref(const global_metadata_snapshot &owner_snapshot
     if (request.service_epoch != expected.service_epoch) {
         set_error(error, "client service_epoch is stale");
         return false;
+    }
+    return true;
+}
+
+bool stage_append_only_runtime_service(const runtime_service_metadata &current,
+                                       runtime_service_metadata *staged,
+                                       std::string *error) {
+    if (staged == nullptr) {
+        set_error(error, "staged runtime_service output is null");
+        return false;
+    }
+    if (current.live_write_mode != cellshard::dataset_live_write_mode_append_only) {
+        set_error(error, "runtime service is not in append-only mode");
+        return false;
+    }
+
+    const std::uint64_t next_generation = std::max({
+        current.canonical_generation,
+        current.execution_plan_generation,
+        current.pack_generation,
+        current.active_read_generation,
+        current.staged_write_generation
+    }) + 1u;
+
+    *staged = current;
+    staged->canonical_generation = next_generation;
+    staged->execution_plan_generation = next_generation;
+    staged->pack_generation = next_generation;
+    staged->staged_write_generation = next_generation;
+    return true;
+}
+
+bool publish_runtime_service_cutover(const runtime_service_metadata &current,
+                                     const runtime_service_metadata &staged,
+                                     runtime_service_metadata *published,
+                                     std::string *error) {
+    if (published == nullptr) {
+        set_error(error, "published runtime_service output is null");
+        return false;
+    }
+    if (current.live_write_mode != cellshard::dataset_live_write_mode_append_only
+        || staged.live_write_mode != cellshard::dataset_live_write_mode_append_only) {
+        set_error(error, "runtime service cutover requires append-only mode");
+        return false;
+    }
+    if (staged.staged_write_generation == 0u) {
+        set_error(error, "staged runtime service does not define a staged_write_generation");
+        return false;
+    }
+    if (staged.staged_write_generation < current.active_read_generation) {
+        set_error(error, "staged runtime generation is older than the active read generation");
+        return false;
+    }
+
+    *published = staged;
+    published->active_read_generation = staged.staged_write_generation;
+    published->staged_write_generation = published->active_read_generation;
+    published->service_epoch = std::max(current.service_epoch, staged.service_epoch) + 1u;
+    return true;
+}
+
+bool describe_pack_delivery(const global_metadata_snapshot &owner_snapshot,
+                            const pack_delivery_request &request,
+                            pack_delivery_descriptor *out,
+                            std::string *error) {
+    if (out == nullptr) {
+        set_error(error, "pack delivery descriptor output is null");
+        return false;
+    }
+    if (!validate_client_snapshot_ref(owner_snapshot, request.request, error)) return false;
+    if (request.shard_id >= owner_snapshot.summary.shards.size()) {
+        set_error(error, "pack delivery shard_id is out of range");
+        return false;
+    }
+
+    *out = pack_delivery_descriptor{};
+    out->snapshot_id = owner_snapshot.snapshot_id;
+    out->shard_id = request.shard_id;
+    out->canonical_generation = owner_snapshot.runtime_service.canonical_generation;
+    out->execution_plan_generation = owner_snapshot.runtime_service.execution_plan_generation;
+    out->pack_generation = owner_snapshot.runtime_service.pack_generation;
+    out->service_epoch = owner_snapshot.runtime_service.service_epoch;
+    out->prefer_execution_pack = request.prefer_execution_pack != 0u ? 1u : 0u;
+
+    if (request.shard_id < owner_snapshot.execution_shards.size()) {
+        const execution_shard_metadata &shard = owner_snapshot.execution_shards[(std::size_t) request.shard_id];
+        out->owner_node_id = shard.owner_node_id;
+        out->owner_rank_id = shard.owner_rank_id;
+        out->execution_format = shard.execution_format;
+    }
+
+    if (out->prefer_execution_pack != 0u) {
+        out->pack_kind = "execution";
+        out->relative_pack_path = "packs/execution/shard." + std::to_string(request.shard_id) + ".exec.pack";
+    } else {
+        out->pack_kind = "canonical";
+        out->relative_pack_path = "packs/canonical/shard." + std::to_string(request.shard_id) + ".pack";
     }
     return true;
 }

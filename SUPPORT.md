@@ -25,6 +25,11 @@ CellShard `0.1.x` is intentionally narrow.
   - `load_dataset_global_metadata_snapshot`
   - `serialize_global_metadata_snapshot`
   - `deserialize_global_metadata_snapshot`
+  - `make_client_snapshot_ref`
+  - `validate_client_snapshot_ref`
+  - `stage_append_only_runtime_service`
+  - `publish_runtime_service_cutover`
+  - `describe_pack_delivery`
   - `DatasetFile.materialize_partition`
   - `write_h5ad`
 

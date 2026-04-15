@@ -69,14 +69,14 @@ Useful `src/sharded/` waypoints:
 
 Useful `src/disk/` waypoint:
 
-- `src/disk/packfile.cuh` and `src/disk/packfile.cu`: the per-part packed payload codec used inside shard `.pack` cache files
+- `src/disk/packfile.cuh` and `src/disk/packfile.cu`: the per-partition packed payload codec used inside shard `.pack` cache files
 
 ## Core Concepts
 
 - `partition`: one stored matrix chunk with explicit row bounds
 - `shard`: a group of partitions used as the higher-level fetch/staging unit
 - `blocked_ell`: the native sparse execution and persistence layout for new `.csh5` output
-- `compressed`: a legacy row-compressed compatibility and interop path, not the forward `.csh5` write format
+- `compressed`: an explicit row-compressed interop path, not a supported `.csh5` file format
 - `sharded<T>`: metadata plus optional loaded payload pointers for a partitioned matrix collection
 - `shard_storage`: the bound storage backend used for lazy fetch/materialization
 - `.csh5`: the canonical CellShard dataset container and archive format
@@ -306,7 +306,7 @@ Hosted CI and portability notes live in `SUPPORT.md`.
 
 ## Python Surface
 
-The Python package exposes an easy high-level facade plus lower-level compatibility helpers:
+The Python package exposes an easy high-level facade plus lower-level owner/client helpers:
 
 - `open(...)` / `Dataset`
 - `open_dataset` / `DatasetFile`
@@ -318,6 +318,11 @@ The Python package exposes an easy high-level facade plus lower-level compatibil
 - `load_dataset_global_metadata_snapshot`
 - `serialize_global_metadata_snapshot`
 - `deserialize_global_metadata_snapshot`
+- `make_client_snapshot_ref`
+- `validate_client_snapshot_ref`
+- `stage_append_only_runtime_service`
+- `publish_runtime_service_cutover`
+- `describe_pack_delivery`
 - `DatasetFile.materialize_partition`
 - `DatasetClient.materialize_torch_sparse_csr`
 - `DatasetClient.materialize_rows_torch_sparse_csr`

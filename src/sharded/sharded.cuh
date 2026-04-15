@@ -4,6 +4,7 @@
 #include "../real.cuh"
 #include "../formats/compressed.cuh"
 #include "../formats/blocked_ell.cuh"
+#include "../formats/quantized_blocked_ell.cuh"
 #include "../formats/sliced_ell.cuh"
 #include "../formats/dense.cuh"
 #include "../formats/diagonal.cuh"
@@ -90,6 +91,10 @@ __host__ __device__ __forceinline__ unsigned int partition_aux(const sparse::com
 
 __host__ __device__ __forceinline__ unsigned long partition_aux(const sparse::blocked_ell *m) {
     return sparse::pack_blocked_ell_aux(m->block_size, sparse::ell_width_blocks(m));
+}
+
+__host__ __device__ __forceinline__ unsigned long partition_aux(const sparse::quantized_blocked_ell *m) {
+    return sparse::pack_quantized_blocked_ell_aux(m->bits, m->block_size, sparse::ell_width_blocks(m));
 }
 
 __host__ __device__ __forceinline__ unsigned long partition_aux(const sparse::sliced_ell *m) {
@@ -265,6 +270,24 @@ __host__ __device__ __forceinline__ std::size_t partition_bytes(const sharded<sp
     return sizeof(sparse::blocked_ell)
         + (std::size_t) ((m->partition_rows[partId] + block_size - 1u) / block_size) * (std::size_t) ell_width * sizeof(types::idx_t)
         + (std::size_t) m->partition_rows[partId] * (std::size_t) (ell_width * block_size) * sizeof(real::storage_t);
+}
+
+__host__ __device__ __forceinline__ std::size_t partition_bytes(const sharded<sparse::quantized_blocked_ell> *m, unsigned long partId) {
+    const unsigned long aux = m->partition_aux[partId];
+    const unsigned long bits = sparse::unpack_quantized_blocked_ell_bits(aux);
+    const unsigned long block_size = sparse::unpack_quantized_blocked_ell_block_size(aux);
+    const unsigned long ell_cols = sparse::unpack_quantized_blocked_ell_cols(aux);
+    const unsigned long row_stride_bytes = sparse::quantized_blocked_ell_aligned_row_bytes((types::u32) bits, (types::u32) ell_cols);
+    const unsigned long row_blocks = block_size == 0u ? 0u : (m->partition_rows[partId] + block_size - 1u) / block_size;
+    const unsigned long ell_width = block_size == 0u ? 0u : ell_cols / block_size;
+    if (partId >= m->num_partitions) return 0;
+    if (m->parts[partId] != 0) return bytes(m->parts[partId]);
+    return sizeof(sparse::quantized_blocked_ell)
+        + (std::size_t) row_blocks * (std::size_t) ell_width * sizeof(types::idx_t)
+        + (std::size_t) m->partition_rows[partId] * (std::size_t) row_stride_bytes
+        + (std::size_t) m->cols * sizeof(float)
+        + (std::size_t) m->cols * sizeof(float)
+        + (std::size_t) m->partition_rows[partId] * sizeof(float);
 }
 
 __host__ __device__ __forceinline__ std::size_t partition_bytes(const sharded<sparse::sliced_ell> *m, unsigned long partId) {

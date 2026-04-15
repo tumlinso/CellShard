@@ -2,6 +2,7 @@
 
 #include "../formats/compressed.cuh"
 #include "../formats/blocked_ell.cuh"
+#include "../formats/quantized_blocked_ell.cuh"
 #include "../formats/sliced_ell.cuh"
 #include "../real.cuh"
 #include "../sharded/shard_paths.cuh"
@@ -25,7 +26,8 @@ enum {
     dataset_codec_family_standard_csr = 1u,
     dataset_codec_family_quantized_csr = 2u,
     dataset_codec_family_blocked_ell = 3u,
-    dataset_codec_family_sliced_ell = 4u
+    dataset_codec_family_sliced_ell = 4u,
+    dataset_codec_family_quantized_blocked_ell = 5u
 };
 
 enum {
@@ -36,7 +38,21 @@ enum {
     dataset_execution_format_mixed = 3u,
     dataset_execution_format_bucketed_blocked_ell = 4u,
     dataset_execution_format_sliced_ell = 5u,
-    dataset_execution_format_bucketed_sliced_ell = 6u
+    dataset_execution_format_bucketed_sliced_ell = 6u,
+    dataset_execution_format_quantized_blocked_ell = 7u
+};
+
+enum {
+    dataset_quantized_decode_policy_unknown = 0u,
+    dataset_quantized_decode_policy_per_gene_affine = 1u,
+    dataset_quantized_decode_policy_column_scale_row_offset = 2u
+};
+
+enum {
+    dataset_codec_flag_direct_device_delivery = 1u << 0,
+    dataset_codec_flag_live_fused_decode = 1u << 1,
+    dataset_codec_quantized_decode_policy_shift = 8u,
+    dataset_codec_quantized_decode_policy_mask = 0xffu << dataset_codec_quantized_decode_policy_shift
 };
 
 enum {
@@ -61,6 +77,17 @@ struct dataset_codec_descriptor {
     std::uint32_t bits;
     std::uint32_t flags;
 };
+
+__host__ __device__ __forceinline__ std::uint32_t dataset_codec_quantized_decode_policy(std::uint32_t flags) {
+    return (flags & dataset_codec_quantized_decode_policy_mask) >> dataset_codec_quantized_decode_policy_shift;
+}
+
+__host__ __device__ __forceinline__ std::uint32_t set_dataset_codec_quantized_decode_policy(
+    std::uint32_t flags,
+    std::uint32_t policy) {
+    return (flags & ~dataset_codec_quantized_decode_policy_mask)
+        | ((policy << dataset_codec_quantized_decode_policy_shift) & dataset_codec_quantized_decode_policy_mask);
+}
 
 struct dataset_text_column_view {
     std::uint32_t count;
@@ -434,6 +461,10 @@ int create_dataset_blocked_ell_h5(const char *filename,
                                  const dataset_layout_view *layout,
                                  const dataset_dataset_table_view *datasets,
                                  const dataset_provenance_view *provenance);
+int create_dataset_quantized_blocked_ell_h5(const char *filename,
+                                            const dataset_layout_view *layout,
+                                            const dataset_dataset_table_view *datasets,
+                                            const dataset_provenance_view *provenance);
 int create_dataset_sliced_ell_h5(const char *filename,
                                  const dataset_layout_view *layout,
                                  const dataset_dataset_table_view *datasets,
@@ -455,10 +486,12 @@ int append_dataset_execution_h5(const char *filename,
                                const dataset_execution_view *execution);
 int append_dataset_runtime_service_h5(const char *filename,
                                      const dataset_runtime_service_view *runtime_service);
-
 int append_blocked_ell_partition_h5(const char *filename,
                                unsigned long partition_id,
                                const sparse::blocked_ell *part);
+int append_quantized_blocked_ell_partition_h5(const char *filename,
+                                              unsigned long partition_id,
+                                              const sparse::quantized_blocked_ell *part);
 int append_sliced_ell_partition_h5(const char *filename,
                                    unsigned long partition_id,
                                    const sparse::sliced_ell *part);
@@ -486,6 +519,9 @@ int invalidate_dataset_h5_cache(shard_storage *s);
 int load_dataset_blocked_ell_h5_header(const char *filename,
                                       sharded<sparse::blocked_ell> *m,
                                       shard_storage *s);
+int load_dataset_quantized_blocked_ell_h5_header(const char *filename,
+                                                 sharded<sparse::quantized_blocked_ell> *m,
+                                                 shard_storage *s);
 int load_dataset_sliced_ell_h5_header(const char *filename,
                                       sharded<sparse::sliced_ell> *m,
                                       shard_storage *s);
@@ -495,12 +531,24 @@ int prefetch_dataset_blocked_ell_h5_partition_cache(const sharded<sparse::blocke
 int prefetch_dataset_blocked_ell_h5_shard_cache(const sharded<sparse::blocked_ell> *m,
                                                shard_storage *s,
                                                unsigned long shard_id);
+int prefetch_dataset_quantized_blocked_ell_h5_partition_cache(const sharded<sparse::quantized_blocked_ell> *m,
+                                                              shard_storage *s,
+                                                              unsigned long partition_id);
+int prefetch_dataset_quantized_blocked_ell_h5_shard_cache(const sharded<sparse::quantized_blocked_ell> *m,
+                                                          shard_storage *s,
+                                                          unsigned long shard_id);
 int warm_dataset_blocked_ell_h5_cache_range(const char *filename,
                                            const char *cache_root,
                                            unsigned long shard_begin,
                                            unsigned long shard_end);
 int warm_dataset_blocked_ell_h5_cache(const char *filename,
                                      const char *cache_root);
+int warm_dataset_quantized_blocked_ell_h5_cache_range(const char *filename,
+                                                      const char *cache_root,
+                                                      unsigned long shard_begin,
+                                                      unsigned long shard_end);
+int warm_dataset_quantized_blocked_ell_h5_cache(const char *filename,
+                                                const char *cache_root);
 int warm_dataset_blocked_ell_h5_execution_cache_range(const char *filename,
                                                      const char *cache_root,
                                                      unsigned long shard_begin,
@@ -521,6 +569,12 @@ int fetch_dataset_blocked_ell_h5_partition(sharded<sparse::blocked_ell> *m,
 int fetch_dataset_blocked_ell_h5_shard(sharded<sparse::blocked_ell> *m,
                                       const shard_storage *s,
                                       unsigned long shard_id);
+int fetch_dataset_quantized_blocked_ell_h5_partition(sharded<sparse::quantized_blocked_ell> *m,
+                                                     const shard_storage *s,
+                                                     unsigned long partition_id);
+int fetch_dataset_quantized_blocked_ell_h5_shard(sharded<sparse::quantized_blocked_ell> *m,
+                                                 const shard_storage *s,
+                                                 unsigned long shard_id);
 int fetch_dataset_sliced_ell_h5_partition(sharded<sparse::sliced_ell> *m,
                                           const shard_storage *s,
                                           unsigned long partition_id);
@@ -552,6 +606,18 @@ inline int prefetch_dataset_blocked_ell_h5_shard_to_cache(const sharded<sparse::
                                                          const shard_storage *s,
                                                          unsigned long shard_id) {
     return prefetch_dataset_blocked_ell_h5_shard_cache(m, const_cast<shard_storage *>(s), shard_id);
+}
+
+inline int prefetch_dataset_quantized_blocked_ell_h5_partition_to_cache(const sharded<sparse::quantized_blocked_ell> *m,
+                                                                        const shard_storage *s,
+                                                                        unsigned long partition_id) {
+    return prefetch_dataset_quantized_blocked_ell_h5_partition_cache(m, const_cast<shard_storage *>(s), partition_id);
+}
+
+inline int prefetch_dataset_quantized_blocked_ell_h5_shard_to_cache(const sharded<sparse::quantized_blocked_ell> *m,
+                                                                    const shard_storage *s,
+                                                                    unsigned long shard_id) {
+    return prefetch_dataset_quantized_blocked_ell_h5_shard_cache(m, const_cast<shard_storage *>(s), shard_id);
 }
 
 } // namespace cellshard

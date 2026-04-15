@@ -3,7 +3,7 @@
 // Umbrella include for the active CellShard surface.
 // This intentionally pulls in:
 // - type/layout policy
-// - per-part matrix formats
+// - per-partition matrix formats
 // - sharded metadata and `.csh5` dataset persistence
 // - host fetch/drop helpers
 // - device staging helpers
@@ -14,13 +14,15 @@
 //
 // Sparse layout posture:
 // - `blocked_ell` is the native sparse type
-// - `compressed` is the secondary fallback / compatibility type
+// - `compressed` is an explicit in-memory interop type, not a native `.csh5`
+//   file format
 
 #include "types.cuh"
 #include "offset_span.cuh"
 #include "formats/dense.cuh"
 #include "formats/compressed.cuh"
 #include "formats/blocked_ell.cuh"
+#include "formats/quantized_blocked_ell.cuh"
 #include "formats/sliced_ell.cuh"
 #include "formats/triplet.cuh"
 #include "formats/diagonal.cuh"

@@ -6,6 +6,7 @@
 
 #include "../formats/compressed.cuh"
 #include "../formats/blocked_ell.cuh"
+#include "../formats/quantized_blocked_ell.cuh"
 #include "../formats/sliced_ell.cuh"
 #include "sharded.cuh"
 #include "shard_paths.cuh"
@@ -68,6 +69,23 @@ inline int load_header(const char *filename, sharded<sparse::blocked_ell> *m, sh
 }
 
 inline int load_header(const char *filename, sharded<sparse::blocked_ell> *m) {
+    return load_header(filename, m, 0);
+}
+
+inline int load_header(const char *filename, sharded<sparse::quantized_blocked_ell> *m, shard_storage *s) {
+    const char *ext = std::strrchr(filename != 0 ? filename : "", '.');
+    if (ext != 0) {
+        if (std::strcmp(ext, ".csh5") == 0 || std::strcmp(ext, ".h5") == 0 || std::strcmp(ext, ".hdf5") == 0) {
+            return load_dataset_quantized_blocked_ell_h5_header(filename, m, s);
+        }
+    }
+    std::fprintf(stderr,
+                 "Error: quantized blocked-ELL sharded load_header requires a .csh5/.h5/.hdf5 dataset file: %s\n",
+                 filename != 0 ? filename : "(null)");
+    return 0;
+}
+
+inline int load_header(const char *filename, sharded<sparse::quantized_blocked_ell> *m) {
     return load_header(filename, m, 0);
 }
 

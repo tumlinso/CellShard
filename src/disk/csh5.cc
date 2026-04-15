@@ -51,8 +51,8 @@ static const char preprocess_group[] = "/preprocess";
 static const char execution_group[] = "/execution";
 static const char runtime_service_group[] = "/runtime_service";
 static const char payload_group[] = "/payload";
-static const char payload_standard_group[] = "/payload/standard_csr";
 static const char payload_blocked_ell_group[] = "/payload/blocked_ell";
+static const char payload_quantized_blocked_ell_group[] = "/payload/quantized_blocked_ell";
 static const char payload_sliced_ell_group[] = "/payload/sliced_ell";
 static const char payload_optimized_blocked_ell_group[] = "/payload/optimized_blocked_ell";
 static const char payload_optimized_sliced_ell_group[] = "/payload/optimized_sliced_ell";
@@ -65,10 +65,10 @@ static const std::uint64_t shard_pack_payload_alignment = 4096u;
 
 enum {
     dataset_matrix_family_none = 0u,
-    dataset_matrix_family_compressed = 1u,
-    dataset_matrix_family_blocked_ell = 2u,
-    dataset_matrix_family_optimized_blocked_ell = 3u,
-    dataset_matrix_family_sliced_ell = 4u
+    dataset_matrix_family_blocked_ell = 1u,
+    dataset_matrix_family_optimized_blocked_ell = 2u,
+    dataset_matrix_family_sliced_ell = 3u,
+    dataset_matrix_family_quantized_blocked_ell = 4u
 };
 
 enum {
@@ -107,8 +107,6 @@ struct dataset_h5_state {
     std::uint64_t num_shards;
     std::uint32_t num_codecs;
     std::uint32_t matrix_family;
-    std::uint64_t *partition_indptr_offsets;
-    std::uint64_t *partition_nnz_offsets;
     std::uint64_t *partition_block_idx_offsets;
     std::uint64_t *partition_value_offsets;
     std::uint64_t *shard_block_idx_offsets;
@@ -123,11 +121,8 @@ struct dataset_h5_state {
     std::uint64_t *shard_part_end;
     std::uint32_t *partition_codec_ids;
     dataset_codec_descriptor *codecs;
-    hid_t payload_standard;
-    hid_t d_standard_indptr;
-    hid_t d_standard_indices;
-    hid_t d_standard_values;
     hid_t payload_blocked_ell;
+    hid_t payload_quantized_blocked_ell;
     hid_t d_blocked_ell_block_idx;
     hid_t d_blocked_ell_values;
     std::uint64_t loaded_blocked_ell_shard_id;
@@ -196,8 +191,6 @@ inline void dataset_h5_state_init(dataset_h5_state *state) {
     state->num_shards = 0;
     state->num_codecs = 0;
     state->matrix_family = dataset_matrix_family_none;
-    state->partition_indptr_offsets = 0;
-    state->partition_nnz_offsets = 0;
     state->partition_block_idx_offsets = 0;
     state->partition_value_offsets = 0;
     state->shard_block_idx_offsets = 0;
@@ -212,11 +205,8 @@ inline void dataset_h5_state_init(dataset_h5_state *state) {
     state->shard_part_end = 0;
     state->partition_codec_ids = 0;
     state->codecs = 0;
-    state->payload_standard = (hid_t) -1;
-    state->d_standard_indptr = (hid_t) -1;
-    state->d_standard_indices = (hid_t) -1;
-    state->d_standard_values = (hid_t) -1;
     state->payload_blocked_ell = (hid_t) -1;
+    state->payload_quantized_blocked_ell = (hid_t) -1;
     state->d_blocked_ell_block_idx = (hid_t) -1;
     state->d_blocked_ell_values = (hid_t) -1;
     state->loaded_blocked_ell_shard_id = std::numeric_limits<std::uint64_t>::max();
@@ -294,20 +284,15 @@ inline void dataset_h5_state_clear(dataset_h5_state *state) {
             if (state->shard_cache_files[shard_i] != 0) std::fclose(state->shard_cache_files[shard_i]);
         }
     }
-    if (state->d_standard_values >= 0) H5Dclose(state->d_standard_values);
-    if (state->d_standard_indices >= 0) H5Dclose(state->d_standard_indices);
-    if (state->d_standard_indptr >= 0) H5Dclose(state->d_standard_indptr);
-    if (state->payload_standard >= 0) H5Gclose(state->payload_standard);
     if (state->d_blocked_ell_values >= 0) H5Dclose(state->d_blocked_ell_values);
     if (state->d_blocked_ell_block_idx >= 0) H5Dclose(state->d_blocked_ell_block_idx);
     if (state->payload_blocked_ell >= 0) H5Gclose(state->payload_blocked_ell);
+    if (state->payload_quantized_blocked_ell >= 0) H5Gclose(state->payload_quantized_blocked_ell);
     if (state->payload_sliced_ell >= 0) H5Gclose(state->payload_sliced_ell);
     if (state->payload_optimized_blocked_ell >= 0) H5Gclose(state->payload_optimized_blocked_ell);
     if (state->payload_optimized_sliced_ell >= 0) H5Gclose(state->payload_optimized_sliced_ell);
     if (state->file >= 0) H5Fclose(state->file);
     state->file = (hid_t) -1;
-    std::free(state->partition_indptr_offsets);
-    std::free(state->partition_nnz_offsets);
     std::free(state->partition_block_idx_offsets);
     std::free(state->partition_value_offsets);
     std::free(state->shard_block_idx_offsets);
@@ -362,8 +347,6 @@ inline void dataset_h5_state_clear(dataset_h5_state *state) {
     std::free(state->shard_access_count);
     std::free(state->shard_last_access_tick);
     delete (dataset_h5_cache_runtime *) state->cache_runtime;
-    state->partition_indptr_offsets = 0;
-    state->partition_nnz_offsets = 0;
     state->partition_block_idx_offsets = 0;
     state->partition_value_offsets = 0;
     state->shard_block_idx_offsets = 0;
@@ -378,11 +361,8 @@ inline void dataset_h5_state_clear(dataset_h5_state *state) {
     state->shard_part_end = 0;
     state->partition_codec_ids = 0;
     state->codecs = 0;
-    state->payload_standard = (hid_t) -1;
-    state->d_standard_indptr = (hid_t) -1;
-    state->d_standard_indices = (hid_t) -1;
-    state->d_standard_values = (hid_t) -1;
     state->payload_blocked_ell = (hid_t) -1;
+    state->payload_quantized_blocked_ell = (hid_t) -1;
     state->d_blocked_ell_block_idx = (hid_t) -1;
     state->d_blocked_ell_values = (hid_t) -1;
     state->loaded_blocked_ell_shard_id = std::numeric_limits<std::uint64_t>::max();
@@ -730,12 +710,6 @@ inline int build_partition_blob_dataset_name(unsigned long partition_id,
                                              std::size_t cap) {
     if (name == 0 || cap == 0u) return 0;
     return std::snprintf(name, cap, "part.%lu", partition_id) > 0;
-}
-
-inline std::size_t standard_csr_part_bytes(std::uint64_t rows, std::uint64_t nnz) {
-    return (std::size_t) (rows + 1u) * sizeof(types::ptr_t)
-        + (std::size_t) nnz * sizeof(types::idx_t)
-        + (std::size_t) nnz * sizeof(real::storage_t);
 }
 
 inline std::size_t blocked_ell_part_block_index_count(std::uint64_t rows, std::uint64_t aux) {
@@ -1159,9 +1133,11 @@ inline void default_execution_metadata(dataset_h5_state *state) {
     const std::uint32_t default_format =
         state != 0 && state->matrix_family == dataset_matrix_family_optimized_blocked_ell
             ? dataset_execution_format_bucketed_blocked_ell
-            : (state != 0 && state->matrix_family == dataset_matrix_family_sliced_ell
+            : (state != 0 && state->matrix_family == dataset_matrix_family_quantized_blocked_ell
+                   ? dataset_execution_format_quantized_blocked_ell
+                   : (state != 0 && state->matrix_family == dataset_matrix_family_sliced_ell
                    ? dataset_execution_format_sliced_ell
-                   : dataset_execution_format_blocked_ell);
+                   : dataset_execution_format_blocked_ell));
     if (state == 0) return;
     state->preferred_base_format = default_format;
     for (partition_id = 0u; partition_id < state->num_partitions; ++partition_id) {
@@ -1327,17 +1303,7 @@ inline std::uint64_t estimate_shard_pack_bytes(const dataset_h5_state *state, un
         rows += state->partition_rows[i];
         nnz += state->partition_nnz[i];
     }
-    if (state->matrix_family == dataset_matrix_family_compressed) {
-        if (!compute_shard_pack_locators<sparse::compressed>(state->partition_rows + begin,
-                                                             state->partition_nnz + begin,
-                                                             state->partition_aux + begin,
-                                                             state->cols,
-                                                             local_count,
-                                                             local_offsets,
-                                                             local_sizes)) {
-            goto done;
-        }
-    } else if (state->matrix_family == dataset_matrix_family_blocked_ell) {
+    if (state->matrix_family == dataset_matrix_family_blocked_ell) {
         if (!compute_shard_pack_locators<sparse::blocked_ell>(state->partition_rows + begin,
                                                               state->partition_nnz + begin,
                                                               state->partition_aux + begin,
@@ -1345,6 +1311,16 @@ inline std::uint64_t estimate_shard_pack_bytes(const dataset_h5_state *state, un
                                                               local_count,
                                                               local_offsets,
                                                               local_sizes)) {
+            goto done;
+        }
+    } else if (state->matrix_family == dataset_matrix_family_quantized_blocked_ell) {
+        if (!compute_shard_pack_locators<sparse::quantized_blocked_ell>(state->partition_rows + begin,
+                                                                        state->partition_nnz + begin,
+                                                                        state->partition_aux + begin,
+                                                                        state->cols,
+                                                                        local_count,
+                                                                        local_offsets,
+                                                                        local_sizes)) {
             goto done;
         }
     } else if (state->matrix_family == dataset_matrix_family_optimized_blocked_ell) {
@@ -1604,42 +1580,6 @@ done:
     return ok;
 }
 
-inline int load_dataset_h5_state(hid_t file, dataset_h5_state *state) {
-    hid_t payload = (hid_t) -1;
-    hid_t codecs = (hid_t) -1;
-    int ok = 0;
-    std::uint64_t num_codecs = 0;
-
-    payload = H5Gopen2(file, payload_standard_group, H5P_DEFAULT);
-    codecs = H5Gopen2(file, codecs_group, H5P_DEFAULT);
-    if (payload < 0 || codecs < 0) goto done;
-    if (!read_attr_u64(file, "num_partitions", &state->num_partitions)) goto done;
-    if (!read_attr_u64(file, "num_codecs", &num_codecs)) goto done;
-    state->num_codecs = (std::uint32_t) num_codecs;
-    if (state->num_partitions != 0) {
-        state->partition_indptr_offsets = (std::uint64_t *) std::calloc((std::size_t) state->num_partitions, sizeof(std::uint64_t));
-        state->partition_nnz_offsets = (std::uint64_t *) std::calloc((std::size_t) state->num_partitions, sizeof(std::uint64_t));
-        state->partition_codec_ids = (std::uint32_t *) std::calloc((std::size_t) state->num_partitions, sizeof(std::uint32_t));
-        if (state->partition_indptr_offsets == 0 || state->partition_nnz_offsets == 0 || state->partition_codec_ids == 0) goto done;
-    }
-    if (state->num_codecs != 0) {
-        state->codecs = (dataset_codec_descriptor *) std::calloc((std::size_t) state->num_codecs, sizeof(dataset_codec_descriptor));
-        if (state->codecs == 0) goto done;
-    }
-    if (!read_dataset_1d(payload, "partition_indptr_offsets", H5T_NATIVE_UINT64, state->partition_indptr_offsets)) goto done;
-    if (!read_dataset_1d(payload, "partition_nnz_offsets", H5T_NATIVE_UINT64, state->partition_nnz_offsets)) goto done;
-    if (!read_dataset_1d(H5Gopen2(file, matrix_group, H5P_DEFAULT), "partition_codec_ids", H5T_NATIVE_UINT32, state->partition_codec_ids)) goto done;
-    if (state->num_codecs != 0) {
-        if (!read_dataset_1d(codecs, "codec_id", H5T_NATIVE_UINT32, &state->codecs[0].codec_id)) goto done;
-    }
-    ok = 1;
-
-done:
-    if (payload >= 0) H5Gclose(payload);
-    if (codecs >= 0) H5Gclose(codecs);
-    return ok;
-}
-
 inline int load_codec_table(hid_t codecs, dataset_codec_descriptor *descs, std::uint32_t count) {
     std::uint32_t i = 0;
     std::uint32_t *codec_ids = 0;
@@ -1693,33 +1633,6 @@ inline const dataset_codec_descriptor *find_codec(const dataset_h5_state *state,
     return 0;
 }
 
-inline int ensure_standard_payload_open(dataset_h5_state *state) {
-    if (state == 0 || state->file < 0) return 0;
-    if (state->payload_standard >= 0
-        && state->d_standard_indptr >= 0
-        && state->d_standard_indices >= 0
-        && state->d_standard_values >= 0) {
-        return 1;
-    }
-    if (state->payload_standard < 0) {
-        state->payload_standard = H5Gopen2(state->file, payload_standard_group, H5P_DEFAULT);
-        if (state->payload_standard < 0) return 0;
-    }
-    if (state->d_standard_indptr < 0) {
-        state->d_standard_indptr = H5Dopen2(state->payload_standard, "indptr", H5P_DEFAULT);
-        if (state->d_standard_indptr < 0) return 0;
-    }
-    if (state->d_standard_indices < 0) {
-        state->d_standard_indices = H5Dopen2(state->payload_standard, "indices", H5P_DEFAULT);
-        if (state->d_standard_indices < 0) return 0;
-    }
-    if (state->d_standard_values < 0) {
-        state->d_standard_values = H5Dopen2(state->payload_standard, "values", H5P_DEFAULT);
-        if (state->d_standard_values < 0) return 0;
-    }
-    return 1;
-}
-
 inline int ensure_blocked_ell_payload_open(dataset_h5_state *state) {
     if (state == 0 || state->file < 0) return 0;
     if (state->payload_blocked_ell >= 0
@@ -1747,6 +1660,13 @@ inline int ensure_sliced_ell_payload_open(dataset_h5_state *state) {
     if (state->payload_sliced_ell >= 0) return 1;
     state->payload_sliced_ell = H5Gopen2(state->file, payload_sliced_ell_group, H5P_DEFAULT);
     return state->payload_sliced_ell >= 0;
+}
+
+inline int ensure_quantized_blocked_ell_payload_open(dataset_h5_state *state) {
+    if (state == 0 || state->file < 0) return 0;
+    if (state->payload_quantized_blocked_ell >= 0) return 1;
+    state->payload_quantized_blocked_ell = H5Gopen2(state->file, payload_quantized_blocked_ell_group, H5P_DEFAULT);
+    return state->payload_quantized_blocked_ell >= 0;
 }
 
 inline int ensure_optimized_blocked_ell_payload_open(dataset_h5_state *state) {
@@ -1832,6 +1752,27 @@ inline int load_sliced_ell_partition_payload(dataset_h5_state *state,
     if (!ensure_sliced_ell_payload_open(state)) return 0;
     if (!build_partition_blob_dataset_name(partition_id, dataset_name, sizeof(dataset_name))) return 0;
     if (!read_blob_dataset(state->payload_sliced_ell, dataset_name, &blob)) return 0;
+    fp = fmemopen(blob.data(), blob.size(), "rb");
+    if (fp == 0) return 0;
+    sparse::clear(part);
+    sparse::init(part);
+    ok = ::cellshard::load(fp, part);
+    std::fclose(fp);
+    return ok;
+}
+
+inline int load_quantized_blocked_ell_partition_payload(dataset_h5_state *state,
+                                                        unsigned long partition_id,
+                                                        sparse::quantized_blocked_ell *part) {
+    std::vector<unsigned char> blob;
+    char dataset_name[64];
+    std::FILE *fp = 0;
+    int ok = 0;
+
+    if (state == 0 || part == 0 || partition_id >= state->num_partitions) return 0;
+    if (!ensure_quantized_blocked_ell_payload_open(state)) return 0;
+    if (!build_partition_blob_dataset_name(partition_id, dataset_name, sizeof(dataset_name))) return 0;
+    if (!read_blob_dataset(state->payload_quantized_blocked_ell, dataset_name, &blob)) return 0;
     fp = fmemopen(blob.data(), blob.size(), "rb");
     if (fp == 0) return 0;
     sparse::clear(part);
@@ -3214,41 +3155,6 @@ inline void compute_cached_part_locator(const dataset_h5_state *state,
     }
 }
 
-inline int load_compressed_part_from_cached_pack(sharded<sparse::compressed> *m,
-                                                 dataset_h5_state *state,
-                                                 unsigned long partition_id) {
-    const unsigned long shard_id = state != 0 && state->partition_shard_ids != 0 ? (unsigned long) state->partition_shard_ids[partition_id] : 0ul;
-    dataset_h5_cache_runtime *runtime = cache_runtime(state);
-    sparse::compressed *part = 0;
-    std::uint64_t offset = 0u;
-    int ok = 0;
-
-    if (m == 0 || state == 0 || runtime == 0 || partition_id >= m->num_partitions) return 0;
-    if (!ensure_cached_shard_file_open(state, shard_id)) return 0;
-    compute_cached_part_locator<sparse::compressed>(state, partition_id, &offset, 0);
-    std::lock_guard<std::mutex> file_lock(runtime->shard_file_mutexes[shard_id]);
-    if (state->shard_cache_files[shard_id] == 0) return 0;
-    part = new sparse::compressed;
-    sparse::init(part);
-    if (fseeko(state->shard_cache_files[shard_id], (off_t) offset, SEEK_SET) != 0) goto done;
-    if (!::cellshard::load(state->shard_cache_files[shard_id], part)) goto done;
-    if (part->rows != m->partition_rows[partition_id]) goto done;
-    if (part->cols != m->cols) goto done;
-    if (part->nnz != m->partition_nnz[partition_id]) goto done;
-    if ((unsigned long) part->axis != m->partition_aux[partition_id]) goto done;
-    if (m->parts[partition_id] != 0) destroy(m->parts[partition_id]);
-    m->parts[partition_id] = part;
-    part = 0;
-    ok = 1;
-
-done:
-    if (part != 0) {
-        sparse::clear(part);
-        delete part;
-    }
-    return ok;
-}
-
 inline int load_blocked_ell_part_from_cached_pack(sharded<sparse::blocked_ell> *m,
                                                   dataset_h5_state *state,
                                                   unsigned long partition_id) {
@@ -3264,6 +3170,41 @@ inline int load_blocked_ell_part_from_cached_pack(sharded<sparse::blocked_ell> *
     std::lock_guard<std::mutex> file_lock(runtime->shard_file_mutexes[shard_id]);
     if (state->shard_cache_files[shard_id] == 0) return 0;
     part = new sparse::blocked_ell;
+    sparse::init(part);
+    if (fseeko(state->shard_cache_files[shard_id], (off_t) offset, SEEK_SET) != 0) goto done;
+    if (!::cellshard::load(state->shard_cache_files[shard_id], part)) goto done;
+    if (part->rows != m->partition_rows[partition_id]) goto done;
+    if (part->cols != m->cols) goto done;
+    if (part->nnz != m->partition_nnz[partition_id]) goto done;
+    if (::cellshard::partition_aux(part) != m->partition_aux[partition_id]) goto done;
+    if (m->parts[partition_id] != 0) destroy(m->parts[partition_id]);
+    m->parts[partition_id] = part;
+    part = 0;
+    ok = 1;
+
+done:
+    if (part != 0) {
+        sparse::clear(part);
+        delete part;
+    }
+    return ok;
+}
+
+inline int load_quantized_blocked_ell_part_from_cached_pack(sharded<sparse::quantized_blocked_ell> *m,
+                                                            dataset_h5_state *state,
+                                                            unsigned long partition_id) {
+    const unsigned long shard_id = state != 0 && state->partition_shard_ids != 0 ? (unsigned long) state->partition_shard_ids[partition_id] : 0ul;
+    dataset_h5_cache_runtime *runtime = cache_runtime(state);
+    sparse::quantized_blocked_ell *part = 0;
+    std::uint64_t offset = 0u;
+    int ok = 0;
+
+    if (m == 0 || state == 0 || runtime == 0 || partition_id >= m->num_partitions) return 0;
+    if (!ensure_cached_shard_file_open(state, shard_id)) return 0;
+    compute_cached_part_locator<sparse::quantized_blocked_ell>(state, partition_id, &offset, 0);
+    std::lock_guard<std::mutex> file_lock(runtime->shard_file_mutexes[shard_id]);
+    if (state->shard_cache_files[shard_id] == 0) return 0;
+    part = new sparse::quantized_blocked_ell;
     sparse::init(part);
     if (fseeko(state->shard_cache_files[shard_id], (off_t) offset, SEEK_SET) != 0) goto done;
     if (!::cellshard::load(state->shard_cache_files[shard_id], part)) goto done;
@@ -3610,101 +3551,6 @@ inline int ensure_execution_pack_ready(shard_storage *s, dataset_h5_state *state
     return materialize_blocked_ell_execution_pack(s, state, shard_id);
 }
 
-inline int materialize_compressed_shard_pack(shard_storage *s, dataset_h5_state *state, unsigned long shard_id) {
-    const std::uint64_t begin = state != 0 && state->shard_part_begin != 0 ? state->shard_part_begin[shard_id] : 0u;
-    const std::uint64_t end = state != 0 && state->shard_part_end != 0 ? state->shard_part_end[shard_id] : 0u;
-    const std::uint64_t partition_count = end >= begin ? (end - begin) : 0u;
-    sparse::compressed **parts = 0;
-    char tmp_path[4096];
-    char final_path[4096];
-    std::uint64_t local = 0u;
-    int ok = 0;
-
-    if (s == 0 || state == 0 || shard_id >= state->num_shards) return 0;
-    if (!open_dataset_h5_backend(s) || !ensure_standard_payload_open(state)) return 0;
-    if (partition_count != 0u) {
-        parts = (sparse::compressed **) std::calloc((std::size_t) partition_count, sizeof(sparse::compressed *));
-        if (parts == 0) return 0;
-    }
-    for (local = 0u; local < partition_count; ++local) {
-        const std::uint64_t partition_id = begin + local;
-        const dataset_codec_descriptor *codec = find_codec(state, state->partition_codec_ids[partition_id]);
-        sparse::compressed *part = new sparse::compressed;
-        sparse::init(part,
-                     (types::dim_t) state->partition_rows[partition_id],
-                     (types::dim_t) state->cols,
-                     (types::nnz_t) state->partition_nnz[partition_id],
-                     (types::u32) state->partition_aux[partition_id]);
-        if (codec == 0 || codec->family != dataset_codec_family_standard_csr) {
-            sparse::clear(part);
-            delete part;
-            goto done;
-        }
-        if (!sparse::allocate(part)) {
-            sparse::clear(part);
-            delete part;
-            goto done;
-        }
-        if (!read_hyperslab_1d(state->d_standard_indptr,
-                               H5T_NATIVE_UINT32,
-                               state->partition_indptr_offsets[partition_id],
-                               state->partition_rows[partition_id] + 1u,
-                               part->majorPtr)) {
-            sparse::clear(part);
-            delete part;
-            goto done;
-        }
-        if (!read_hyperslab_1d(state->d_standard_indices,
-                               H5T_NATIVE_UINT32,
-                               state->partition_nnz_offsets[partition_id],
-                               state->partition_nnz[partition_id],
-                               part->minorIdx)) {
-            sparse::clear(part);
-            delete part;
-            goto done;
-        }
-        if (!read_hyperslab_1d(state->d_standard_values,
-                               H5T_NATIVE_UINT16,
-                               state->partition_nnz_offsets[partition_id],
-                               state->partition_nnz[partition_id],
-                               part->val)) {
-            sparse::clear(part);
-            delete part;
-            goto done;
-        }
-        parts[local] = part;
-    }
-    if (!build_shard_pack_temp_path(state, shard_id, tmp_path, sizeof(tmp_path))) goto done;
-    if (!build_shard_pack_path(state, shard_id, final_path, sizeof(final_path))) goto done;
-    if (!write_shard_pack_file<sparse::compressed>(tmp_path,
-                                                   state->cols,
-                                                   state->partition_rows + begin,
-                                                   state->partition_nnz + begin,
-                                                   state->partition_aux + begin,
-                                                   partition_count,
-                                                   parts)) {
-        goto done;
-    }
-    if (::rename(tmp_path, final_path) != 0) {
-        std::remove(tmp_path);
-        goto done;
-    }
-    ok = 1;
-
-done:
-    if (!ok && build_shard_pack_temp_path(state, shard_id, tmp_path, sizeof(tmp_path))) std::remove(tmp_path);
-    if (parts != 0) {
-        for (local = 0u; local < partition_count; ++local) {
-            if (parts[local] != 0) {
-                sparse::clear(parts[local]);
-                delete parts[local];
-            }
-        }
-    }
-    std::free(parts);
-    return ok;
-}
-
 inline int materialize_blocked_ell_shard_pack(shard_storage *s, dataset_h5_state *state, unsigned long shard_id) {
     const std::uint64_t begin = state != 0 && state->shard_part_begin != 0 ? state->shard_part_begin[shard_id] : 0u;
     const std::uint64_t end = state != 0 && state->shard_part_end != 0 ? state->shard_part_end[shard_id] : 0u;
@@ -3764,6 +3610,64 @@ inline int materialize_blocked_ell_shard_pack(shard_storage *s, dataset_h5_state
 done:
     if (!ok && build_shard_pack_temp_path(state, shard_id, tmp_path, sizeof(tmp_path))) std::remove(tmp_path);
     clear_blocked_ell_parts(parts, (unsigned long) partition_count);
+    std::free(parts);
+    return ok;
+}
+
+inline int materialize_quantized_blocked_ell_shard_pack(shard_storage *s, dataset_h5_state *state, unsigned long shard_id) {
+    const std::uint64_t begin = state != 0 && state->shard_part_begin != 0 ? state->shard_part_begin[shard_id] : 0u;
+    const std::uint64_t end = state != 0 && state->shard_part_end != 0 ? state->shard_part_end[shard_id] : 0u;
+    const std::uint64_t partition_count = end >= begin ? (end - begin) : 0u;
+    sparse::quantized_blocked_ell **parts = 0;
+    char tmp_path[4096];
+    char final_path[4096];
+    std::uint64_t local = 0u;
+    int ok = 0;
+
+    if (s == 0 || state == 0 || shard_id >= state->num_shards) return 0;
+    if (!open_dataset_h5_backend(s)) return 0;
+    if (partition_count != 0u) {
+        parts = (sparse::quantized_blocked_ell **) std::calloc((std::size_t) partition_count, sizeof(sparse::quantized_blocked_ell *));
+        if (parts == 0) return 0;
+    }
+    for (local = 0u; local < partition_count; ++local) {
+        const std::uint64_t partition_id = begin + local;
+        sparse::quantized_blocked_ell *part = new sparse::quantized_blocked_ell;
+        sparse::init(part);
+        if (!load_quantized_blocked_ell_partition_payload(state, (unsigned long) partition_id, part)) {
+            sparse::clear(part);
+            delete part;
+            goto done;
+        }
+        parts[local] = part;
+    }
+    if (!build_shard_pack_temp_path(state, shard_id, tmp_path, sizeof(tmp_path))) goto done;
+    if (!build_shard_pack_path(state, shard_id, final_path, sizeof(final_path))) goto done;
+    if (!write_shard_pack_file<sparse::quantized_blocked_ell>(tmp_path,
+                                                              state->cols,
+                                                              state->partition_rows + begin,
+                                                              state->partition_nnz + begin,
+                                                              state->partition_aux + begin,
+                                                              partition_count,
+                                                              parts)) {
+        goto done;
+    }
+    if (::rename(tmp_path, final_path) != 0) {
+        std::remove(tmp_path);
+        goto done;
+    }
+    ok = 1;
+
+done:
+    if (!ok && build_shard_pack_temp_path(state, shard_id, tmp_path, sizeof(tmp_path))) std::remove(tmp_path);
+    if (parts != 0) {
+        for (local = 0u; local < partition_count; ++local) {
+            if (parts[local] != 0) {
+                sparse::clear(parts[local]);
+                delete parts[local];
+            }
+        }
+    }
     std::free(parts);
     return ok;
 }
@@ -3828,8 +3732,8 @@ done:
 
 inline int materialize_shard_pack(shard_storage *s, dataset_h5_state *state, unsigned long shard_id) {
     if (state == 0) return 0;
-    if (state->matrix_family == dataset_matrix_family_compressed) return materialize_compressed_shard_pack(s, state, shard_id);
     if (state->matrix_family == dataset_matrix_family_blocked_ell) return materialize_blocked_ell_shard_pack(s, state, shard_id);
+    if (state->matrix_family == dataset_matrix_family_quantized_blocked_ell) return materialize_quantized_blocked_ell_shard_pack(s, state, shard_id);
     if (state->matrix_family == dataset_matrix_family_optimized_blocked_ell) return materialize_blocked_ell_shard_pack(s, state, shard_id);
     if (state->matrix_family == dataset_matrix_family_sliced_ell) return materialize_sliced_ell_shard_pack(s, state, shard_id);
     return 0;
@@ -3991,195 +3895,6 @@ void close_dataset_h5_backend(shard_storage *s) {
 }
 
 } // namespace
-
-int create_dataset_compressed_h5(const char *filename,
-                                const dataset_layout_view *layout,
-                                const dataset_dataset_table_view *datasets,
-                                const dataset_provenance_view *provenance) {
-    hid_t file = (hid_t) -1;
-    hid_t matrix = (hid_t) -1;
-    hid_t dsets = (hid_t) -1;
-    hid_t prov = (hid_t) -1;
-    hid_t codecs = (hid_t) -1;
-    hid_t payload_root = (hid_t) -1;
-    hid_t payload = (hid_t) -1;
-    std::uint64_t total_indptr = 0;
-    std::uint64_t total_nnz = 0;
-    std::uint64_t *partition_indptr_offsets = 0;
-    std::uint64_t *partition_nnz_offsets = 0;
-    std::uint64_t *partition_aux = 0;
-    std::uint32_t i = 0;
-    int ok = 0;
-    const std::uint64_t dim_limit = local_dim_limit();
-    const std::uint64_t nnz_limit = local_nnz_limit();
-    unsigned long shard_part_begin = 0ul;
-
-    if (filename == 0 || layout == 0) return 0;
-    if (layout->partition_rows == 0 || layout->partition_nnz == 0 || layout->partition_axes == 0 || layout->partition_row_offsets == 0 || layout->partition_dataset_ids == 0 || layout->partition_codec_ids == 0 || layout->shard_offsets == 0) return 0;
-    if (layout->cols > local_index_limit()) {
-        std::fprintf(stderr,
-                     "cellshard: dataset column count exceeds the current u32 execution limit while writing %s (cols=%llu, limit=%llu)\n",
-                     filename,
-                     (unsigned long long) layout->cols,
-                     (unsigned long long) local_index_limit());
-        return 0;
-    }
-
-    partition_indptr_offsets = (std::uint64_t *) std::calloc((std::size_t) layout->num_partitions, sizeof(std::uint64_t));
-    partition_nnz_offsets = (std::uint64_t *) std::calloc((std::size_t) layout->num_partitions, sizeof(std::uint64_t));
-    partition_aux = (std::uint64_t *) std::calloc((std::size_t) layout->num_partitions, sizeof(std::uint64_t));
-    if ((layout->num_partitions != 0) && (partition_indptr_offsets == 0 || partition_nnz_offsets == 0 || partition_aux == 0)) goto done;
-
-    for (i = 0; i < layout->num_partitions; ++i) {
-        if (layout->partition_rows[i] > dim_limit) {
-            ok = fail_dataset_u32_limit(filename, "part", i, "rows", layout->partition_rows[i], dim_limit);
-            goto done;
-        }
-        if (layout->partition_nnz[i] > nnz_limit) {
-            ok = fail_dataset_u32_limit(filename, "part", i, "nnz", layout->partition_nnz[i], nnz_limit);
-            goto done;
-        }
-        partition_indptr_offsets[i] = total_indptr;
-        partition_nnz_offsets[i] = total_nnz;
-        total_indptr += layout->partition_rows[i] + 1u;
-        total_nnz += layout->partition_nnz[i];
-        partition_aux[i] = layout->partition_aux != 0 ? layout->partition_aux[i] : (std::uint64_t) layout->partition_axes[i];
-    }
-
-    for (std::uint32_t shard_i = 0; shard_i < layout->num_shards; ++shard_i) {
-        const std::uint64_t row_begin = layout->shard_offsets[shard_i];
-        const std::uint64_t row_end = layout->shard_offsets[shard_i + 1u];
-        std::uint64_t shard_nnz = 0u;
-        unsigned long part_end = shard_part_begin;
-        while (shard_part_begin < layout->num_partitions && layout->partition_row_offsets[shard_part_begin] < row_begin) ++shard_part_begin;
-        part_end = shard_part_begin;
-        while (part_end < layout->num_partitions && layout->partition_row_offsets[part_end + 1u] <= row_end) {
-            shard_nnz += layout->partition_nnz[part_end];
-            ++part_end;
-        }
-        if (row_end - row_begin > dim_limit) warn_dataset_u32_limit(filename, "shard", shard_i, "rows", row_end - row_begin, dim_limit);
-        if (shard_nnz > nnz_limit) warn_dataset_u32_limit(filename, "shard", shard_i, "nnz", shard_nnz, nnz_limit);
-        shard_part_begin = part_end;
-    }
-
-    file = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
-    if (file < 0) goto done;
-    if (!write_attr_string(file, "cellshard_magic", dataset_magic)) goto done;
-    if (!write_attr_u32(file, "schema_version", dataset_h5_schema_version)) goto done;
-    if (!write_attr_string(file, "matrix_format", "compressed")) goto done;
-    if (!write_attr_u64(file, "rows", layout->rows)) goto done;
-    if (!write_attr_u64(file, "cols", layout->cols)) goto done;
-    if (!write_attr_u64(file, "nnz", layout->nnz)) goto done;
-    if (!write_attr_u64(file, "num_partitions", layout->num_partitions)) goto done;
-    if (!write_attr_u64(file, "num_shards", layout->num_shards)) goto done;
-    if (!write_attr_u64(file, "num_codecs", layout->num_codecs)) goto done;
-    if (!write_attr_u64(file, "num_datasets", datasets != 0 ? datasets->count : 0u)) goto done;
-
-    matrix = create_group(file, matrix_group);
-    dsets = create_group(file, datasets_group);
-    prov = create_group(file, provenance_group);
-    codecs = create_group(file, codecs_group);
-    payload_root = create_group(file, payload_group);
-    payload = payload_root >= 0 ? create_group(payload_root, "standard_csr") : (hid_t) -1;
-    if (matrix < 0 || dsets < 0 || prov < 0 || codecs < 0 || payload_root < 0 || payload < 0) goto done;
-
-    if (!write_dataset_1d(matrix, "partition_rows", H5T_NATIVE_UINT64, (hsize_t) layout->num_partitions, layout->partition_rows)) goto done;
-    if (!write_dataset_1d(matrix, "partition_nnz", H5T_NATIVE_UINT64, (hsize_t) layout->num_partitions, layout->partition_nnz)) goto done;
-    if (!write_dataset_1d(matrix, "partition_axes", H5T_NATIVE_UINT32, (hsize_t) layout->num_partitions, layout->partition_axes)) goto done;
-    if (!write_dataset_1d(matrix, "partition_aux", H5T_NATIVE_UINT64, (hsize_t) layout->num_partitions, partition_aux)) goto done;
-    if (!write_dataset_1d(matrix, "partition_row_offsets", H5T_NATIVE_UINT64, (hsize_t) layout->num_partitions + 1u, layout->partition_row_offsets)) goto done;
-    if (!write_dataset_1d(matrix, "partition_dataset_ids", H5T_NATIVE_UINT32, (hsize_t) layout->num_partitions, layout->partition_dataset_ids)) goto done;
-    if (!write_dataset_1d(matrix, "partition_codec_ids", H5T_NATIVE_UINT32, (hsize_t) layout->num_partitions, layout->partition_codec_ids)) goto done;
-    if (!write_dataset_1d(matrix, "shard_offsets", H5T_NATIVE_UINT64, (hsize_t) layout->num_shards + 1u, layout->shard_offsets)) goto done;
-
-    if (datasets != 0) {
-        if (!write_text_column(dsets, "dataset_ids", &datasets->dataset_ids)) goto done;
-        if (!write_text_column(dsets, "matrix_paths", &datasets->matrix_paths)) goto done;
-        if (!write_text_column(dsets, "feature_paths", &datasets->feature_paths)) goto done;
-        if (!write_text_column(dsets, "barcode_paths", &datasets->barcode_paths)) goto done;
-        if (!write_text_column(dsets, "metadata_paths", &datasets->metadata_paths)) goto done;
-        if (!write_dataset_1d(dsets, "formats", H5T_NATIVE_UINT32, (hsize_t) datasets->count, datasets->formats)) goto done;
-        if (!write_dataset_1d(dsets, "row_begin", H5T_NATIVE_UINT64, (hsize_t) datasets->count, datasets->row_begin)) goto done;
-        if (!write_dataset_1d(dsets, "row_end", H5T_NATIVE_UINT64, (hsize_t) datasets->count, datasets->row_end)) goto done;
-        if (!write_dataset_1d(dsets, "rows", H5T_NATIVE_UINT64, (hsize_t) datasets->count, datasets->rows)) goto done;
-        if (!write_dataset_1d(dsets, "cols", H5T_NATIVE_UINT64, (hsize_t) datasets->count, datasets->cols)) goto done;
-        if (!write_dataset_1d(dsets, "nnz", H5T_NATIVE_UINT64, (hsize_t) datasets->count, datasets->nnz)) goto done;
-    }
-
-    if (provenance != 0) {
-        if (!write_text_column(prov, "global_barcodes", &provenance->global_barcodes)) goto done;
-        if (!write_dataset_1d(prov, "cell_dataset_ids", H5T_NATIVE_UINT32, (hsize_t) layout->rows, provenance->cell_dataset_ids)) goto done;
-        if (!write_dataset_1d(prov, "cell_local_indices", H5T_NATIVE_UINT64, (hsize_t) layout->rows, provenance->cell_local_indices)) goto done;
-        if (!write_text_column(prov, "feature_ids", &provenance->feature_ids)) goto done;
-        if (!write_text_column(prov, "feature_names", &provenance->feature_names)) goto done;
-        if (!write_text_column(prov, "feature_types", &provenance->feature_types)) goto done;
-        if (!write_dataset_1d(prov, "feature_dataset_ids", H5T_NATIVE_UINT32, (hsize_t) layout->cols, provenance->feature_dataset_ids)) goto done;
-        if (!write_dataset_1d(prov, "feature_local_indices", H5T_NATIVE_UINT64, (hsize_t) layout->cols, provenance->feature_local_indices)) goto done;
-        if (datasets != 0) {
-            if (!write_dataset_1d(prov, "dataset_feature_offsets", H5T_NATIVE_UINT64, (hsize_t) datasets->count + 1u, provenance->dataset_feature_offsets)) goto done;
-            if (!write_dataset_1d(prov, "dataset_feature_to_global", H5T_NATIVE_UINT32, (hsize_t) provenance->dataset_feature_offsets[datasets->count], provenance->dataset_feature_to_global)) goto done;
-        }
-    }
-
-    if (layout->num_codecs != 0) {
-        std::uint32_t *codec_id = (std::uint32_t *) std::calloc((std::size_t) layout->num_codecs, sizeof(std::uint32_t));
-        std::uint32_t *family = (std::uint32_t *) std::calloc((std::size_t) layout->num_codecs, sizeof(std::uint32_t));
-        std::uint32_t *value_code = (std::uint32_t *) std::calloc((std::size_t) layout->num_codecs, sizeof(std::uint32_t));
-        std::uint32_t *scale_value_code = (std::uint32_t *) std::calloc((std::size_t) layout->num_codecs, sizeof(std::uint32_t));
-        std::uint32_t *bits = (std::uint32_t *) std::calloc((std::size_t) layout->num_codecs, sizeof(std::uint32_t));
-        std::uint32_t *flags = (std::uint32_t *) std::calloc((std::size_t) layout->num_codecs, sizeof(std::uint32_t));
-        if (codec_id == 0 || family == 0 || value_code == 0 || scale_value_code == 0 || bits == 0 || flags == 0) {
-            std::free(codec_id);
-            std::free(family);
-            std::free(value_code);
-            std::free(scale_value_code);
-            std::free(bits);
-            std::free(flags);
-            goto done;
-        }
-        for (i = 0; i < layout->num_codecs; ++i) {
-            codec_id[i] = layout->codecs[i].codec_id;
-            family[i] = layout->codecs[i].family;
-            value_code[i] = layout->codecs[i].value_code;
-            scale_value_code[i] = layout->codecs[i].scale_value_code;
-            bits[i] = layout->codecs[i].bits;
-            flags[i] = layout->codecs[i].flags;
-        }
-        if (!write_dataset_1d(codecs, "codec_id", H5T_NATIVE_UINT32, (hsize_t) layout->num_codecs, codec_id)) goto done;
-        if (!write_dataset_1d(codecs, "family", H5T_NATIVE_UINT32, (hsize_t) layout->num_codecs, family)) goto done;
-        if (!write_dataset_1d(codecs, "value_code", H5T_NATIVE_UINT32, (hsize_t) layout->num_codecs, value_code)) goto done;
-        if (!write_dataset_1d(codecs, "scale_value_code", H5T_NATIVE_UINT32, (hsize_t) layout->num_codecs, scale_value_code)) goto done;
-        if (!write_dataset_1d(codecs, "bits", H5T_NATIVE_UINT32, (hsize_t) layout->num_codecs, bits)) goto done;
-        if (!write_dataset_1d(codecs, "flags", H5T_NATIVE_UINT32, (hsize_t) layout->num_codecs, flags)) goto done;
-        std::free(codec_id);
-        std::free(family);
-        std::free(value_code);
-        std::free(scale_value_code);
-        std::free(bits);
-        std::free(flags);
-    }
-
-    if (!write_dataset_1d(payload, "partition_indptr_offsets", H5T_NATIVE_UINT64, (hsize_t) layout->num_partitions, partition_indptr_offsets)) goto done;
-    if (!write_dataset_1d(payload, "partition_nnz_offsets", H5T_NATIVE_UINT64, (hsize_t) layout->num_partitions, partition_nnz_offsets)) goto done;
-    if (!write_dataset_1d(payload, "indptr", H5T_NATIVE_UINT32, (hsize_t) total_indptr, 0)) goto done;
-    if (!write_dataset_1d(payload, "indices", H5T_NATIVE_UINT32, (hsize_t) total_nnz, 0)) goto done;
-    if (!write_dataset_1d(payload, "values", H5T_NATIVE_UINT16, (hsize_t) total_nnz, 0)) goto done;
-
-    ok = 1;
-
-done:
-    std::free(partition_indptr_offsets);
-    std::free(partition_nnz_offsets);
-    std::free(partition_aux);
-    if (payload >= 0) H5Gclose(payload);
-    if (payload_root >= 0) H5Gclose(payload_root);
-    if (codecs >= 0) H5Gclose(codecs);
-    if (prov >= 0) H5Gclose(prov);
-    if (dsets >= 0) H5Gclose(dsets);
-    if (matrix >= 0) H5Gclose(matrix);
-    if (file >= 0) H5Fclose(file);
-    return ok;
-}
 
 int create_dataset_blocked_ell_h5(const char *filename,
                                  const dataset_layout_view *layout,
@@ -4414,6 +4129,181 @@ done:
     std::free(partition_value_offsets);
     std::free(shard_block_idx_offsets);
     std::free(shard_value_offsets);
+    if (payload >= 0) H5Gclose(payload);
+    if (payload_root >= 0) H5Gclose(payload_root);
+    if (codecs >= 0) H5Gclose(codecs);
+    if (prov >= 0) H5Gclose(prov);
+    if (dsets >= 0) H5Gclose(dsets);
+    if (matrix >= 0) H5Gclose(matrix);
+    if (file >= 0) H5Fclose(file);
+    return ok;
+}
+
+int create_dataset_quantized_blocked_ell_h5(const char *filename,
+                                            const dataset_layout_view *layout,
+                                            const dataset_dataset_table_view *datasets,
+                                            const dataset_provenance_view *provenance) {
+    hid_t file = (hid_t) -1;
+    hid_t matrix = (hid_t) -1;
+    hid_t dsets = (hid_t) -1;
+    hid_t prov = (hid_t) -1;
+    hid_t codecs = (hid_t) -1;
+    hid_t payload_root = (hid_t) -1;
+    hid_t payload = (hid_t) -1;
+    std::uint64_t *partition_aux = 0;
+    std::uint32_t *partition_axes = 0;
+    std::uint32_t i = 0;
+    int ok = 0;
+    const std::uint64_t dim_limit = local_dim_limit();
+    const std::uint64_t nnz_limit = local_nnz_limit();
+    const std::uint64_t idx_limit = local_index_limit();
+
+    if (filename == 0 || layout == 0) return 0;
+    if (layout->partition_rows == 0 || layout->partition_nnz == 0 || layout->partition_aux == 0 || layout->partition_row_offsets == 0 || layout->partition_dataset_ids == 0 || layout->partition_codec_ids == 0 || layout->shard_offsets == 0) return 0;
+    if (layout->cols > idx_limit) {
+        std::fprintf(stderr,
+                     "cellshard: dataset column count exceeds the current u32 execution limit while writing %s (cols=%llu, limit=%llu)\n",
+                     filename,
+                     (unsigned long long) layout->cols,
+                     (unsigned long long) idx_limit);
+        return 0;
+    }
+
+    partition_aux = (std::uint64_t *) std::calloc((std::size_t) layout->num_partitions, sizeof(std::uint64_t));
+    partition_axes = (std::uint32_t *) std::calloc((std::size_t) layout->num_partitions, sizeof(std::uint32_t));
+    if (layout->num_partitions != 0u && (partition_aux == 0 || partition_axes == 0)) goto done;
+    for (i = 0; i < layout->num_partitions; ++i) {
+        const std::uint32_t block_size = sparse::unpack_quantized_blocked_ell_block_size((unsigned long) layout->partition_aux[i]);
+        const std::uint32_t bits = sparse::unpack_quantized_blocked_ell_bits((unsigned long) layout->partition_aux[i]);
+        const std::uint32_t ell_cols = sparse::unpack_quantized_blocked_ell_cols((unsigned long) layout->partition_aux[i]);
+        const std::uint64_t row_blocks = block_size == 0u ? 0u : (layout->partition_rows[i] + block_size - 1u) / block_size;
+        const std::uint64_t ell_width = block_size == 0u ? 0u : ell_cols / block_size;
+        const std::uint64_t block_idx_count = row_blocks * ell_width;
+        const std::uint64_t packed_value_bytes =
+            (std::uint64_t) layout->partition_rows[i] * (std::uint64_t) sparse::quantized_blocked_ell_aligned_row_bytes(bits, ell_cols);
+        if (layout->partition_rows[i] > dim_limit) {
+            ok = fail_dataset_u32_limit(filename, "part", i, "rows", layout->partition_rows[i], dim_limit);
+            goto done;
+        }
+        if (layout->partition_nnz[i] > nnz_limit) {
+            ok = fail_dataset_u32_limit(filename, "part", i, "nnz", layout->partition_nnz[i], nnz_limit);
+            goto done;
+        }
+        if (block_idx_count > idx_limit) {
+            ok = fail_dataset_u32_limit(filename, "part", i, "block_col_idx_count", block_idx_count, idx_limit);
+            goto done;
+        }
+        if (packed_value_bytes > nnz_limit) {
+            ok = fail_dataset_u32_limit(filename, "part", i, "packed_value_bytes", packed_value_bytes, nnz_limit);
+            goto done;
+        }
+        partition_aux[i] = layout->partition_aux[i];
+        partition_axes[i] = layout->partition_axes != 0 ? layout->partition_axes[i] : 0u;
+    }
+
+    file = H5Fcreate(filename, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+    if (file < 0) goto done;
+    if (!write_attr_string(file, "cellshard_magic", dataset_magic)) goto done;
+    if (!write_attr_u32(file, "schema_version", dataset_h5_schema_version)) goto done;
+    if (!write_attr_string(file, "matrix_format", "quantized_blocked_ell")) goto done;
+    if (!write_attr_string(file, "payload_layout", payload_layout_shard_packed)) goto done;
+    if (!write_attr_u64(file, "rows", layout->rows)) goto done;
+    if (!write_attr_u64(file, "cols", layout->cols)) goto done;
+    if (!write_attr_u64(file, "nnz", layout->nnz)) goto done;
+    if (!write_attr_u64(file, "num_partitions", layout->num_partitions)) goto done;
+    if (!write_attr_u64(file, "num_shards", layout->num_shards)) goto done;
+    if (!write_attr_u64(file, "num_codecs", layout->num_codecs)) goto done;
+    if (!write_attr_u64(file, "num_datasets", datasets != 0 ? datasets->count : 0u)) goto done;
+
+    matrix = create_group(file, matrix_group);
+    dsets = create_group(file, datasets_group);
+    prov = create_group(file, provenance_group);
+    codecs = create_group(file, codecs_group);
+    payload_root = create_group(file, payload_group);
+    payload = payload_root >= 0 ? create_group(payload_root, "quantized_blocked_ell") : (hid_t) -1;
+    if (matrix < 0 || dsets < 0 || prov < 0 || codecs < 0 || payload_root < 0 || payload < 0) goto done;
+
+    if (!write_dataset_1d(matrix, "partition_rows", H5T_NATIVE_UINT64, (hsize_t) layout->num_partitions, layout->partition_rows)) goto done;
+    if (!write_dataset_1d(matrix, "partition_nnz", H5T_NATIVE_UINT64, (hsize_t) layout->num_partitions, layout->partition_nnz)) goto done;
+    if (!write_dataset_1d(matrix, "partition_axes", H5T_NATIVE_UINT32, (hsize_t) layout->num_partitions, partition_axes)) goto done;
+    if (!write_dataset_1d(matrix, "partition_aux", H5T_NATIVE_UINT64, (hsize_t) layout->num_partitions, partition_aux)) goto done;
+    if (!write_dataset_1d(matrix, "partition_row_offsets", H5T_NATIVE_UINT64, (hsize_t) layout->num_partitions + 1u, layout->partition_row_offsets)) goto done;
+    if (!write_dataset_1d(matrix, "partition_dataset_ids", H5T_NATIVE_UINT32, (hsize_t) layout->num_partitions, layout->partition_dataset_ids)) goto done;
+    if (!write_dataset_1d(matrix, "partition_codec_ids", H5T_NATIVE_UINT32, (hsize_t) layout->num_partitions, layout->partition_codec_ids)) goto done;
+    if (!write_dataset_1d(matrix, "shard_offsets", H5T_NATIVE_UINT64, (hsize_t) layout->num_shards + 1u, layout->shard_offsets)) goto done;
+
+    if (datasets != 0) {
+        if (!write_text_column(dsets, "dataset_ids", &datasets->dataset_ids)) goto done;
+        if (!write_text_column(dsets, "matrix_paths", &datasets->matrix_paths)) goto done;
+        if (!write_text_column(dsets, "feature_paths", &datasets->feature_paths)) goto done;
+        if (!write_text_column(dsets, "barcode_paths", &datasets->barcode_paths)) goto done;
+        if (!write_text_column(dsets, "metadata_paths", &datasets->metadata_paths)) goto done;
+        if (!write_dataset_1d(dsets, "formats", H5T_NATIVE_UINT32, (hsize_t) datasets->count, datasets->formats)) goto done;
+        if (!write_dataset_1d(dsets, "row_begin", H5T_NATIVE_UINT64, (hsize_t) datasets->count, datasets->row_begin)) goto done;
+        if (!write_dataset_1d(dsets, "row_end", H5T_NATIVE_UINT64, (hsize_t) datasets->count, datasets->row_end)) goto done;
+        if (!write_dataset_1d(dsets, "rows", H5T_NATIVE_UINT64, (hsize_t) datasets->count, datasets->rows)) goto done;
+        if (!write_dataset_1d(dsets, "cols", H5T_NATIVE_UINT64, (hsize_t) datasets->count, datasets->cols)) goto done;
+        if (!write_dataset_1d(dsets, "nnz", H5T_NATIVE_UINT64, (hsize_t) datasets->count, datasets->nnz)) goto done;
+    }
+
+    if (provenance != 0) {
+        if (!write_text_column(prov, "global_barcodes", &provenance->global_barcodes)) goto done;
+        if (!write_dataset_1d(prov, "cell_dataset_ids", H5T_NATIVE_UINT32, (hsize_t) layout->rows, provenance->cell_dataset_ids)) goto done;
+        if (!write_dataset_1d(prov, "cell_local_indices", H5T_NATIVE_UINT64, (hsize_t) layout->rows, provenance->cell_local_indices)) goto done;
+        if (!write_text_column(prov, "feature_ids", &provenance->feature_ids)) goto done;
+        if (!write_text_column(prov, "feature_names", &provenance->feature_names)) goto done;
+        if (!write_text_column(prov, "feature_types", &provenance->feature_types)) goto done;
+        if (!write_dataset_1d(prov, "feature_dataset_ids", H5T_NATIVE_UINT32, (hsize_t) layout->cols, provenance->feature_dataset_ids)) goto done;
+        if (!write_dataset_1d(prov, "feature_local_indices", H5T_NATIVE_UINT64, (hsize_t) layout->cols, provenance->feature_local_indices)) goto done;
+        if (datasets != 0) {
+            if (!write_dataset_1d(prov, "dataset_feature_offsets", H5T_NATIVE_UINT64, (hsize_t) datasets->count + 1u, provenance->dataset_feature_offsets)) goto done;
+            if (!write_dataset_1d(prov, "dataset_feature_to_global", H5T_NATIVE_UINT32, (hsize_t) provenance->dataset_feature_offsets[datasets->count], provenance->dataset_feature_to_global)) goto done;
+        }
+    }
+
+    if (layout->num_codecs != 0) {
+        std::uint32_t *codec_id = (std::uint32_t *) std::calloc((std::size_t) layout->num_codecs, sizeof(std::uint32_t));
+        std::uint32_t *family = (std::uint32_t *) std::calloc((std::size_t) layout->num_codecs, sizeof(std::uint32_t));
+        std::uint32_t *value_code = (std::uint32_t *) std::calloc((std::size_t) layout->num_codecs, sizeof(std::uint32_t));
+        std::uint32_t *scale_value_code = (std::uint32_t *) std::calloc((std::size_t) layout->num_codecs, sizeof(std::uint32_t));
+        std::uint32_t *bits = (std::uint32_t *) std::calloc((std::size_t) layout->num_codecs, sizeof(std::uint32_t));
+        std::uint32_t *flags = (std::uint32_t *) std::calloc((std::size_t) layout->num_codecs, sizeof(std::uint32_t));
+        if (codec_id == 0 || family == 0 || value_code == 0 || scale_value_code == 0 || bits == 0 || flags == 0) {
+            std::free(codec_id);
+            std::free(family);
+            std::free(value_code);
+            std::free(scale_value_code);
+            std::free(bits);
+            std::free(flags);
+            goto done;
+        }
+        for (i = 0; i < layout->num_codecs; ++i) {
+            codec_id[i] = layout->codecs[i].codec_id;
+            family[i] = layout->codecs[i].family;
+            value_code[i] = layout->codecs[i].value_code;
+            scale_value_code[i] = layout->codecs[i].scale_value_code;
+            bits[i] = layout->codecs[i].bits;
+            flags[i] = layout->codecs[i].flags;
+        }
+        if (!write_dataset_1d(codecs, "codec_id", H5T_NATIVE_UINT32, (hsize_t) layout->num_codecs, codec_id)) goto done;
+        if (!write_dataset_1d(codecs, "family", H5T_NATIVE_UINT32, (hsize_t) layout->num_codecs, family)) goto done;
+        if (!write_dataset_1d(codecs, "value_code", H5T_NATIVE_UINT32, (hsize_t) layout->num_codecs, value_code)) goto done;
+        if (!write_dataset_1d(codecs, "scale_value_code", H5T_NATIVE_UINT32, (hsize_t) layout->num_codecs, scale_value_code)) goto done;
+        if (!write_dataset_1d(codecs, "bits", H5T_NATIVE_UINT32, (hsize_t) layout->num_codecs, bits)) goto done;
+        if (!write_dataset_1d(codecs, "flags", H5T_NATIVE_UINT32, (hsize_t) layout->num_codecs, flags)) goto done;
+        std::free(codec_id);
+        std::free(family);
+        std::free(value_code);
+        std::free(scale_value_code);
+        std::free(bits);
+        std::free(flags);
+    }
+
+    ok = 1;
+
+done:
+    std::free(partition_aux);
+    std::free(partition_axes);
     if (payload >= 0) H5Gclose(payload);
     if (payload_root >= 0) H5Gclose(payload_root);
     if (codecs >= 0) H5Gclose(codecs);
@@ -5084,138 +4974,6 @@ done:
     return ok;
 }
 
-int append_standard_csr_partition_h5(const char *filename,
-                                unsigned long partition_id,
-                                const sparse::compressed *part) {
-    hid_t file = (hid_t) -1;
-    hid_t payload = (hid_t) -1;
-    hid_t d_indptr = (hid_t) -1;
-    hid_t d_indices = (hid_t) -1;
-    hid_t d_values = (hid_t) -1;
-    std::uint64_t *partition_indptr_offsets = 0;
-    std::uint64_t *partition_nnz_offsets = 0;
-    std::uint64_t num_partitions = 0;
-    int ok = 0;
-
-    if (filename == 0 || part == 0 || part->axis != sparse::compressed_by_row) return 0;
-
-    file = H5Fopen(filename, H5F_ACC_RDWR, H5P_DEFAULT);
-    if (file < 0) return 0;
-    if (!ensure_magic(file)) goto done;
-    if (!read_attr_u64(file, "num_partitions", &num_partitions)) goto done;
-    if (partition_id >= num_partitions) goto done;
-
-    partition_indptr_offsets = (std::uint64_t *) std::calloc((std::size_t) num_partitions, sizeof(std::uint64_t));
-    partition_nnz_offsets = (std::uint64_t *) std::calloc((std::size_t) num_partitions, sizeof(std::uint64_t));
-    if ((num_partitions != 0) && (partition_indptr_offsets == 0 || partition_nnz_offsets == 0)) goto done;
-
-    payload = H5Gopen2(file, payload_standard_group, H5P_DEFAULT);
-    if (payload < 0) goto done;
-    if (!read_dataset_1d(payload, "partition_indptr_offsets", H5T_NATIVE_UINT64, partition_indptr_offsets)) goto done;
-    if (!read_dataset_1d(payload, "partition_nnz_offsets", H5T_NATIVE_UINT64, partition_nnz_offsets)) goto done;
-    d_indptr = H5Dopen2(payload, "indptr", H5P_DEFAULT);
-    d_indices = H5Dopen2(payload, "indices", H5P_DEFAULT);
-    d_values = H5Dopen2(payload, "values", H5P_DEFAULT);
-    if (d_indptr < 0 || d_indices < 0 || d_values < 0) goto done;
-    if (!read_hyperslab_1d(d_indptr, H5T_NATIVE_UINT32, 0, 0, 0)) goto done;
-
-    {
-        hsize_t off[1];
-        hsize_t dims[1];
-        hid_t filespace = (hid_t) -1;
-        hid_t memspace = (hid_t) -1;
-
-        off[0] = (hsize_t) partition_indptr_offsets[partition_id];
-        dims[0] = (hsize_t) part->rows + 1u;
-        filespace = H5Dget_space(d_indptr);
-        if (filespace < 0) goto done;
-        if (H5Sselect_hyperslab(filespace, H5S_SELECT_SET, off, 0, dims, 0) < 0) {
-            H5Sclose(filespace);
-            goto done;
-        }
-        memspace = H5Screate_simple(1, dims, 0);
-        if (memspace < 0) {
-            H5Sclose(filespace);
-            goto done;
-        }
-        if (H5Dwrite(d_indptr, H5T_NATIVE_UINT32, memspace, filespace, H5P_DEFAULT, part->majorPtr) < 0) {
-            H5Sclose(memspace);
-            H5Sclose(filespace);
-            goto done;
-        }
-        H5Sclose(memspace);
-        H5Sclose(filespace);
-    }
-
-    {
-        hsize_t off[1];
-        hsize_t dims[1];
-        hid_t filespace = (hid_t) -1;
-        hid_t memspace = (hid_t) -1;
-
-        off[0] = (hsize_t) partition_nnz_offsets[partition_id];
-        dims[0] = (hsize_t) part->nnz;
-        filespace = H5Dget_space(d_indices);
-        if (filespace < 0) goto done;
-        if (H5Sselect_hyperslab(filespace, H5S_SELECT_SET, off, 0, dims, 0) < 0) {
-            H5Sclose(filespace);
-            goto done;
-        }
-        memspace = H5Screate_simple(1, dims, 0);
-        if (memspace < 0) {
-            H5Sclose(filespace);
-            goto done;
-        }
-        if (H5Dwrite(d_indices, H5T_NATIVE_UINT32, memspace, filespace, H5P_DEFAULT, part->minorIdx) < 0) {
-            H5Sclose(memspace);
-            H5Sclose(filespace);
-            goto done;
-        }
-        H5Sclose(memspace);
-        H5Sclose(filespace);
-    }
-
-    {
-        hsize_t off[1];
-        hsize_t dims[1];
-        hid_t filespace = (hid_t) -1;
-        hid_t memspace = (hid_t) -1;
-
-        off[0] = (hsize_t) partition_nnz_offsets[partition_id];
-        dims[0] = (hsize_t) part->nnz;
-        filespace = H5Dget_space(d_values);
-        if (filespace < 0) goto done;
-        if (H5Sselect_hyperslab(filespace, H5S_SELECT_SET, off, 0, dims, 0) < 0) {
-            H5Sclose(filespace);
-            goto done;
-        }
-        memspace = H5Screate_simple(1, dims, 0);
-        if (memspace < 0) {
-            H5Sclose(filespace);
-            goto done;
-        }
-        if (H5Dwrite(d_values, H5T_NATIVE_UINT16, memspace, filespace, H5P_DEFAULT, part->val) < 0) {
-            H5Sclose(memspace);
-            H5Sclose(filespace);
-            goto done;
-        }
-        H5Sclose(memspace);
-        H5Sclose(filespace);
-    }
-
-    ok = 1;
-
-done:
-    std::free(partition_indptr_offsets);
-    std::free(partition_nnz_offsets);
-    if (d_values >= 0) H5Dclose(d_values);
-    if (d_indices >= 0) H5Dclose(d_indices);
-    if (d_indptr >= 0) H5Dclose(d_indptr);
-    if (payload >= 0) H5Gclose(payload);
-    if (file >= 0) H5Fclose(file);
-    return ok;
-}
-
 int append_blocked_ell_partition_h5(const char *filename,
                                unsigned long partition_id,
                                const sparse::blocked_ell *part) {
@@ -5313,6 +5071,44 @@ done:
     std::free(partition_value_offsets);
     if (d_values >= 0) H5Dclose(d_values);
     if (d_block_idx >= 0) H5Dclose(d_block_idx);
+    if (payload >= 0) H5Gclose(payload);
+    if (file >= 0) H5Fclose(file);
+    return ok;
+}
+
+int append_quantized_blocked_ell_partition_h5(const char *filename,
+                                              unsigned long partition_id,
+                                              const sparse::quantized_blocked_ell *part) {
+    hid_t file = (hid_t) -1;
+    hid_t payload = (hid_t) -1;
+    char *buffer = 0;
+    unsigned char *blob = 0;
+    std::size_t blob_bytes = 0u;
+    char dataset_name[64];
+    std::FILE *fp = 0;
+    int ok = 0;
+
+    if (filename == 0 || part == 0) return 0;
+    file = H5Fopen(filename, H5F_ACC_RDWR, H5P_DEFAULT);
+    if (file < 0) return 0;
+    if (!ensure_magic(file)) goto done;
+    payload = H5Gopen2(file, payload_quantized_blocked_ell_group, H5P_DEFAULT);
+    if (payload < 0) goto done;
+    if (!build_partition_blob_dataset_name(partition_id, dataset_name, sizeof(dataset_name))) goto done;
+    fp = open_memstream(&buffer, &blob_bytes);
+    if (fp == 0) goto done;
+    if (!::cellshard::store(fp, part) || std::fclose(fp) != 0) {
+        fp = 0;
+        goto done;
+    }
+    fp = 0;
+    blob = (unsigned char *) buffer;
+    if (!write_blob_dataset(payload, dataset_name, blob, blob_bytes)) goto done;
+    ok = 1;
+
+done:
+    if (fp != 0) std::fclose(fp);
+    std::free(buffer);
     if (payload >= 0) H5Gclose(payload);
     if (file >= 0) H5Fclose(file);
     return ok;
@@ -5617,155 +5413,6 @@ int invalidate_dataset_h5_cache(shard_storage *s) {
     return 1;
 }
 
-int load_dataset_compressed_h5_header(const char *filename,
-                                     sharded<sparse::compressed> *m,
-                                     shard_storage *s) {
-    hid_t file = (hid_t) -1;
-    hid_t matrix = (hid_t) -1;
-    hid_t codecs = (hid_t) -1;
-    std::uint64_t rows = 0;
-    std::uint64_t cols = 0;
-    std::uint64_t nnz = 0;
-    std::uint64_t num_partitions = 0;
-    std::uint64_t num_shards = 0;
-    std::uint64_t num_codecs = 0;
-    std::uint64_t *partition_rows = 0;
-    std::uint64_t *partition_nnz = 0;
-    std::uint32_t *partition_axes = 0;
-    std::uint64_t *partition_row_offsets = 0;
-    std::uint64_t *shard_offsets = 0;
-    unsigned long *part_rows_ul = 0;
-    unsigned long *part_nnz_ul = 0;
-    unsigned long *part_axes_ul = 0;
-    unsigned long *shard_offsets_ul = 0;
-    unsigned long i = 0;
-    int ok = 0;
-
-    if (filename == 0 || m == 0) return 0;
-    file = H5Fopen(filename, H5F_ACC_RDONLY, H5P_DEFAULT);
-    if (file < 0) return 0;
-    if (!ensure_magic(file)) goto done;
-    if (!read_attr_u64(file, "rows", &rows)) goto done;
-    if (!read_attr_u64(file, "cols", &cols)) goto done;
-    if (!read_attr_u64(file, "nnz", &nnz)) goto done;
-    if (!read_attr_u64(file, "num_partitions", &num_partitions)) goto done;
-    if (!read_attr_u64(file, "num_shards", &num_shards)) goto done;
-    if (!read_attr_u64(file, "num_codecs", &num_codecs)) goto done;
-
-    matrix = H5Gopen2(file, matrix_group, H5P_DEFAULT);
-    codecs = H5Gopen2(file, codecs_group, H5P_DEFAULT);
-    if (matrix < 0 || codecs < 0) goto done;
-
-    partition_rows = (std::uint64_t *) std::calloc((std::size_t) num_partitions, sizeof(std::uint64_t));
-    partition_nnz = (std::uint64_t *) std::calloc((std::size_t) num_partitions, sizeof(std::uint64_t));
-    partition_axes = (std::uint32_t *) std::calloc((std::size_t) num_partitions, sizeof(std::uint32_t));
-    partition_row_offsets = (std::uint64_t *) std::calloc((std::size_t) num_partitions + 1u, sizeof(std::uint64_t));
-    shard_offsets = (std::uint64_t *) std::calloc((std::size_t) num_shards + 1u, sizeof(std::uint64_t));
-    part_rows_ul = (unsigned long *) std::calloc((std::size_t) num_partitions, sizeof(unsigned long));
-    part_nnz_ul = (unsigned long *) std::calloc((std::size_t) num_partitions, sizeof(unsigned long));
-    part_axes_ul = (unsigned long *) std::calloc((std::size_t) num_partitions, sizeof(unsigned long));
-    shard_offsets_ul = (unsigned long *) std::calloc((std::size_t) num_shards + 1u, sizeof(unsigned long));
-    if ((num_partitions != 0) && (partition_rows == 0 || partition_nnz == 0 || partition_axes == 0 || partition_row_offsets == 0 || part_rows_ul == 0 || part_nnz_ul == 0 || part_axes_ul == 0)) goto done;
-    if ((num_shards + 1u) != 0u && (shard_offsets == 0 || shard_offsets_ul == 0)) goto done;
-
-    if (!read_dataset_1d(matrix, "partition_rows", H5T_NATIVE_UINT64, partition_rows)) goto done;
-    if (!read_dataset_1d(matrix, "partition_nnz", H5T_NATIVE_UINT64, partition_nnz)) goto done;
-    if (!read_dataset_1d(matrix, "partition_axes", H5T_NATIVE_UINT32, partition_axes)) goto done;
-    if (!read_dataset_1d(matrix, "partition_row_offsets", H5T_NATIVE_UINT64, partition_row_offsets)) goto done;
-    if (!read_dataset_1d(matrix, "shard_offsets", H5T_NATIVE_UINT64, shard_offsets)) goto done;
-
-    clear(m);
-    init(m);
-    for (i = 0; i < (unsigned long) num_partitions; ++i) {
-        if (!sharded_from_u64(partition_rows[i], part_rows_ul + i, "partition_rows", filename)) goto done;
-        if (!sharded_from_u64(partition_nnz[i], part_nnz_ul + i, "partition_nnz", filename)) goto done;
-        part_axes_ul[i] = (unsigned long) partition_axes[i];
-    }
-    for (i = 0; i <= (unsigned long) num_shards; ++i) {
-        if (!sharded_from_u64(shard_offsets[i], shard_offsets_ul + i, "shard_offsets", filename)) goto done;
-    }
-    if (!define_partitions(m, (unsigned long) cols, (unsigned long) num_partitions, part_rows_ul, part_nnz_ul, part_axes_ul)) goto done;
-    if (!reshard(m, (unsigned long) num_shards, shard_offsets_ul)) goto done;
-    m->rows = (unsigned long) rows;
-    m->nnz = (unsigned long) nnz;
-
-    if (s != 0) {
-        dataset_h5_state *state = 0;
-        if (!bind_dataset_h5(s, filename)) goto done;
-        state = (dataset_h5_state *) s->backend_state;
-        state->rows = rows;
-        state->cols = cols;
-        state->nnz = nnz;
-        state->num_partitions = num_partitions;
-        state->num_shards = num_shards;
-        state->num_codecs = (std::uint32_t) num_codecs;
-        state->matrix_family = dataset_matrix_family_compressed;
-        if (num_partitions != 0) {
-            state->partition_rows = (std::uint64_t *) std::calloc((std::size_t) num_partitions, sizeof(std::uint64_t));
-            state->partition_nnz = (std::uint64_t *) std::calloc((std::size_t) num_partitions, sizeof(std::uint64_t));
-            state->partition_aux = (std::uint64_t *) std::calloc((std::size_t) num_partitions, sizeof(std::uint64_t));
-            state->partition_row_offsets = (std::uint64_t *) std::calloc((std::size_t) num_partitions + 1u, sizeof(std::uint64_t));
-            state->partition_indptr_offsets = (std::uint64_t *) std::calloc((std::size_t) num_partitions, sizeof(std::uint64_t));
-            state->partition_nnz_offsets = (std::uint64_t *) std::calloc((std::size_t) num_partitions, sizeof(std::uint64_t));
-            state->partition_codec_ids = (std::uint32_t *) std::calloc((std::size_t) num_partitions, sizeof(std::uint32_t));
-            if (state->partition_rows == 0
-                || state->partition_nnz == 0
-                || state->partition_aux == 0
-                || state->partition_row_offsets == 0
-                || state->partition_indptr_offsets == 0
-                || state->partition_nnz_offsets == 0
-                || state->partition_codec_ids == 0) goto done;
-            std::memcpy(state->partition_rows, partition_rows, (std::size_t) num_partitions * sizeof(std::uint64_t));
-            std::memcpy(state->partition_nnz, partition_nnz, (std::size_t) num_partitions * sizeof(std::uint64_t));
-            std::memcpy(state->partition_row_offsets, partition_row_offsets, ((std::size_t) num_partitions + 1u) * sizeof(std::uint64_t));
-            for (i = 0; i < (unsigned long) num_partitions; ++i) state->partition_aux[i] = (std::uint64_t) partition_axes[i];
-        }
-        state->shard_offsets = (std::uint64_t *) std::calloc((std::size_t) num_shards + 1u, sizeof(std::uint64_t));
-        if (state->shard_offsets == 0 && (num_shards + 1u) != 0u) goto done;
-        if (state->shard_offsets != 0) std::memcpy(state->shard_offsets, shard_offsets, ((std::size_t) num_shards + 1u) * sizeof(std::uint64_t));
-        if (num_codecs != 0) {
-            state->codecs = (dataset_codec_descriptor *) std::calloc((std::size_t) num_codecs, sizeof(dataset_codec_descriptor));
-            if (state->codecs == 0) goto done;
-        }
-        {
-            hid_t payload = H5Gopen2(file, payload_standard_group, H5P_DEFAULT);
-            if (payload < 0) goto done;
-            if (!read_dataset_1d(payload, "partition_indptr_offsets", H5T_NATIVE_UINT64, state->partition_indptr_offsets)) {
-                H5Gclose(payload);
-                goto done;
-            }
-            if (!read_dataset_1d(payload, "partition_nnz_offsets", H5T_NATIVE_UINT64, state->partition_nnz_offsets)) {
-                H5Gclose(payload);
-                goto done;
-            }
-            H5Gclose(payload);
-        }
-        if (!read_dataset_1d(matrix, "partition_codec_ids", H5T_NATIVE_UINT32, state->partition_codec_ids)) goto done;
-        if (!load_codec_table(codecs, state->codecs, (std::uint32_t) num_codecs)) goto done;
-        if (!build_shard_partition_spans(state)) goto done;
-        if (!load_dataset_execution_metadata(file, state)) goto done;
-        if (!load_dataset_runtime_service_metadata(file, state)) goto done;
-    }
-
-    ok = 1;
-
-done:
-    if (!ok && s != 0) clear(s);
-    std::free(partition_rows);
-    std::free(partition_nnz);
-    std::free(partition_axes);
-    std::free(partition_row_offsets);
-    std::free(shard_offsets);
-    std::free(part_rows_ul);
-    std::free(part_nnz_ul);
-    std::free(part_axes_ul);
-    std::free(shard_offsets_ul);
-    if (codecs >= 0) H5Gclose(codecs);
-    if (matrix >= 0) H5Gclose(matrix);
-    if (file >= 0) H5Fclose(file);
-    return ok;
-}
-
 int load_dataset_blocked_ell_h5_header(const char *filename,
                                       sharded<sparse::blocked_ell> *m,
                                       shard_storage *s) {
@@ -5790,6 +5437,7 @@ int load_dataset_blocked_ell_h5_header(const char *filename,
     unsigned long i = 0;
     int ok = 0;
     int optimized_codec = 0;
+    char matrix_format[64];
     char payload_layout[64];
 
     if (filename == 0 || m == 0) return 0;
@@ -5802,8 +5450,11 @@ int load_dataset_blocked_ell_h5_header(const char *filename,
     if (!read_attr_u64(file, "num_partitions", &num_partitions)) goto done;
     if (!read_attr_u64(file, "num_shards", &num_shards)) goto done;
     if (!read_attr_u64(file, "num_codecs", &num_codecs)) goto done;
+    matrix_format[0] = '\0';
+    if (!read_attr_string(file, "matrix_format", matrix_format, sizeof(matrix_format))) goto done;
     payload_layout[0] = '\0';
     if (!read_attr_string(file, "payload_layout", payload_layout, sizeof(payload_layout))) goto done;
+    if (std::strcmp(matrix_format, "blocked_ell") != 0) goto done;
 
     matrix = H5Gopen2(file, matrix_group, H5P_DEFAULT);
     codecs = H5Gopen2(file, codecs_group, H5P_DEFAULT);
@@ -5931,6 +5582,146 @@ done:
     if (codecs >= 0) H5Gclose(codecs);
     if (matrix >= 0) H5Gclose(matrix);
     if (file >= 0) H5Fclose(file);
+    return ok;
+}
+
+int load_dataset_quantized_blocked_ell_h5_header(const char *filename,
+                                                 sharded<sparse::quantized_blocked_ell> *m,
+                                                 shard_storage *s) {
+    hid_t file = (hid_t) -1;
+    hid_t matrix = (hid_t) -1;
+    hid_t codecs = (hid_t) -1;
+    std::uint64_t rows = 0;
+    std::uint64_t cols = 0;
+    std::uint64_t nnz = 0;
+    std::uint64_t num_partitions = 0;
+    std::uint64_t num_shards = 0;
+    std::uint64_t num_codecs = 0;
+    std::uint64_t *partition_rows = 0;
+    std::uint64_t *partition_nnz = 0;
+    std::uint64_t *partition_aux = 0;
+    std::uint64_t *partition_row_offsets = 0;
+    std::uint64_t *shard_offsets = 0;
+    unsigned long *part_rows_ul = 0;
+    unsigned long *part_nnz_ul = 0;
+    unsigned long *part_aux_ul = 0;
+    unsigned long *shard_offsets_ul = 0;
+    unsigned long i = 0;
+    int ok = 0;
+    char matrix_format[64];
+    char payload_layout[64];
+
+    if (filename == 0 || m == 0) return 0;
+    file = H5Fopen(filename, H5F_ACC_RDONLY, H5P_DEFAULT);
+    if (file < 0) return 0;
+    if (!ensure_magic(file)) goto done;
+    if (!read_attr_u64(file, "rows", &rows)) goto done;
+    if (!read_attr_u64(file, "cols", &cols)) goto done;
+    if (!read_attr_u64(file, "nnz", &nnz)) goto done;
+    if (!read_attr_u64(file, "num_partitions", &num_partitions)) goto done;
+    if (!read_attr_u64(file, "num_shards", &num_shards)) goto done;
+    if (!read_attr_u64(file, "num_codecs", &num_codecs)) goto done;
+    matrix_format[0] = '\0';
+    if (!read_attr_string(file, "matrix_format", matrix_format, sizeof(matrix_format))) goto done;
+    payload_layout[0] = '\0';
+    if (!read_attr_string(file, "payload_layout", payload_layout, sizeof(payload_layout))) goto done;
+    if (std::strcmp(matrix_format, "quantized_blocked_ell") != 0 || std::strcmp(payload_layout, payload_layout_shard_packed) != 0) goto done;
+
+    matrix = H5Gopen2(file, matrix_group, H5P_DEFAULT);
+    codecs = H5Gopen2(file, codecs_group, H5P_DEFAULT);
+    if (matrix < 0 || codecs < 0) goto done;
+
+    partition_rows = (std::uint64_t *) std::calloc((std::size_t) num_partitions, sizeof(std::uint64_t));
+    partition_nnz = (std::uint64_t *) std::calloc((std::size_t) num_partitions, sizeof(std::uint64_t));
+    partition_aux = (std::uint64_t *) std::calloc((std::size_t) num_partitions, sizeof(std::uint64_t));
+    partition_row_offsets = (std::uint64_t *) std::calloc((std::size_t) num_partitions + 1u, sizeof(std::uint64_t));
+    shard_offsets = (std::uint64_t *) std::calloc((std::size_t) num_shards + 1u, sizeof(std::uint64_t));
+    part_rows_ul = (unsigned long *) std::calloc((std::size_t) num_partitions, sizeof(unsigned long));
+    part_nnz_ul = (unsigned long *) std::calloc((std::size_t) num_partitions, sizeof(unsigned long));
+    part_aux_ul = (unsigned long *) std::calloc((std::size_t) num_partitions, sizeof(unsigned long));
+    shard_offsets_ul = (unsigned long *) std::calloc((std::size_t) num_shards + 1u, sizeof(unsigned long));
+    if ((num_partitions != 0) && (partition_rows == 0 || partition_nnz == 0 || partition_aux == 0 || partition_row_offsets == 0 || part_rows_ul == 0 || part_nnz_ul == 0 || part_aux_ul == 0)) goto done;
+    if ((num_shards + 1u) != 0u && (shard_offsets == 0 || shard_offsets_ul == 0)) goto done;
+
+    if (!read_dataset_1d(matrix, "partition_rows", H5T_NATIVE_UINT64, partition_rows)) goto done;
+    if (!read_dataset_1d(matrix, "partition_nnz", H5T_NATIVE_UINT64, partition_nnz)) goto done;
+    if (!read_dataset_1d(matrix, "partition_aux", H5T_NATIVE_UINT64, partition_aux)) goto done;
+    if (!read_dataset_1d(matrix, "partition_row_offsets", H5T_NATIVE_UINT64, partition_row_offsets)) goto done;
+    if (!read_dataset_1d(matrix, "shard_offsets", H5T_NATIVE_UINT64, shard_offsets)) goto done;
+
+    clear(m);
+    init(m);
+    for (i = 0; i < (unsigned long) num_partitions; ++i) {
+        if (!sharded_from_u64(partition_rows[i], part_rows_ul + i, "partition_rows", filename)) goto done;
+        if (!sharded_from_u64(partition_nnz[i], part_nnz_ul + i, "partition_nnz", filename)) goto done;
+        if (!sharded_from_u64(partition_aux[i], part_aux_ul + i, "partition_aux", filename)) goto done;
+    }
+    for (i = 0; i <= (unsigned long) num_shards; ++i) {
+        if (!sharded_from_u64(shard_offsets[i], shard_offsets_ul + i, "shard_offsets", filename)) goto done;
+    }
+    if (!define_partitions(m, (unsigned long) cols, (unsigned long) num_partitions, part_rows_ul, part_nnz_ul, part_aux_ul)) goto done;
+    if (!reshard(m, (unsigned long) num_shards, shard_offsets_ul)) goto done;
+    m->rows = (unsigned long) rows;
+    m->nnz = (unsigned long) nnz;
+
+    if (s != 0) {
+        dataset_h5_state *state = 0;
+        if (!bind_dataset_h5(s, filename)) goto done;
+        state = (dataset_h5_state *) s->backend_state;
+        state->rows = rows;
+        state->cols = cols;
+        state->nnz = nnz;
+        state->num_partitions = num_partitions;
+        state->num_shards = num_shards;
+        state->num_codecs = (std::uint32_t) num_codecs;
+        if (num_partitions != 0) {
+            state->partition_rows = (std::uint64_t *) std::calloc((std::size_t) num_partitions, sizeof(std::uint64_t));
+            state->partition_nnz = (std::uint64_t *) std::calloc((std::size_t) num_partitions, sizeof(std::uint64_t));
+            state->partition_aux = (std::uint64_t *) std::calloc((std::size_t) num_partitions, sizeof(std::uint64_t));
+            state->partition_row_offsets = (std::uint64_t *) std::calloc((std::size_t) num_partitions + 1u, sizeof(std::uint64_t));
+            state->partition_codec_ids = (std::uint32_t *) std::calloc((std::size_t) num_partitions, sizeof(std::uint32_t));
+            if (state->partition_rows == 0
+                || state->partition_nnz == 0
+                || state->partition_aux == 0
+                || state->partition_row_offsets == 0
+                || state->partition_codec_ids == 0) goto done;
+            std::memcpy(state->partition_rows, partition_rows, (std::size_t) num_partitions * sizeof(std::uint64_t));
+            std::memcpy(state->partition_nnz, partition_nnz, (std::size_t) num_partitions * sizeof(std::uint64_t));
+            std::memcpy(state->partition_aux, partition_aux, (std::size_t) num_partitions * sizeof(std::uint64_t));
+            std::memcpy(state->partition_row_offsets, partition_row_offsets, ((std::size_t) num_partitions + 1u) * sizeof(std::uint64_t));
+        }
+        state->shard_offsets = (std::uint64_t *) std::calloc((std::size_t) num_shards + 1u, sizeof(std::uint64_t));
+        if (state->shard_offsets == 0 && (num_shards + 1u) != 0u) goto done;
+        if (state->shard_offsets != 0) std::memcpy(state->shard_offsets, shard_offsets, ((std::size_t) num_shards + 1u) * sizeof(std::uint64_t));
+        if (num_codecs != 0) {
+            state->codecs = (dataset_codec_descriptor *) std::calloc((std::size_t) num_codecs, sizeof(dataset_codec_descriptor));
+            if (state->codecs == 0) goto done;
+        }
+        if (!read_dataset_1d(matrix, "partition_codec_ids", H5T_NATIVE_UINT32, state->partition_codec_ids)) goto done;
+        if (!load_codec_table(codecs, state->codecs, (std::uint32_t) num_codecs)) goto done;
+        state->matrix_family = dataset_matrix_family_quantized_blocked_ell;
+        if (!build_shard_partition_spans(state)) goto done;
+        if (!load_dataset_execution_metadata(file, state)) goto done;
+        if (!load_dataset_runtime_service_metadata(file, state)) goto done;
+    }
+
+    ok = 1;
+
+done:
+    if (!ok && s != 0) clear(s);
+    std::free(partition_rows);
+    std::free(partition_nnz);
+    std::free(partition_aux);
+    std::free(partition_row_offsets);
+    std::free(shard_offsets);
+    std::free(part_rows_ul);
+    std::free(part_nnz_ul);
+    std::free(part_aux_ul);
+    std::free(shard_offsets_ul);
+    if (codecs >= 0) H5Gclose(codecs);
+    if (matrix >= 0) H5Gclose(matrix);
+    if (file >= 0) H5Fclose(file);
+    if (!ok) clear(m);
     return ok;
 }
 
@@ -6066,52 +5857,6 @@ done:
     return ok;
 }
 
-int fetch_dataset_compressed_h5_partition(sharded<sparse::compressed> *m,
-                                    const shard_storage *s,
-                                    unsigned long partition_id) {
-    shard_storage *storage = const_cast<shard_storage *>(s);
-    dataset_h5_state *state = 0;
-    if (m == 0 || storage == 0 || storage->backend != shard_storage_backend_dataset_h5 || partition_id >= m->num_partitions || storage->backend_state == 0) return 0;
-    state = (dataset_h5_state *) storage->backend_state;
-    if (!ensure_cached_shard_ready(storage, (unsigned long) state->partition_shard_ids[partition_id])) return 0;
-    return load_compressed_part_from_cached_pack(m, state, partition_id);
-}
-
-int fetch_dataset_compressed_h5_shard(sharded<sparse::compressed> *m,
-                                     const shard_storage *s,
-                                     unsigned long shard_id) {
-    unsigned long begin = 0;
-    unsigned long end = 0;
-    unsigned long i = 0;
-    dataset_h5_state *state = 0;
-
-    if (m == 0 || s == 0 || s->backend_state == 0 || shard_id >= m->num_shards) return 0;
-    state = (dataset_h5_state *) s->backend_state;
-    if (!ensure_cached_shard_ready(const_cast<shard_storage *>(s), shard_id)) return 0;
-    begin = first_partition_in_shard(m, shard_id);
-    end = last_partition_in_shard(m, shard_id);
-    for (i = begin; i < end; ++i) {
-        if (!load_compressed_part_from_cached_pack(m, state, i)) return 0;
-    }
-    return 1;
-}
-
-int prefetch_dataset_compressed_h5_partition_cache(const sharded<sparse::compressed> *m,
-                                             shard_storage *s,
-                                             unsigned long partition_id) {
-    dataset_h5_state *state = 0;
-    if (m == 0 || s == 0 || s->backend != shard_storage_backend_dataset_h5 || partition_id >= m->num_partitions || s->backend_state == 0) return 0;
-    state = (dataset_h5_state *) s->backend_state;
-    return ensure_cached_shard_ready(s, (unsigned long) state->partition_shard_ids[partition_id]);
-}
-
-int prefetch_dataset_compressed_h5_shard_cache(const sharded<sparse::compressed> *m,
-                                              shard_storage *s,
-                                              unsigned long shard_id) {
-    if (m == 0 || s == 0 || shard_id >= m->num_shards) return 0;
-    return ensure_cached_shard_ready(s, shard_id);
-}
-
 int fetch_dataset_blocked_ell_h5_partition(sharded<sparse::blocked_ell> *m,
                                      const shard_storage *s,
                                      unsigned long partition_id) {
@@ -6136,6 +5881,34 @@ int fetch_dataset_blocked_ell_h5_shard(sharded<sparse::blocked_ell> *m,
     if (!ensure_cached_shard_ready(const_cast<shard_storage *>(s), shard_id)) return 0;
     for (i = begin; i < end; ++i) {
         if (!load_blocked_ell_part_from_cached_pack(m, state, i)) return 0;
+    }
+    return 1;
+}
+
+int fetch_dataset_quantized_blocked_ell_h5_partition(sharded<sparse::quantized_blocked_ell> *m,
+                                                     const shard_storage *s,
+                                                     unsigned long partition_id) {
+    shard_storage *storage = const_cast<shard_storage *>(s);
+    dataset_h5_state *state = 0;
+    if (m == 0 || storage == 0 || storage->backend != shard_storage_backend_dataset_h5 || partition_id >= m->num_partitions || storage->backend_state == 0) return 0;
+    state = (dataset_h5_state *) storage->backend_state;
+    if (!ensure_cached_shard_ready(storage, (unsigned long) state->partition_shard_ids[partition_id])) return 0;
+    return load_quantized_blocked_ell_part_from_cached_pack(m, state, partition_id);
+}
+
+int fetch_dataset_quantized_blocked_ell_h5_shard(sharded<sparse::quantized_blocked_ell> *m,
+                                                 const shard_storage *s,
+                                                 unsigned long shard_id) {
+    const unsigned long begin = first_partition_in_shard(m, shard_id);
+    const unsigned long end = last_partition_in_shard(m, shard_id);
+    unsigned long i = 0;
+    dataset_h5_state *state = 0;
+
+    if (m == 0 || s == 0 || shard_id >= m->num_shards || s->backend_state == 0) return 0;
+    state = (dataset_h5_state *) s->backend_state;
+    if (!ensure_cached_shard_ready(const_cast<shard_storage *>(s), shard_id)) return 0;
+    for (i = begin; i < end; ++i) {
+        if (!load_quantized_blocked_ell_part_from_cached_pack(m, state, i)) return 0;
     }
     return 1;
 }
@@ -6180,6 +5953,22 @@ int prefetch_dataset_blocked_ell_h5_partition_cache(const sharded<sparse::blocke
 int prefetch_dataset_blocked_ell_h5_shard_cache(const sharded<sparse::blocked_ell> *m,
                                                shard_storage *s,
                                                unsigned long shard_id) {
+    if (m == 0 || s == 0 || shard_id >= m->num_shards) return 0;
+    return ensure_cached_shard_ready(s, shard_id);
+}
+
+int prefetch_dataset_quantized_blocked_ell_h5_partition_cache(const sharded<sparse::quantized_blocked_ell> *m,
+                                                              shard_storage *s,
+                                                              unsigned long partition_id) {
+    dataset_h5_state *state = 0;
+    if (m == 0 || s == 0 || s->backend != shard_storage_backend_dataset_h5 || partition_id >= m->num_partitions || s->backend_state == 0) return 0;
+    state = (dataset_h5_state *) s->backend_state;
+    return ensure_cached_shard_ready(s, (unsigned long) state->partition_shard_ids[partition_id]);
+}
+
+int prefetch_dataset_quantized_blocked_ell_h5_shard_cache(const sharded<sparse::quantized_blocked_ell> *m,
+                                                          shard_storage *s,
+                                                          unsigned long shard_id) {
     if (m == 0 || s == 0 || shard_id >= m->num_shards) return 0;
     return ensure_cached_shard_ready(s, shard_id);
 }
@@ -6261,6 +6050,58 @@ int warm_dataset_blocked_ell_h5_cache(const char *filename,
     if (!bind_dataset_h5_cache(&storage, cache_root)) goto done;
     for (shard_id = 0ul; shard_id < matrix.num_shards; ++shard_id) {
         if (!prefetch_dataset_blocked_ell_h5_shard_cache(&matrix, &storage, shard_id)) goto done;
+    }
+    ok = 1;
+
+done:
+    clear(&storage);
+    clear(&matrix);
+    return ok;
+}
+
+int warm_dataset_quantized_blocked_ell_h5_cache_range(const char *filename,
+                                                      const char *cache_root,
+                                                      unsigned long shard_begin,
+                                                      unsigned long shard_end) {
+    sharded<sparse::quantized_blocked_ell> matrix;
+    shard_storage storage;
+    unsigned long shard_id = 0ul;
+    int ok = 0;
+
+    if (filename == 0 || cache_root == 0 || *cache_root == '\0') return 0;
+
+    init(&matrix);
+    init(&storage);
+    if (!load_dataset_quantized_blocked_ell_h5_header(filename, &matrix, &storage)) goto done;
+    if (!bind_dataset_h5_cache(&storage, cache_root)) goto done;
+    if (shard_begin > matrix.num_shards) goto done;
+    if (shard_end > matrix.num_shards) shard_end = matrix.num_shards;
+    for (shard_id = shard_begin; shard_id < shard_end; ++shard_id) {
+        if (!prefetch_dataset_quantized_blocked_ell_h5_shard_cache(&matrix, &storage, shard_id)) goto done;
+    }
+    ok = 1;
+
+done:
+    clear(&storage);
+    clear(&matrix);
+    return ok;
+}
+
+int warm_dataset_quantized_blocked_ell_h5_cache(const char *filename,
+                                                const char *cache_root) {
+    sharded<sparse::quantized_blocked_ell> matrix;
+    shard_storage storage;
+    unsigned long shard_id = 0ul;
+    int ok = 0;
+
+    if (filename == 0 || cache_root == 0 || *cache_root == '\0') return 0;
+
+    init(&matrix);
+    init(&storage);
+    if (!load_dataset_quantized_blocked_ell_h5_header(filename, &matrix, &storage)) goto done;
+    if (!bind_dataset_h5_cache(&storage, cache_root)) goto done;
+    for (shard_id = 0ul; shard_id < matrix.num_shards; ++shard_id) {
+        if (!prefetch_dataset_quantized_blocked_ell_h5_shard_cache(&matrix, &storage, shard_id)) goto done;
     }
     ok = 1;
 

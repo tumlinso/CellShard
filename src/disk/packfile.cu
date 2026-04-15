@@ -82,6 +82,28 @@ inline void free_blocked_ell_result(blocked_ell_load_result *out) {
     out->ell_cols = 0u;
 }
 
+inline void free_quantized_blocked_ell_result(quantized_blocked_ell_load_result *out) {
+    if (out->storage != 0) std::free(out->storage);
+    else {
+        std::free(out->blockColIdx);
+        std::free(out->packed_values);
+        std::free(out->column_scales);
+        std::free(out->column_offsets);
+        std::free(out->row_offsets);
+    }
+    out->storage = 0;
+    out->blockColIdx = 0;
+    out->packed_values = 0;
+    out->column_scales = 0;
+    out->column_offsets = 0;
+    out->row_offsets = 0;
+    out->block_size = 0u;
+    out->ell_cols = 0u;
+    out->bits = 0u;
+    out->row_stride_bytes = 0u;
+    out->decode_policy = 0u;
+}
+
 inline void free_sliced_ell_result(sliced_ell_load_result *out) {
     if (out->storage != 0) std::free(out->storage);
     else {
@@ -397,6 +419,151 @@ int load_blocked_ell_raw(std::FILE *fp, std::size_t value_size, blocked_ell_load
 
 done:
     if (!ok) free_blocked_ell_result(out);
+    return ok;
+}
+
+int store_quantized_blocked_ell_raw(const char *filename,
+                                    types::dim_t rows,
+                                    types::dim_t cols,
+                                    types::nnz_t nnz,
+                                    types::u32 block_size,
+                                    types::u32 ell_cols,
+                                    types::u32 bits,
+                                    types::u32 row_stride_bytes,
+                                    types::u32 decode_policy,
+                                    const types::idx_t *blockColIdx,
+                                    const std::uint8_t *packed_values,
+                                    const float *column_scales,
+                                    const float *column_offsets,
+                                    const float *row_offsets) {
+    std::FILE *fp = 0;
+    int ok = 0;
+
+    fp = std::fopen(filename, "wb");
+    if (fp == 0) return 0;
+    configure_stream(fp);
+    ok = store_quantized_blocked_ell_raw(fp,
+                                         rows,
+                                         cols,
+                                         nnz,
+                                         block_size,
+                                         ell_cols,
+                                         bits,
+                                         row_stride_bytes,
+                                         decode_policy,
+                                         blockColIdx,
+                                         packed_values,
+                                         column_scales,
+                                         column_offsets,
+                                         row_offsets);
+
+done:
+    std::fclose(fp);
+    return ok;
+}
+
+int store_quantized_blocked_ell_raw(std::FILE *fp,
+                                    types::dim_t rows,
+                                    types::dim_t cols,
+                                    types::nnz_t nnz,
+                                    types::u32 block_size,
+                                    types::u32 ell_cols,
+                                    types::u32 bits,
+                                    types::u32 row_stride_bytes,
+                                    types::u32 decode_policy,
+                                    const types::idx_t *blockColIdx,
+                                    const std::uint8_t *packed_values,
+                                    const float *column_scales,
+                                    const float *column_offsets,
+                                    const float *row_offsets) {
+    const std::size_t row_blocks = block_size == 0u ? 0u : (std::size_t) ((rows + block_size - 1u) / block_size);
+    const std::size_t ell_width = block_size == 0u ? 0u : (std::size_t) (ell_cols / block_size);
+    const std::size_t packed_bytes = (std::size_t) rows * (std::size_t) row_stride_bytes;
+
+    if (!write_header(fp, disk_format_quantized_blocked_ell, rows, cols, nnz)) return 0;
+    if (!write_block(fp, &block_size, sizeof(block_size), 1)) return 0;
+    if (!write_block(fp, &ell_cols, sizeof(ell_cols), 1)) return 0;
+    if (!write_block(fp, &bits, sizeof(bits), 1)) return 0;
+    if (!write_block(fp, &row_stride_bytes, sizeof(row_stride_bytes), 1)) return 0;
+    if (!write_block(fp, &decode_policy, sizeof(decode_policy), 1)) return 0;
+    if (row_blocks * ell_width != 0u && !write_block(fp, blockColIdx, sizeof(types::idx_t), row_blocks * ell_width)) return 0;
+    if (packed_bytes != 0u && !write_block(fp, packed_values, sizeof(std::uint8_t), packed_bytes)) return 0;
+    if (cols != 0 && !write_block(fp, column_scales, sizeof(float), (std::size_t) cols)) return 0;
+    if (cols != 0 && !write_block(fp, column_offsets, sizeof(float), (std::size_t) cols)) return 0;
+    if (rows != 0 && !write_block(fp, row_offsets, sizeof(float), (std::size_t) rows)) return 0;
+    return 1;
+}
+
+int load_quantized_blocked_ell_raw(const char *filename, quantized_blocked_ell_load_result *out) {
+    std::FILE *fp = 0;
+    int ok = 0;
+
+    out->storage = 0;
+    out->blockColIdx = 0;
+    out->packed_values = 0;
+    out->column_scales = 0;
+    out->column_offsets = 0;
+    out->row_offsets = 0;
+    fp = std::fopen(filename, "rb");
+    if (fp == 0) return 0;
+    configure_stream(fp);
+    ok = load_quantized_blocked_ell_raw(fp, out);
+
+done:
+    std::fclose(fp);
+    return ok;
+}
+
+int load_quantized_blocked_ell_raw(std::FILE *fp, quantized_blocked_ell_load_result *out) {
+    int ok = 0;
+    std::size_t storage_bytes = 0u;
+    std::size_t idx_bytes = 0u;
+    std::size_t packed_offset = 0u;
+    std::size_t packed_bytes = 0u;
+    std::size_t column_scales_offset = 0u;
+    std::size_t column_offsets_offset = 0u;
+    std::size_t row_offsets_offset = 0u;
+    std::size_t row_blocks = 0u;
+    std::size_t ell_width = 0u;
+
+    out->storage = 0;
+    out->blockColIdx = 0;
+    out->packed_values = 0;
+    out->column_scales = 0;
+    out->column_offsets = 0;
+    out->row_offsets = 0;
+    if (!read_header(fp, &out->h)) goto done;
+    if (!check_disk_format(disk_format_quantized_blocked_ell, out->h.format, "quantized blocked ell matrix")) goto done;
+    if (!read_block(fp, &out->block_size, sizeof(out->block_size), 1)) goto done;
+    if (!read_block(fp, &out->ell_cols, sizeof(out->ell_cols), 1)) goto done;
+    if (!read_block(fp, &out->bits, sizeof(out->bits), 1)) goto done;
+    if (!read_block(fp, &out->row_stride_bytes, sizeof(out->row_stride_bytes), 1)) goto done;
+    if (!read_block(fp, &out->decode_policy, sizeof(out->decode_policy), 1)) goto done;
+    row_blocks = out->block_size == 0u ? 0u : (std::size_t) ((out->h.rows + out->block_size - 1u) / out->block_size);
+    ell_width = out->block_size == 0u ? 0u : (std::size_t) (out->ell_cols / out->block_size);
+    idx_bytes = row_blocks * ell_width * sizeof(types::idx_t);
+    packed_offset = align_up_bytes(idx_bytes, alignof(std::uint8_t));
+    packed_bytes = (std::size_t) out->h.rows * (std::size_t) out->row_stride_bytes;
+    column_scales_offset = align_up_bytes(packed_offset + packed_bytes, alignof(float));
+    column_offsets_offset = column_scales_offset + (std::size_t) out->h.cols * sizeof(float);
+    row_offsets_offset = column_offsets_offset + (std::size_t) out->h.cols * sizeof(float);
+    storage_bytes = row_offsets_offset + (std::size_t) out->h.rows * sizeof(float);
+    out->storage = alloc_bytes(storage_bytes);
+    if (storage_bytes != 0u && out->storage == 0) goto done;
+    out->blockColIdx = idx_bytes != 0u ? (types::idx_t *) out->storage : 0;
+    out->packed_values = packed_bytes != 0u ? (std::uint8_t *) ((char *) out->storage + packed_offset) : 0;
+    out->column_scales = out->h.cols != 0u ? (float *) ((char *) out->storage + column_scales_offset) : 0;
+    out->column_offsets = out->h.cols != 0u ? (float *) ((char *) out->storage + column_offsets_offset) : 0;
+    out->row_offsets = out->h.rows != 0u ? (float *) ((char *) out->storage + row_offsets_offset) : 0;
+    if (idx_bytes != 0u && !read_block(fp, out->blockColIdx, sizeof(types::idx_t), row_blocks * ell_width)) goto done;
+    if (packed_bytes != 0u && !read_block(fp, out->packed_values, sizeof(std::uint8_t), packed_bytes)) goto done;
+    if (out->h.cols != 0u && !read_block(fp, out->column_scales, sizeof(float), (std::size_t) out->h.cols)) goto done;
+    if (out->h.cols != 0u && !read_block(fp, out->column_offsets, sizeof(float), (std::size_t) out->h.cols)) goto done;
+    if (out->h.rows != 0u && !read_block(fp, out->row_offsets, sizeof(float), (std::size_t) out->h.rows)) goto done;
+    ok = 1;
+
+done:
+    if (!ok) free_quantized_blocked_ell_result(out);
     return ok;
 }
 
@@ -726,6 +893,52 @@ int load(std::FILE *fp, sparse::blocked_ell *m) {
     m->storage = tmp.storage;
     m->blockColIdx = tmp.blockColIdx;
     m->val = (real::storage_t *) tmp.val;
+    return 1;
+}
+
+int store(std::FILE *fp, const sparse::quantized_blocked_ell *m) {
+    return store_quantized_blocked_ell_raw(fp,
+                                           m->rows,
+                                           m->cols,
+                                           m->nnz,
+                                           m->block_size,
+                                           m->ell_cols,
+                                           m->bits,
+                                           m->row_stride_bytes,
+                                           m->decode_policy,
+                                           m->blockColIdx,
+                                           m->packed_values,
+                                           m->column_scales,
+                                           m->column_offsets,
+                                           m->row_offsets);
+}
+
+int load(std::FILE *fp, sparse::quantized_blocked_ell *m) {
+    quantized_blocked_ell_load_result tmp;
+
+    tmp.storage = 0;
+    tmp.blockColIdx = 0;
+    tmp.packed_values = 0;
+    tmp.column_scales = 0;
+    tmp.column_offsets = 0;
+    tmp.row_offsets = 0;
+    if (!load_quantized_blocked_ell_raw(fp, &tmp)) return 0;
+    sparse::clear(m);
+    sparse::init(m,
+                 tmp.h.rows,
+                 tmp.h.cols,
+                 tmp.h.nnz,
+                 tmp.block_size,
+                 tmp.ell_cols,
+                 tmp.bits,
+                 tmp.decode_policy,
+                 tmp.row_stride_bytes);
+    m->storage = tmp.storage;
+    m->blockColIdx = tmp.blockColIdx;
+    m->packed_values = tmp.packed_values;
+    m->column_scales = tmp.column_scales;
+    m->column_offsets = tmp.column_offsets;
+    m->row_offsets = tmp.row_offsets;
     return 1;
 }
 

@@ -65,6 +65,7 @@ Main source areas:
 Useful public/runtime waypoints:
 
 - `include/CellShard/runtime/layout/sharded.cuh`: the metadata-only `sharded<T>` view and partition/shard boundary helpers
+- `include/CellShard/runtime/storage/shard_storage.cuh`: shard-storage backend, role, and capability definitions for the active `.csh5` runtime
 - `include/CellShard/runtime/host/sharded_host.cuh`: host-side fetch/drop and shard regrouping
 - `include/CellShard/runtime/device/sharded_device.cuh`: single-GPU upload and staging
 - `include/CellShard/runtime/distributed/distributed.cuh`: local multi-GPU shard placement and owner staging
@@ -133,6 +134,15 @@ The fingerprinted instance keeps source identity stable, while the directory
 names around it make it obvious where manifests, canonical packs, and the
 currently published execution-pack generation live.
 
+Sliced-ELL is the main exception to the old "plain canonical payload plus
+execution-only rebucketed payload" split. Sliced datasets now persist the
+optimized row-bucketed partition payload directly in `.csh5`, together with the
+row maps and canonical slice metadata needed to reconstruct logical canonical
+row order. The runtime still publishes that unified sliced payload on the usual
+`shard.<id>.exec.pack` path, but the bytes in that file are the same native
+bucketed sliced partition payload that `.csh5` stores, not a second
+execution-only sliced codec.
+
 Do not think of `.csh5` as the final hot execution substrate. `.csh5` is the durable canonical source and append target, while `.pack` is the runtime format used for high-throughput repeated access and delivery.
 
 The intended workflow is:
@@ -143,6 +153,12 @@ The intended workflow is:
 4. serve or fetch host partitions or shards from the active pack generation
 5. optionally upload or stage them to GPU, and keep repeated hot readers on device-resident execution partitions when the generation is unchanged
 6. run higher-level compute outside CellShard
+
+Note on naming:
+
+- `runtime/storage/shard_storage.cuh` is the public storage-role surface
+- the older `runtime/layout/shard_paths.cuh` name is retained only as a compatibility shim
+- actual cache-pack path builders live in the `.csh5` runtime helpers, especially `src/io/csh5/preprocess_helpers_part.hh`
 
 For large or remote MTX ingest, the practical write-side workflow is:
 

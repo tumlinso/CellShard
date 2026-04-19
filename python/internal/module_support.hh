@@ -6,7 +6,7 @@
 #include "../../include/CellShard/formats/compressed.cuh"
 #include "../../include/CellShard/io/csh5/api.cuh"
 #include "../../include/CellShard/runtime/host/sharded_host.cuh"
-#include "../../include/CellShard/runtime/layout/shard_paths.cuh"
+#include "../../include/CellShard/runtime/storage/shard_storage.cuh"
 #include "../../include/CellShard/runtime/layout/sharded.cuh"
 #include "../../include/CellShard/runtime/storage/disk.cuh"
 

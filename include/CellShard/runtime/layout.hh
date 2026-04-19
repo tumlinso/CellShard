@@ -1,4 +1,4 @@
 #pragma once
 
-#include "layout/shard_paths.cuh"
+#include "storage/shard_storage.cuh"
 #include "layout/sharded.cuh"

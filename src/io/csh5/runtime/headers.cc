@@ -176,8 +176,8 @@ int load_dataset_sliced_ell_h5_header(const char *filename,
         filename,
         m,
         s,
-        0,
-        0,
+        "sliced_ell",
+        payload_layout_optimized_sliced_ell,
         [](hid_t, dataset_h5_state *state, const char *) -> int {
             state->matrix_family = dataset_matrix_family_sliced_ell;
             return 1;

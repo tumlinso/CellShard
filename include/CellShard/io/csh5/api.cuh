@@ -5,7 +5,7 @@
 #include "../../formats/quantized_blocked_ell.cuh"
 #include "../../formats/sliced_ell.cuh"
 #include "../../core/real.cuh"
-#include "../../runtime/layout/shard_paths.cuh"
+#include "../../runtime/storage/shard_storage.cuh"
 #include "../../runtime/layout/sharded.cuh"
 
 #include <cstdint>
@@ -419,6 +419,9 @@ struct bucketed_sliced_ell_partition {
     std::uint32_t *segment_row_offsets;
     std::uint32_t *exec_to_canonical_rows;
     std::uint32_t *canonical_to_exec_rows;
+    std::uint32_t canonical_slice_count;
+    std::uint32_t *canonical_slice_row_offsets;
+    std::uint32_t *canonical_slice_widths;
 };
 
 inline void init(bucketed_sliced_ell_partition *part) {
@@ -431,6 +434,9 @@ inline void init(bucketed_sliced_ell_partition *part) {
     part->segment_row_offsets = nullptr;
     part->exec_to_canonical_rows = nullptr;
     part->canonical_to_exec_rows = nullptr;
+    part->canonical_slice_count = 0u;
+    part->canonical_slice_row_offsets = nullptr;
+    part->canonical_slice_widths = nullptr;
 }
 
 inline void clear(bucketed_sliced_ell_partition *part) {
@@ -443,6 +449,8 @@ inline void clear(bucketed_sliced_ell_partition *part) {
     std::free(part->segment_row_offsets);
     std::free(part->exec_to_canonical_rows);
     std::free(part->canonical_to_exec_rows);
+    std::free(part->canonical_slice_row_offsets);
+    std::free(part->canonical_slice_widths);
     init(part);
 }
 
@@ -482,7 +490,7 @@ template<typename MatrixT>
 struct partition_record;
 }
 
-struct dataset_sliced_execution_device_partition_view {
+struct dataset_sliced_bucketed_device_partition_view {
     unsigned long partition_id;
     std::uint32_t segment_count;
     const bucketed_sliced_ell_partition *host_partition;
@@ -493,7 +501,7 @@ struct dataset_sliced_execution_device_partition_view {
     std::uint64_t service_epoch;
 };
 
-inline void init(dataset_sliced_execution_device_partition_view *view) {
+inline void init(dataset_sliced_bucketed_device_partition_view *view) {
     if (view == nullptr) return;
     view->partition_id = 0u;
     view->segment_count = 0u;
@@ -568,13 +576,10 @@ int append_quantized_blocked_ell_partition_h5(const char *filename,
                                               const sparse::quantized_blocked_ell *part);
 int append_sliced_ell_partition_h5(const char *filename,
                                    unsigned long partition_id,
-                                   const sparse::sliced_ell *part);
+                                   const bucketed_sliced_ell_partition *part);
 int append_bucketed_blocked_ell_shard_h5(const char *filename,
                                          unsigned long shard_id,
                                          const bucketed_blocked_ell_shard *shard);
-int append_bucketed_sliced_ell_shard_h5(const char *filename,
-                                        unsigned long shard_id,
-                                        const bucketed_sliced_ell_shard *shard);
 
 // Header load binds a lazy shard_storage backend; fetch/prefetch calls are the
 // points that actually materialize partition payloads or populate local caches.
@@ -646,21 +651,21 @@ int fetch_dataset_blocked_ell_h5_execution_partition(bucketed_blocked_ell_partit
                                                     const sharded<sparse::blocked_ell> *m,
                                                     const shard_storage *s,
                                                     unsigned long partition_id);
-int fetch_dataset_sliced_ell_h5_execution_partition(bucketed_sliced_ell_partition *out,
-                                                    const sharded<sparse::sliced_ell> *m,
-                                                    const shard_storage *s,
-                                                    unsigned long partition_id);
+int fetch_dataset_sliced_ell_h5_bucketed_partition(bucketed_sliced_ell_partition *out,
+                                                   const sharded<sparse::sliced_ell> *m,
+                                                   const shard_storage *s,
+                                                   unsigned long partition_id);
 #if CELLSHARD_ENABLE_CUDA
-int acquire_dataset_sliced_ell_h5_execution_partition_device(dataset_sliced_execution_device_partition_view *out,
-                                                             const sharded<sparse::sliced_ell> *m,
-                                                             const shard_storage *s,
-                                                             unsigned long partition_id,
-                                                             int device_id,
-                                                             std::uint64_t cache_budget_bytes);
-int release_dataset_sliced_ell_h5_execution_partition_device(dataset_sliced_execution_device_partition_view *view);
-int clear_dataset_sliced_ell_h5_device_cache(const char *source_path,
-                                             int device_id);
-int clear_all_dataset_sliced_ell_h5_device_caches();
+int acquire_dataset_sliced_ell_h5_bucketed_partition_device(dataset_sliced_bucketed_device_partition_view *out,
+                                                            const sharded<sparse::sliced_ell> *m,
+                                                            const shard_storage *s,
+                                                            unsigned long partition_id,
+                                                            int device_id,
+                                                            std::uint64_t cache_budget_bytes);
+int release_dataset_sliced_ell_h5_bucketed_partition_device(dataset_sliced_bucketed_device_partition_view *view);
+int clear_dataset_sliced_ell_h5_bucketed_device_cache(const char *source_path,
+                                                      int device_id);
+int clear_all_dataset_sliced_ell_h5_bucketed_device_caches();
 #endif
 int fetch_dataset_blocked_ell_h5_partition(sharded<sparse::blocked_ell> *m,
                                      const shard_storage *s,

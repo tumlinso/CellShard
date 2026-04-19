@@ -142,7 +142,7 @@ done:
 
 int append_sliced_ell_partition_h5(const char *filename,
                                    unsigned long partition_id,
-                                   const sparse::sliced_ell *part) {
+                                   const bucketed_sliced_ell_partition *part) {
     hid_t file = (hid_t) -1;
     hid_t payload = (hid_t) -1;
     char *buffer = 0;
@@ -161,13 +161,15 @@ int append_sliced_ell_partition_h5(const char *filename,
     if (!build_partition_blob_dataset_name(partition_id, dataset_name, sizeof(dataset_name))) goto done;
     fp = open_memstream(&buffer, &blob_bytes);
     if (fp == 0) goto done;
-    if (!::cellshard::store(fp, part) || std::fclose(fp) != 0) {
+    if (!write_sliced_execution_partition_blob(fp, part) || std::fclose(fp) != 0) {
         fp = 0;
         goto done;
     }
     fp = 0;
     blob = (unsigned char *) buffer;
     if (!write_blob_dataset(payload, dataset_name, blob, blob_bytes)) goto done;
+    if (H5Aexists(file, "payload_layout") > 0 && H5Adelete(file, "payload_layout") < 0) goto done;
+    if (!write_attr_string(file, "payload_layout", payload_layout_optimized_sliced_ell)) goto done;
     ok = 1;
 
 done:
@@ -207,45 +209,6 @@ int append_bucketed_blocked_ell_shard_h5(const char *filename,
     if (!write_blob_dataset(payload, dataset_name, blob, blob_bytes)) goto done;
     if (H5Aexists(file, "payload_layout") > 0 && H5Adelete(file, "payload_layout") < 0) goto done;
     if (!write_attr_string(file, "payload_layout", payload_layout_optimized_blocked_ell)) goto done;
-    ok = 1;
-
-done:
-    std::free(blob);
-    if (payload >= 0) H5Gclose(payload);
-    if (payload_root >= 0) H5Gclose(payload_root);
-    if (file >= 0) H5Fclose(file);
-    return ok;
-}
-
-int append_bucketed_sliced_ell_shard_h5(const char *filename,
-                                        unsigned long shard_id,
-                                        const bucketed_sliced_ell_shard *shard) {
-    hid_t file = (hid_t) -1;
-    hid_t payload_root = (hid_t) -1;
-    hid_t payload = (hid_t) -1;
-    unsigned char *blob = 0;
-    std::size_t blob_bytes = 0u;
-    char dataset_name[64];
-    int ok = 0;
-
-    if (filename == 0 || shard == 0) return 0;
-    file = H5Fopen(filename, H5F_ACC_RDWR, H5P_DEFAULT);
-    if (file < 0) return 0;
-    if (!ensure_dataset_identity(file)) goto done;
-    payload_root = H5Gopen2(file, payload_group, H5P_DEFAULT);
-    if (payload_root < 0) payload_root = create_group(file, payload_group);
-    if (payload_root < 0) goto done;
-    if (H5Lexists(payload_root, "optimized_sliced_ell", H5P_DEFAULT) > 0) {
-        payload = H5Gopen2(payload_root, "optimized_sliced_ell", H5P_DEFAULT);
-    } else {
-        payload = create_group(payload_root, "optimized_sliced_ell");
-    }
-    if (payload < 0) goto done;
-    if (!build_optimized_shard_dataset_name(shard_id, dataset_name, sizeof(dataset_name))) goto done;
-    if (!serialize_optimized_sliced_shard(shard, &blob, &blob_bytes)) goto done;
-    if (!write_blob_dataset(payload, dataset_name, blob, blob_bytes)) goto done;
-    if (H5Aexists(file, "payload_layout") > 0 && H5Adelete(file, "payload_layout") < 0) goto done;
-    if (!write_attr_string(file, "payload_layout", payload_layout_optimized_sliced_ell)) goto done;
     ok = 1;
 
 done:

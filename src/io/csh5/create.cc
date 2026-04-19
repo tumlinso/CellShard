@@ -494,7 +494,7 @@ int create_dataset_sliced_ell_h5(const char *filename,
                                             layout,
                                             datasets,
                                             "sliced_ell",
-                                            payload_layout_shard_packed)) {
+                                            payload_layout_optimized_sliced_ell)) {
         goto done;
     }
     payload = payload_root >= 0 ? create_group(payload_root, "sliced_ell") : (hid_t) -1;

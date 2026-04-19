@@ -674,7 +674,7 @@ inline void default_execution_metadata(dataset_h5_state *state) {
             : (state != 0 && state->matrix_family == dataset_matrix_family_quantized_blocked_ell
                    ? dataset_execution_format_quantized_blocked_ell
                    : (state != 0 && state->matrix_family == dataset_matrix_family_sliced_ell
-                   ? dataset_execution_format_sliced_ell
+                   ? dataset_execution_format_bucketed_sliced_ell
                    : dataset_execution_format_blocked_ell));
     if (state == 0) return;
     state->preferred_base_format = default_format;

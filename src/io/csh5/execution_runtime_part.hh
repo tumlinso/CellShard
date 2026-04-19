@@ -1,5 +1,10 @@
 #pragma once
 
+inline int load_sliced_bucketed_partition_from_exec_pack(const dataset_h5_state *state,
+                                                         unsigned long shard_id,
+                                                         unsigned long partition_id,
+                                                         bucketed_sliced_ell_partition *out);
+
 inline int load_optimized_partition_blob(std::FILE *fp, bucketed_blocked_ell_partition *part) {
     std::uint32_t segment = 0u;
     if (fp == 0 || part == 0) return 0;
@@ -163,9 +168,22 @@ inline int write_sliced_execution_partition_blob(std::FILE *fp, const bucketed_s
     if (!write_sharded_block(fp, &part->cols, sizeof(part->cols), 1u)) return 0;
     if (!write_sharded_block(fp, &part->nnz, sizeof(part->nnz), 1u)) return 0;
     if (!write_sharded_block(fp, &part->segment_count, sizeof(part->segment_count), 1u)) return 0;
+    if (!write_sharded_block(fp, &part->canonical_slice_count, sizeof(part->canonical_slice_count), 1u)) return 0;
     if (!write_sharded_block(fp, part->segment_row_offsets, sizeof(std::uint32_t), (std::size_t) part->segment_count + 1u)) return 0;
     if (!write_sharded_block(fp, part->exec_to_canonical_rows, sizeof(std::uint32_t), part->rows)) return 0;
     if (!write_sharded_block(fp, part->canonical_to_exec_rows, sizeof(std::uint32_t), part->rows)) return 0;
+    if (!write_sharded_block(fp,
+                             part->canonical_slice_row_offsets,
+                             sizeof(std::uint32_t),
+                             (std::size_t) part->canonical_slice_count + 1u)) {
+        return 0;
+    }
+    if (!write_sharded_block(fp,
+                             part->canonical_slice_widths,
+                             sizeof(std::uint32_t),
+                             (std::size_t) part->canonical_slice_count)) {
+        return 0;
+    }
     for (segment = 0u; segment < part->segment_count; ++segment) {
         if (!::cellshard::store(fp, part->segments + segment)) return 0;
     }
@@ -180,12 +198,20 @@ inline int load_sliced_execution_partition_blob(std::FILE *fp, bucketed_sliced_e
     if (!read_sharded_block(fp, &part->cols, sizeof(part->cols), 1u)) return 0;
     if (!read_sharded_block(fp, &part->nnz, sizeof(part->nnz), 1u)) return 0;
     if (!read_sharded_block(fp, &part->segment_count, sizeof(part->segment_count), 1u)) return 0;
+    if (!read_sharded_block(fp, &part->canonical_slice_count, sizeof(part->canonical_slice_count), 1u)) return 0;
     part->segments = part->segment_count != 0u ? (sparse::sliced_ell *) std::calloc((std::size_t) part->segment_count, sizeof(sparse::sliced_ell)) : 0;
     part->segment_row_offsets = (std::uint32_t *) std::calloc((std::size_t) part->segment_count + 1u, sizeof(std::uint32_t));
     part->exec_to_canonical_rows = part->rows != 0u ? (std::uint32_t *) std::calloc((std::size_t) part->rows, sizeof(std::uint32_t)) : 0;
     part->canonical_to_exec_rows = part->rows != 0u ? (std::uint32_t *) std::calloc((std::size_t) part->rows, sizeof(std::uint32_t)) : 0;
+    part->canonical_slice_row_offsets =
+        (std::uint32_t *) std::calloc((std::size_t) part->canonical_slice_count + 1u, sizeof(std::uint32_t));
+    part->canonical_slice_widths = part->canonical_slice_count != 0u
+        ? (std::uint32_t *) std::calloc((std::size_t) part->canonical_slice_count, sizeof(std::uint32_t))
+        : 0;
     if ((part->segment_count != 0u && (part->segments == 0 || part->segment_row_offsets == 0))
-        || (part->rows != 0u && (part->exec_to_canonical_rows == 0 || part->canonical_to_exec_rows == 0))) {
+        || (part->rows != 0u && (part->exec_to_canonical_rows == 0 || part->canonical_to_exec_rows == 0))
+        || part->canonical_slice_row_offsets == 0
+        || (part->canonical_slice_count != 0u && part->canonical_slice_widths == 0)) {
         clear(part);
         return 0;
     }
@@ -202,10 +228,86 @@ inline int load_sliced_execution_partition_blob(std::FILE *fp, bucketed_sliced_e
         clear(part);
         return 0;
     }
+    if (!read_sharded_block(fp,
+                            part->canonical_slice_row_offsets,
+                            sizeof(std::uint32_t),
+                            (std::size_t) part->canonical_slice_count + 1u)) {
+        clear(part);
+        return 0;
+    }
+    if (!read_sharded_block(fp,
+                            part->canonical_slice_widths,
+                            sizeof(std::uint32_t),
+                            (std::size_t) part->canonical_slice_count)) {
+        clear(part);
+        return 0;
+    }
     for (segment = 0u; segment < part->segment_count; ++segment) {
         if (!::cellshard::load(fp, part->segments + segment)) {
             clear(part);
             return 0;
+        }
+    }
+    return 1;
+}
+
+inline int find_bucketed_sliced_segment(const bucketed_sliced_ell_partition *part,
+                                        std::uint32_t exec_row,
+                                        std::uint32_t *segment_out,
+                                        std::uint32_t *segment_row_out) {
+    if (part == 0 || segment_out == 0 || segment_row_out == 0 || exec_row >= part->rows) return 0;
+    for (std::uint32_t segment = 0u; segment < part->segment_count; ++segment) {
+        const std::uint32_t row_begin = part->segment_row_offsets[segment];
+        const std::uint32_t row_end = part->segment_row_offsets[segment + 1u];
+        if (exec_row >= row_begin && exec_row < row_end) {
+            *segment_out = segment;
+            *segment_row_out = exec_row - row_begin;
+            return 1;
+        }
+    }
+    return 0;
+}
+
+inline int rebuild_canonical_sliced_partition(const bucketed_sliced_ell_partition *src,
+                                              sparse::sliced_ell *out) {
+    if (src == 0 || out == 0) return 0;
+    sparse::clear(out);
+    sparse::init(out, src->rows, src->cols, src->nnz);
+    if (!sparse::allocate(out,
+                          src->canonical_slice_count,
+                          src->canonical_slice_row_offsets,
+                          src->canonical_slice_widths)) {
+        sparse::clear(out);
+        return 0;
+    }
+    for (std::uint32_t exec_row = 0u; exec_row < src->rows; ++exec_row) {
+        std::uint32_t segment = 0u, segment_row = 0u;
+        const std::uint32_t canonical_row = src->exec_to_canonical_rows != 0 ? src->exec_to_canonical_rows[exec_row] : exec_row;
+        const std::uint32_t dst_slice = sparse::find_slice(out, canonical_row);
+        const std::uint32_t dst_row_begin = dst_slice < out->slice_count ? out->slice_row_offsets[dst_slice] : 0u;
+        const std::uint32_t dst_width = dst_slice < out->slice_count ? out->slice_widths[dst_slice] : 0u;
+        const std::size_t dst_base =
+            sparse::slice_slot_base(out, dst_slice) + (std::size_t) (canonical_row - dst_row_begin) * (std::size_t) dst_width;
+        std::size_t dst_slot = 0u;
+        if (!find_bucketed_sliced_segment(src, exec_row, &segment, &segment_row)) {
+            sparse::clear(out);
+            return 0;
+        }
+        {
+            const sparse::sliced_ell *seg = src->segments + segment;
+            const std::uint32_t seg_width = seg->slice_count != 0u ? seg->slice_widths[0] : 0u;
+            const std::size_t seg_base = (std::size_t) segment_row * (std::size_t) seg_width;
+            for (std::uint32_t slot = 0u; slot < seg_width; ++slot) {
+                const types::idx_t col = seg->col_idx[seg_base + slot];
+                if (col == sparse::sliced_ell_invalid_col) continue;
+                if (dst_slot >= dst_width) {
+                    sparse::clear(out);
+                    return 0;
+                }
+                out->col_idx[dst_base + dst_slot] = col;
+                out->val[dst_base + dst_slot] = seg->val[seg_base + slot];
+                ++dst_slot;
+            }
         }
     }
     return 1;
@@ -452,20 +554,16 @@ inline int load_sliced_ell_part_from_cached_pack(sharded<sparse::sliced_ell> *m,
                                                  dataset_h5_state *state,
                                                  unsigned long partition_id) {
     const unsigned long shard_id = state != 0 && state->partition_shard_ids != 0 ? (unsigned long) state->partition_shard_ids[partition_id] : 0ul;
-    dataset_h5_cache_runtime *runtime = cache_runtime(state);
     sparse::sliced_ell *part = 0;
-    std::uint64_t offset = 0u;
+    bucketed_sliced_ell_partition stored;
     int ok = 0;
 
-    if (m == 0 || state == 0 || runtime == 0 || partition_id >= m->num_partitions) return 0;
-    if (!ensure_cached_shard_file_open(state, shard_id)) return 0;
-    compute_cached_part_locator<sparse::sliced_ell>(state, partition_id, &offset, 0);
-    std::lock_guard<std::mutex> file_lock(runtime->shard_file_mutexes[shard_id]);
-    if (state->shard_cache_files[shard_id] == 0) return 0;
+    init(&stored);
+    if (m == 0 || state == 0 || partition_id >= m->num_partitions) return 0;
     part = new sparse::sliced_ell;
     sparse::init(part);
-    if (fseeko(state->shard_cache_files[shard_id], (off_t) offset, SEEK_SET) != 0) goto done;
-    if (!::cellshard::load(state->shard_cache_files[shard_id], part)) goto done;
+    if (!load_sliced_bucketed_partition_from_exec_pack(state, shard_id, partition_id, &stored)) goto done;
+    if (!rebuild_canonical_sliced_partition(&stored, part)) goto done;
     if (part->rows != m->partition_rows[partition_id]) goto done;
     if (part->cols != m->cols) goto done;
     if (part->nnz != m->partition_nnz[partition_id]) goto done;
@@ -476,6 +574,7 @@ inline int load_sliced_ell_part_from_cached_pack(sharded<sparse::sliced_ell> *m,
     ok = 1;
 
 done:
+    clear(&stored);
     if (part != 0) {
         sparse::clear(part);
         delete part;
@@ -524,6 +623,43 @@ inline int load_sliced_execution_partition_from_pack(const dataset_h5_state *sta
                                                      unsigned long shard_id,
                                                      unsigned long partition_id,
                                                      bucketed_sliced_ell_partition *out) {
+    char path[4096];
+    std::FILE *fp = 0;
+    unsigned char magic[8];
+    std::uint64_t file_shard_id = 0u;
+    std::uint64_t partition_count = 0u;
+    std::uint64_t *partition_offsets = 0;
+    std::uint64_t local_partition_id = 0u;
+    int ok = 0;
+
+    if (state == 0 || out == 0 || shard_id >= state->num_shards || partition_id >= state->num_partitions) return 0;
+    if (!build_execution_pack_path(state, shard_id, path, sizeof(path))) return 0;
+    fp = std::fopen(path, "rb");
+    if (fp == 0) return 0;
+    if (!read_sharded_block(fp, magic, sizeof(magic), 1u)) goto done;
+    if (std::memcmp(magic, execution_pack_magic, sizeof(magic)) != 0) goto done;
+    if (!read_sharded_block(fp, &file_shard_id, sizeof(file_shard_id), 1u)) goto done;
+    if (!read_sharded_block(fp, &partition_count, sizeof(partition_count), 1u)) goto done;
+    if (file_shard_id != shard_id) goto done;
+    local_partition_id = partition_id - state->shard_part_begin[shard_id];
+    if (local_partition_id >= partition_count) goto done;
+    partition_offsets = (std::uint64_t *) std::calloc((std::size_t) partition_count, sizeof(std::uint64_t));
+    if (partition_count != 0u && partition_offsets == 0) goto done;
+    if (!read_sharded_block(fp, partition_offsets, sizeof(std::uint64_t), (std::size_t) partition_count)) goto done;
+    if (fseeko(fp, (off_t) partition_offsets[local_partition_id], SEEK_SET) != 0) goto done;
+    if (!load_sliced_execution_partition_blob(fp, out)) goto done;
+    ok = 1;
+
+done:
+    if (fp != 0) std::fclose(fp);
+    std::free(partition_offsets);
+    return ok;
+}
+
+inline int load_sliced_bucketed_partition_from_exec_pack(const dataset_h5_state *state,
+                                                         unsigned long shard_id,
+                                                         unsigned long partition_id,
+                                                         bucketed_sliced_ell_partition *out) {
     char path[4096];
     std::FILE *fp = 0;
     unsigned char magic[8];
@@ -653,82 +789,25 @@ inline int materialize_sliced_ell_execution_pack(shard_storage *s, dataset_h5_st
     const std::uint64_t begin = state != 0 && state->shard_part_begin != 0 ? state->shard_part_begin[shard_id] : 0u;
     const std::uint64_t end = state != 0 && state->shard_part_end != 0 ? state->shard_part_end[shard_id] : 0u;
     const std::uint64_t partition_count = end >= begin ? (end - begin) : 0u;
-    bucketed_sliced_ell_partition *exec_parts = 0;
-    const bucketed_sliced_ell_shard *optimized_shard = 0;
+    bucketed_sliced_ell_partition *parts = 0;
     std::uint64_t *partition_offsets = 0;
     char tmp_path[4096];
     char final_path[4096];
-    std::FILE *fp = 0;
     std::uint64_t local = 0u;
-    std::uint64_t pack_bytes = 0u;
+    std::FILE *fp = 0;
     int ok = 0;
 
     if (s == 0 || state == 0 || shard_id >= state->num_shards) return 0;
     if (!open_dataset_h5_backend(s)) return 0;
     if (partition_count != 0u) {
+        parts = (bucketed_sliced_ell_partition *) std::calloc((std::size_t) partition_count, sizeof(bucketed_sliced_ell_partition));
         partition_offsets = (std::uint64_t *) std::calloc((std::size_t) partition_count, sizeof(std::uint64_t));
-        exec_parts = (bucketed_sliced_ell_partition *) std::calloc((std::size_t) partition_count, sizeof(bucketed_sliced_ell_partition));
-        if (partition_offsets == 0 || exec_parts == 0) goto done;
-        for (local = 0u; local < partition_count; ++local) init(exec_parts + local);
+        if (parts == 0 || partition_offsets == 0) return 0;
+        for (local = 0u; local < partition_count; ++local) init(parts + local);
     }
-    if (!ensure_execution_metadata_allocated(state)) goto done;
-    if (!ensure_optimized_sliced_ell_payload_open(state) || !load_optimized_sliced_ell_shard_payload(state, shard_id)) {
-        std::uint32_t shard_segment_total = 0u;
-        for (local = 0u; local < partition_count; ++local) {
-            const std::uint64_t partition_id = begin + local;
-            const std::uint32_t requested_bucket_count =
-                state->partition_execution_formats != 0
-                && state->partition_execution_formats[partition_id] == dataset_execution_format_bucketed_sliced_ell
-                && state->partition_blocked_ell_bucket_counts != 0
-                    ? std::max<std::uint32_t>(1u, state->partition_blocked_ell_bucket_counts[partition_id])
-                    : 1u;
-            std::uint64_t bucketed_bytes = 0u;
-            sparse::sliced_ell part;
-            sparse::init(&part);
-            if (!load_sliced_ell_partition_payload(state, (unsigned long) partition_id, &part)) {
-                sparse::clear(&part);
-                goto done;
-            }
-            if (!build_bucketed_sliced_execution_partition(exec_parts + local, &part, requested_bucket_count, &bucketed_bytes)) {
-                sparse::clear(&part);
-                goto done;
-            }
-            state->partition_sliced_ell_slice_counts[partition_id] = part.slice_count;
-            state->partition_sliced_ell_slice_rows[partition_id] = sparse::uniform_slice_rows(&part);
-            state->partition_sliced_ell_bytes[partition_id] = sliced_execution_segment_bytes(&part);
-            state->partition_bucketed_sliced_ell_bytes[partition_id] = bucketed_bytes;
-            state->partition_execution_bytes[partition_id] = bucketed_bytes;
-            state->partition_execution_formats[partition_id] = requested_bucket_count > 1u
-                ? dataset_execution_format_bucketed_sliced_ell
-                : dataset_execution_format_sliced_ell;
-            shard_segment_total += exec_parts[local].segment_count;
-            sparse::clear(&part);
-        }
-        state->shard_execution_formats[shard_id] = dataset_execution_format_bucketed_sliced_ell;
-        state->shard_bucketed_partition_counts[shard_id] = (std::uint32_t) partition_count;
-        state->shard_bucketed_segment_counts[shard_id] = shard_segment_total;
-        state->shard_sliced_ell_slice_counts[shard_id] = shard_segment_total;
-        state->shard_sliced_ell_slice_rows[shard_id] = partition_count != 0u
-            ? state->partition_sliced_ell_slice_rows[begin]
-            : 0u;
-        for (local = 1u; local < partition_count; ++local) {
-            if (state->shard_sliced_ell_slice_rows[shard_id] != state->partition_sliced_ell_slice_rows[begin + local]) {
-                state->shard_sliced_ell_slice_rows[shard_id] = 0u;
-                break;
-            }
-        }
-    } else {
-        optimized_shard = &state->loaded_optimized_sliced_shard;
-        if (optimized_shard->partition_count != partition_count) goto done;
-        state->shard_execution_formats[shard_id] = dataset_execution_format_bucketed_sliced_ell;
-        state->shard_bucketed_partition_counts[shard_id] = optimized_shard->partition_count;
-        state->shard_bucketed_segment_counts[shard_id] = 0u;
-        state->shard_sliced_ell_slice_counts[shard_id] = 0u;
-        state->shard_sliced_ell_slice_rows[shard_id] = 0u;
-        for (local = 0u; local < partition_count; ++local) {
-            state->shard_bucketed_segment_counts[shard_id] += optimized_shard->partitions[local].segment_count;
-            state->shard_sliced_ell_slice_counts[shard_id] += optimized_shard->partitions[local].segment_count;
-        }
+    for (local = 0u; local < partition_count; ++local) {
+        const std::uint64_t partition_id = begin + local;
+        if (!load_bucketed_sliced_ell_partition_payload(state, (unsigned long) partition_id, parts + local)) goto done;
     }
     if (!build_execution_pack_temp_path(state, shard_id, tmp_path, sizeof(tmp_path))) goto done;
     if (!build_execution_pack_path(state, shard_id, final_path, sizeof(final_path))) goto done;
@@ -744,13 +823,8 @@ inline int materialize_sliced_ell_execution_pack(shard_storage *s, dataset_h5_st
     }
     for (local = 0u; local < partition_count; ++local) {
         partition_offsets[local] = (std::uint64_t) ftello(fp);
-        if (optimized_shard != 0) {
-            if (!write_sliced_execution_partition_blob(fp, optimized_shard->partitions + local)) goto done;
-        } else {
-            if (!write_sliced_execution_partition_blob(fp, exec_parts + local)) goto done;
-        }
+        if (!write_sliced_execution_partition_blob(fp, parts + local)) goto done;
     }
-    pack_bytes = (std::uint64_t) ftello(fp);
     if (fseeko(fp, (off_t) (sizeof(execution_pack_magic) + sizeof(std::uint64_t) * 2u), SEEK_SET) != 0) goto done;
     if (!write_sharded_block(fp, partition_offsets, sizeof(std::uint64_t), (std::size_t) partition_count)) goto done;
     if (std::fflush(fp) != 0) goto done;
@@ -760,18 +834,16 @@ inline int materialize_sliced_ell_execution_pack(shard_storage *s, dataset_h5_st
         std::remove(tmp_path);
         goto done;
     }
-    state->shard_bucketed_sliced_ell_bytes[shard_id] = pack_bytes;
-    state->shard_execution_bytes[shard_id] = pack_bytes;
     ok = 1;
 
 done:
     if (fp != 0) std::fclose(fp);
     if (!ok && build_execution_pack_temp_path(state, shard_id, tmp_path, sizeof(tmp_path))) std::remove(tmp_path);
-    if (exec_parts != 0) {
-        for (local = 0u; local < partition_count; ++local) clear(exec_parts + local);
+    if (parts != 0) {
+        for (local = 0u; local < partition_count; ++local) clear(parts + local);
     }
     std::free(partition_offsets);
-    std::free(exec_parts);
+    std::free(parts);
     return ok;
 }
 
@@ -931,40 +1003,49 @@ inline int materialize_sliced_ell_shard_pack(shard_storage *s, dataset_h5_state 
     const std::uint64_t begin = state != 0 && state->shard_part_begin != 0 ? state->shard_part_begin[shard_id] : 0u;
     const std::uint64_t end = state != 0 && state->shard_part_end != 0 ? state->shard_part_end[shard_id] : 0u;
     const std::uint64_t partition_count = end >= begin ? (end - begin) : 0u;
-    sparse::sliced_ell **parts = 0;
+    bucketed_sliced_ell_partition *parts = 0;
+    std::uint64_t *partition_offsets = 0;
     char tmp_path[4096];
     char final_path[4096];
     std::uint64_t local = 0u;
+    std::FILE *fp = 0;
     int ok = 0;
 
     if (s == 0 || state == 0 || shard_id >= state->num_shards) return 0;
     if (!open_dataset_h5_backend(s)) return 0;
     if (partition_count != 0u) {
-        parts = (sparse::sliced_ell **) std::calloc((std::size_t) partition_count, sizeof(sparse::sliced_ell *));
-        if (parts == 0) return 0;
+        parts = (bucketed_sliced_ell_partition *) std::calloc((std::size_t) partition_count, sizeof(bucketed_sliced_ell_partition));
+        partition_offsets = (std::uint64_t *) std::calloc((std::size_t) partition_count, sizeof(std::uint64_t));
+        if (parts == 0 || partition_offsets == 0) return 0;
+        for (local = 0u; local < partition_count; ++local) init(parts + local);
     }
     for (local = 0u; local < partition_count; ++local) {
         const std::uint64_t partition_id = begin + local;
-        sparse::sliced_ell *part = new sparse::sliced_ell;
-        sparse::init(part);
-        if (!load_sliced_ell_partition_payload(state, (unsigned long) partition_id, part)) {
-            sparse::clear(part);
-            delete part;
+        if (!load_bucketed_sliced_ell_partition_payload(state, (unsigned long) partition_id, parts + local)) {
             goto done;
         }
-        parts[local] = part;
     }
     if (!build_shard_pack_temp_path(state, shard_id, tmp_path, sizeof(tmp_path))) goto done;
     if (!build_shard_pack_path(state, shard_id, final_path, sizeof(final_path))) goto done;
-    if (!write_shard_pack_file<sparse::sliced_ell>(tmp_path,
-                                                   state->cols,
-                                                   state->partition_rows + begin,
-                                                   state->partition_nnz + begin,
-                                                   state->partition_aux + begin,
-                                                   partition_count,
-                                                   parts)) {
-        goto done;
+    fp = std::fopen(tmp_path, "wb");
+    if (fp == 0) goto done;
+    std::setvbuf(fp, 0, _IOFBF, (std::size_t) 8u << 20u);
+    if (!write_sharded_block(fp, execution_pack_magic, sizeof(execution_pack_magic), 1u)) goto done;
+    if (!write_sharded_block(fp, &shard_id, sizeof(shard_id), 1u)) goto done;
+    if (!write_sharded_block(fp, &partition_count, sizeof(partition_count), 1u)) goto done;
+    for (local = 0u; local < partition_count; ++local) {
+        const std::uint64_t zero = 0u;
+        if (!write_sharded_block(fp, &zero, sizeof(zero), 1u)) goto done;
     }
+    for (local = 0u; local < partition_count; ++local) {
+        partition_offsets[local] = (std::uint64_t) ftello(fp);
+        if (!write_sliced_execution_partition_blob(fp, parts + local)) goto done;
+    }
+    if (fseeko(fp, (off_t) (sizeof(execution_pack_magic) + sizeof(std::uint64_t) * 2u), SEEK_SET) != 0) goto done;
+    if (!write_sharded_block(fp, partition_offsets, sizeof(std::uint64_t), (std::size_t) partition_count)) goto done;
+    if (std::fflush(fp) != 0) goto done;
+    std::fclose(fp);
+    fp = 0;
     if (::rename(tmp_path, final_path) != 0) {
         std::remove(tmp_path);
         goto done;
@@ -972,15 +1053,14 @@ inline int materialize_sliced_ell_shard_pack(shard_storage *s, dataset_h5_state 
     ok = 1;
 
 done:
+    if (fp != 0) std::fclose(fp);
     if (!ok && build_shard_pack_temp_path(state, shard_id, tmp_path, sizeof(tmp_path))) std::remove(tmp_path);
     if (parts != 0) {
         for (local = 0u; local < partition_count; ++local) {
-            if (parts[local] != 0) {
-                sparse::clear(parts[local]);
-                delete parts[local];
-            }
+            clear(parts + local);
         }
     }
+    std::free(partition_offsets);
     std::free(parts);
     return ok;
 }

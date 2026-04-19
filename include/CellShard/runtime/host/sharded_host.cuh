@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../layout/sharded.cuh"
-#include "../layout/shard_paths.cuh"
+#include "../storage/shard_storage.cuh"
 #include "../../io/csh5/api.cuh"
 #include "../../io/pack/packfile.cuh"
 

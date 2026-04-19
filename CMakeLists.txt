@@ -173,7 +173,7 @@ set(cellshard_inspect_sources
     src/io/csh5/runtime/fetch.cc
     src/io/csh5/runtime/warm.cc
     src/bucket/blocked_ell_bipartite_optimize_bridge.cu
-    src/runtime/layout/shard_paths.cu
+    src/runtime/storage/shard_storage.cu
 )
 set_source_files_properties(${cellshard_inspect_sources} PROPERTIES LANGUAGE CXX)
 if(CELLSHARD_ENABLE_CUDA)

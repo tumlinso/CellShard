@@ -27,22 +27,38 @@ int fetch_dataset_quantized_blocked_ell_h5_shard(sharded<sparse::quantized_block
 int fetch_dataset_sliced_ell_h5_partition(sharded<sparse::sliced_ell> *m,
                                           const shard_storage *s,
                                           unsigned long partition_id) {
-    return fetch_cached_partition_common(m, s, partition_id, load_sliced_ell_part_from_cached_pack);
+    shard_storage *storage = const_cast<shard_storage *>(s);
+    dataset_h5_state *state = dataset_h5_state_from_storage(storage);
+    const unsigned long shard_id = state != 0 && state->partition_shard_ids != 0
+        ? (unsigned long) state->partition_shard_ids[partition_id]
+        : 0ul;
+    if (m == 0 || storage == 0 || state == 0 || partition_id >= m->num_partitions) return 0;
+    if (!ensure_execution_pack_ready(storage, state, shard_id)) return 0;
+    return load_sliced_ell_part_from_cached_pack(m, state, partition_id);
 }
 
 int fetch_dataset_sliced_ell_h5_shard(sharded<sparse::sliced_ell> *m,
                                       const shard_storage *s,
                                       unsigned long shard_id) {
-    return fetch_cached_shard_common(m, s, shard_id, load_sliced_ell_part_from_cached_pack);
+    const unsigned long begin = first_partition_in_shard(m, shard_id);
+    const unsigned long end = last_partition_in_shard(m, shard_id);
+    shard_storage *storage = const_cast<shard_storage *>(s);
+    dataset_h5_state *state = dataset_h5_state_from_storage(storage);
+    if (m == 0 || storage == 0 || state == 0 || shard_id >= m->num_shards) return 0;
+    if (!ensure_execution_pack_ready(storage, state, shard_id)) return 0;
+    for (unsigned long i = begin; i < end; ++i) {
+        if (!load_sliced_ell_part_from_cached_pack(m, state, i)) return 0;
+    }
+    return 1;
 }
 
 #if CELLSHARD_ENABLE_CUDA
-int acquire_dataset_sliced_ell_h5_execution_partition_device(dataset_sliced_execution_device_partition_view *out,
-                                                             const sharded<sparse::sliced_ell> *m,
-                                                             const shard_storage *s,
-                                                             unsigned long partition_id,
-                                                             int device_id,
-                                                             std::uint64_t cache_budget_bytes) {
+int acquire_dataset_sliced_ell_h5_bucketed_partition_device(dataset_sliced_bucketed_device_partition_view *out,
+                                                            const sharded<sparse::sliced_ell> *m,
+                                                            const shard_storage *s,
+                                                            unsigned long partition_id,
+                                                            int device_id,
+                                                            std::uint64_t cache_budget_bytes) {
     dataset_runtime_service_view runtime_service{};
     bucketed_sliced_ell_partition fetched;
     device::partition_record<sparse::sliced_ell> *uploaded_segments = 0;
@@ -97,7 +113,7 @@ int acquire_dataset_sliced_ell_h5_execution_partition_device(dataset_sliced_exec
         }
     }
 
-    if (!fetch_dataset_sliced_ell_h5_execution_partition(&fetched, m, s, partition_id)) return 0;
+    if (!fetch_dataset_sliced_ell_h5_bucketed_partition(&fetched, m, s, partition_id)) return 0;
     expected_bytes = bucketed_sliced_device_bytes(&fetched);
     while (state->byte_budget != 0u
            && state->resident_bytes != 0u
@@ -152,14 +168,14 @@ fail:
     return 0;
 }
 
-int release_dataset_sliced_ell_h5_execution_partition_device(dataset_sliced_execution_device_partition_view *view) {
+int release_dataset_sliced_ell_h5_bucketed_partition_device(dataset_sliced_bucketed_device_partition_view *view) {
     if (view == 0) return 0;
     init(view);
     return 1;
 }
 
-int clear_dataset_sliced_ell_h5_device_cache(const char *source_path,
-                                             int device_id) {
+int clear_dataset_sliced_ell_h5_bucketed_device_cache(const char *source_path,
+                                                      int device_id) {
     std::lock_guard<std::mutex> lock(sliced_execution_device_caches_mutex());
     if (source_path == 0) return 0;
     if (sliced_execution_device_cache_state *state = find_sliced_execution_device_cache(source_path, device_id)) {
@@ -169,7 +185,7 @@ int clear_dataset_sliced_ell_h5_device_cache(const char *source_path,
     return 0;
 }
 
-int clear_all_dataset_sliced_ell_h5_device_caches() {
+int clear_all_dataset_sliced_ell_h5_bucketed_device_caches() {
     std::lock_guard<std::mutex> lock(sliced_execution_device_caches_mutex());
     std::vector<sliced_execution_device_cache_state> &caches = sliced_execution_device_caches();
     for (std::size_t i = 0u; i < caches.size(); ++i) clear_sliced_execution_device_cache_state(&caches[i]);
@@ -204,19 +220,26 @@ int prefetch_dataset_quantized_blocked_ell_h5_shard_cache(const sharded<sparse::
 int prefetch_dataset_sliced_ell_h5_partition_cache(const sharded<sparse::sliced_ell> *m,
                                                    shard_storage *s,
                                                    unsigned long partition_id) {
-    return prefetch_partition_cache_common(m, s, partition_id);
+    dataset_h5_state *state = dataset_h5_state_from_storage(s);
+    const unsigned long shard_id = state != 0 && state->partition_shard_ids != 0
+        ? (unsigned long) state->partition_shard_ids[partition_id]
+        : 0ul;
+    if (m == 0 || s == 0 || state == 0 || partition_id >= m->num_partitions) return 0;
+    return ensure_execution_pack_ready(s, state, shard_id);
 }
 
 int prefetch_dataset_sliced_ell_h5_shard_cache(const sharded<sparse::sliced_ell> *m,
                                                shard_storage *s,
                                                unsigned long shard_id) {
-    return prefetch_shard_cache_common(m, s, shard_id);
+    dataset_h5_state *state = dataset_h5_state_from_storage(s);
+    if (m == 0 || s == 0 || state == 0 || shard_id >= m->num_shards) return 0;
+    return ensure_execution_pack_ready(s, state, shard_id);
 }
 
-int fetch_dataset_sliced_ell_h5_execution_partition(bucketed_sliced_ell_partition *out,
-                                                    const sharded<sparse::sliced_ell> *m,
-                                                    const shard_storage *s,
-                                                    unsigned long partition_id) {
+int fetch_dataset_sliced_ell_h5_bucketed_partition(bucketed_sliced_ell_partition *out,
+                                                   const sharded<sparse::sliced_ell> *m,
+                                                   const shard_storage *s,
+                                                   unsigned long partition_id) {
     shard_storage *storage = const_cast<shard_storage *>(s);
     dataset_h5_state *state = dataset_h5_state_from_storage(storage);
     unsigned long shard_id = 0ul;
@@ -224,27 +247,9 @@ int fetch_dataset_sliced_ell_h5_execution_partition(bucketed_sliced_ell_partitio
     if (out == 0 || m == 0 || state == 0 || partition_id >= m->num_partitions) return 0;
     shard_id = (unsigned long) state->partition_shard_ids[partition_id];
     if (!ensure_execution_pack_ready(storage, state, shard_id)) return 0;
-    if (load_sliced_execution_partition_from_pack(state, shard_id, partition_id, out)) return 1;
-    if (!shard_storage_has_capability(storage,
-                                      shard_storage_cap_materialize_execution_pack | shard_storage_cap_canonical_read)) {
-        return 0;
-    }
-    if (!ensure_optimized_sliced_ell_payload_open(state) || !load_optimized_sliced_ell_shard_payload(state, shard_id)) {
-        if (!fetch_dataset_sliced_ell_h5_partition(const_cast<sharded<sparse::sliced_ell> *>(m), storage, partition_id)) return 0;
-        if (m->parts[partition_id] == 0) return 0;
-        return build_bucketed_sliced_execution_partition(out,
-                                                         m->parts[partition_id],
-                                                         state->partition_blocked_ell_bucket_counts != 0
-                                                             ? state->partition_blocked_ell_bucket_counts[partition_id]
-                                                             : 1u,
-                                                         0);
-    }
-    {
-        const std::uint64_t begin = state->shard_part_begin[shard_id];
-        const std::uint64_t local_partition = partition_id - begin;
-        if (local_partition >= state->loaded_optimized_sliced_shard.partition_count) return 0;
-        return clone_bucketed_sliced_partition(out, state->loaded_optimized_sliced_shard.partitions + local_partition);
-    }
+    if (load_sliced_bucketed_partition_from_exec_pack(state, shard_id, partition_id, out)) return 1;
+    if (!shard_storage_has_capability(storage, shard_storage_cap_canonical_read)) return 0;
+    return load_bucketed_sliced_ell_partition_payload(state, partition_id, out);
 }
 
 int fetch_dataset_blocked_ell_h5_execution_partition(bucketed_blocked_ell_partition *out,

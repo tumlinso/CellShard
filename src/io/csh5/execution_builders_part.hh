@@ -1,5 +1,7 @@
 #pragma once
 
+inline int load_sliced_execution_partition_blob(std::FILE *fp, bucketed_sliced_ell_partition *part);
+
 inline int ensure_blocked_ell_payload_open(dataset_h5_state *state) {
     if (state == 0 || state->file < 0) return 0;
     if (state->payload_blocked_ell >= 0
@@ -41,13 +43,6 @@ inline int ensure_optimized_blocked_ell_payload_open(dataset_h5_state *state) {
     if (state->payload_optimized_blocked_ell >= 0) return 1;
     state->payload_optimized_blocked_ell = H5Gopen2(state->file, payload_optimized_blocked_ell_group, H5P_DEFAULT);
     return state->payload_optimized_blocked_ell >= 0;
-}
-
-inline int ensure_optimized_sliced_ell_payload_open(dataset_h5_state *state) {
-    if (state == 0 || state->file < 0) return 0;
-    if (state->payload_optimized_sliced_ell >= 0) return 1;
-    state->payload_optimized_sliced_ell = H5Gopen2(state->file, payload_optimized_sliced_ell_group, H5P_DEFAULT);
-    return state->payload_optimized_sliced_ell >= 0;
 }
 
 inline int deserialize_optimized_shard(const unsigned char *data,
@@ -110,9 +105,9 @@ inline int load_optimized_blocked_ell_shard_payload(dataset_h5_state *state,
     return 1;
 }
 
-inline int load_sliced_ell_partition_payload(dataset_h5_state *state,
-                                             unsigned long partition_id,
-                                             sparse::sliced_ell *part) {
+inline int load_bucketed_sliced_ell_partition_payload(dataset_h5_state *state,
+                                                      unsigned long partition_id,
+                                                      bucketed_sliced_ell_partition *part) {
     std::vector<unsigned char> blob;
     char dataset_name[64];
     std::FILE *fp = 0;
@@ -124,9 +119,9 @@ inline int load_sliced_ell_partition_payload(dataset_h5_state *state,
     if (!read_blob_dataset(state->payload_sliced_ell, dataset_name, &blob)) return 0;
     fp = fmemopen(blob.data(), blob.size(), "rb");
     if (fp == 0) return 0;
-    sparse::clear(part);
-    sparse::init(part);
-    ok = ::cellshard::load(fp, part);
+    clear(part);
+    init(part);
+    ok = load_sliced_execution_partition_blob(fp, part);
     std::fclose(fp);
     return ok;
 }
@@ -150,22 +145,6 @@ inline int load_quantized_blocked_ell_partition_payload(dataset_h5_state *state,
     ok = ::cellshard::load(fp, part);
     std::fclose(fp);
     return ok;
-}
-
-inline int load_optimized_sliced_ell_shard_payload(dataset_h5_state *state,
-                                                   std::uint64_t shard_id) {
-    std::vector<unsigned char> blob;
-    char dataset_name[64];
-    if (state == 0 || shard_id >= state->num_shards) return 0;
-    if (state->loaded_optimized_sliced_shard_id == shard_id) return 1;
-    if (!ensure_optimized_sliced_ell_payload_open(state)) return 0;
-    if (!build_optimized_shard_dataset_name((unsigned long) shard_id, dataset_name, sizeof(dataset_name))) return 0;
-    if (!read_blob_dataset(state->payload_optimized_sliced_ell, dataset_name, &blob)) return 0;
-    clear(&state->loaded_optimized_sliced_shard);
-    init(&state->loaded_optimized_sliced_shard);
-    if (!deserialize_optimized_sliced_shard(blob.data(), blob.size(), &state->loaded_optimized_sliced_shard)) return 0;
-    state->loaded_optimized_sliced_shard_id = shard_id;
-    return 1;
 }
 
 inline int prepare_blocked_ell_parts_from_state(const dataset_h5_state *state,
@@ -340,9 +319,16 @@ inline int clone_bucketed_sliced_partition(bucketed_sliced_ell_partition *dst,
     dst->cols = src->cols;
     dst->nnz = src->nnz;
     dst->segment_count = src->segment_count;
+    dst->canonical_slice_count = src->canonical_slice_count;
     dst->segments = dst->segment_count != 0u ? (sparse::sliced_ell *) std::calloc((std::size_t) dst->segment_count, sizeof(sparse::sliced_ell)) : 0;
     dst->segment_row_offsets = (std::uint32_t *) std::calloc((std::size_t) dst->segment_count + 1u, sizeof(std::uint32_t));
+    dst->canonical_slice_row_offsets =
+        (std::uint32_t *) std::calloc((std::size_t) dst->canonical_slice_count + 1u, sizeof(std::uint32_t));
+    dst->canonical_slice_widths =
+        dst->canonical_slice_count != 0u ? (std::uint32_t *) std::calloc((std::size_t) dst->canonical_slice_count, sizeof(std::uint32_t)) : 0;
     if ((dst->segment_count != 0u && (dst->segments == 0 || dst->segment_row_offsets == 0))
+        || (((std::size_t) dst->canonical_slice_count + 1u) != 0u && dst->canonical_slice_row_offsets == 0)
+        || (dst->canonical_slice_count != 0u && dst->canonical_slice_widths == 0)
         || !duplicate_u32_array(&dst->exec_to_canonical_rows, src->exec_to_canonical_rows, src->rows)
         || !duplicate_u32_array(&dst->canonical_to_exec_rows, src->canonical_to_exec_rows, src->rows)) {
         clear(dst);
@@ -352,6 +338,16 @@ inline int clone_bucketed_sliced_partition(bucketed_sliced_ell_partition *dst,
         std::memcpy(dst->segment_row_offsets,
                     src->segment_row_offsets,
                     ((std::size_t) dst->segment_count + 1u) * sizeof(std::uint32_t));
+    }
+    if (dst->canonical_slice_row_offsets != 0) {
+        std::memcpy(dst->canonical_slice_row_offsets,
+                    src->canonical_slice_row_offsets,
+                    ((std::size_t) dst->canonical_slice_count + 1u) * sizeof(std::uint32_t));
+    }
+    if (dst->canonical_slice_widths != 0) {
+        std::memcpy(dst->canonical_slice_widths,
+                    src->canonical_slice_widths,
+                    (std::size_t) dst->canonical_slice_count * sizeof(std::uint32_t));
     }
     for (segment = 0u; segment < dst->segment_count; ++segment) {
         const sparse::sliced_ell *src_segment = src->segments + segment;
@@ -1355,14 +1351,32 @@ inline int allocate_bucketed_sliced_execution_partition(bucketed_sliced_ell_part
     out->cols = part->cols;
     out->nnz = part->nnz;
     out->segment_count = (std::uint32_t) layout.segment_widths.size();
+    out->canonical_slice_count = part->slice_count;
     out->segments = out->segment_count != 0u ? (sparse::sliced_ell *) std::calloc((std::size_t) out->segment_count, sizeof(sparse::sliced_ell)) : 0;
     out->segment_row_offsets = (std::uint32_t *) std::calloc((std::size_t) out->segment_count + 1u, sizeof(std::uint32_t));
     out->exec_to_canonical_rows = out->rows != 0u ? (std::uint32_t *) std::calloc((std::size_t) out->rows, sizeof(std::uint32_t)) : 0;
     out->canonical_to_exec_rows = out->rows != 0u ? (std::uint32_t *) std::calloc((std::size_t) out->rows, sizeof(std::uint32_t)) : 0;
+    out->canonical_slice_row_offsets =
+        (std::uint32_t *) std::calloc((std::size_t) out->canonical_slice_count + 1u, sizeof(std::uint32_t));
+    out->canonical_slice_widths = out->canonical_slice_count != 0u
+        ? (std::uint32_t *) std::calloc((std::size_t) out->canonical_slice_count, sizeof(std::uint32_t))
+        : 0;
     if ((out->segment_count != 0u && (out->segments == 0 || out->segment_row_offsets == 0))
-        || (out->rows != 0u && (out->exec_to_canonical_rows == 0 || out->canonical_to_exec_rows == 0))) {
+        || (out->rows != 0u && (out->exec_to_canonical_rows == 0 || out->canonical_to_exec_rows == 0))
+        || (((std::size_t) out->canonical_slice_count + 1u) != 0u && out->canonical_slice_row_offsets == 0)
+        || (out->canonical_slice_count != 0u && out->canonical_slice_widths == 0)) {
         clear(out);
         return 0;
+    }
+    if (out->canonical_slice_row_offsets != 0) {
+        std::memcpy(out->canonical_slice_row_offsets,
+                    part->slice_row_offsets,
+                    ((std::size_t) out->canonical_slice_count + 1u) * sizeof(std::uint32_t));
+    }
+    if (out->canonical_slice_widths != 0) {
+        std::memcpy(out->canonical_slice_widths,
+                    part->slice_widths,
+                    (std::size_t) out->canonical_slice_count * sizeof(std::uint32_t));
     }
     for (segment = 0u; segment < out->segment_count; ++segment) {
         const std::uint32_t row_begin = layout.segment_row_offsets[segment];
@@ -2094,4 +2108,3 @@ inline int load_execution_partition_blob(std::FILE *fp, bucketed_blocked_ell_par
     }
     return 1;
 }
-

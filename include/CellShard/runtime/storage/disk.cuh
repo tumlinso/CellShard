@@ -9,7 +9,7 @@
 #include "../../formats/quantized_blocked_ell.cuh"
 #include "../../formats/sliced_ell.cuh"
 #include "../layout/sharded.cuh"
-#include "../layout/shard_paths.cuh"
+#include "shard_storage.cuh"
 #include "../../io/csh5/api.cuh"
 
 namespace cellshard {

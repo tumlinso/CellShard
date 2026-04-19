@@ -1,3 +1,3 @@
 #pragma once
 
-#include "../../include/CellShard/runtime/layout/shard_paths.cuh"
+#include "../../include/CellShard/runtime/storage/shard_storage.cuh"

@@ -91,6 +91,14 @@ if(CELLSHARD_ENABLE_CUDA AND NOT TARGET CUDA::cudart)
     find_package(CUDAToolkit REQUIRED)
 endif()
 
+if(CELLSHARD_ENABLE_CUDA)
+    find_library(CELLSHARD_NCCL_LIBRARY
+        NAMES nccl
+        HINTS
+            /opt/nvidia/hpc_sdk/Linux_x86_64/26.1/comm_libs/12.9/nccl/lib
+    )
+endif()
+
 if(NOT HDF5_FOUND)
     find_package(HDF5 REQUIRED COMPONENTS C)
 endif()
@@ -139,10 +147,8 @@ add_library(cellshard_headers INTERFACE)
 add_library(CellShard::headers ALIAS cellshard_headers)
 set_target_properties(cellshard_headers PROPERTIES EXPORT_NAME headers)
 target_include_directories(cellshard_headers INTERFACE
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/export>
-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/CellShard>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 target_compile_features(cellshard_headers INTERFACE cxx_std_17)
 if(CELLSHARD_ENABLE_CUDA)
@@ -157,11 +163,22 @@ target_compile_definitions(cellshard_headers INTERFACE
 )
 
 set(cellshard_inspect_sources
-    src/disk/packfile.cu
-    src/disk/csh5.cc
-    src/sharded/shard_paths.cu
+    src/io/pack/packfile.cu
+    src/io/csh5/create.cc
+    src/io/csh5/metadata.cc
+    src/io/csh5/finalize_preprocess.cc
+    src/io/csh5/write.cc
+    src/io/csh5/runtime/bind.cc
+    src/io/csh5/runtime/headers.cc
+    src/io/csh5/runtime/fetch.cc
+    src/io/csh5/runtime/warm.cc
+    src/bucket/blocked_ell_bipartite_optimize_bridge.cu
+    src/runtime/layout/shard_paths.cu
 )
 set_source_files_properties(${cellshard_inspect_sources} PROPERTIES LANGUAGE CXX)
+if(CELLSHARD_ENABLE_CUDA)
+    set_source_files_properties(src/bucket/blocked_ell_bipartite_optimize_bridge.cu PROPERTIES LANGUAGE CUDA)
+endif()
 
 add_library(cellshard_inspect STATIC
     ${cellshard_inspect_sources}
@@ -169,12 +186,11 @@ add_library(cellshard_inspect STATIC
 add_library(CellShard::inspect ALIAS cellshard_inspect)
 set_target_properties(cellshard_inspect PROPERTIES EXPORT_NAME inspect)
 target_include_directories(cellshard_inspect
-    PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/export>
-        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/CellShard>
     PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/export
         ${HDF5_INCLUDE_DIRS}
 )
 target_link_libraries(cellshard_inspect
@@ -212,6 +228,9 @@ if(CELLSHARD_ENABLE_CUDA)
         cellshard_inspect
         CUDA::cudart
     )
+    if(CELLSHARD_NCCL_LIBRARY)
+        target_link_libraries(cellshard_runtime INTERFACE ${CELLSHARD_NCCL_LIBRARY})
+    endif()
     target_compile_features(cellshard_runtime INTERFACE cxx_std_17)
     cellshard_assert_no_torch_dependency(cellshard_runtime)
     list(APPEND CELLSHARD_EXPORT_TARGETS cellshard_runtime)
@@ -220,17 +239,18 @@ endif()
 
 if(CELLSHARD_BUILD_EXPORT)
     add_library(cellshard_export STATIC
-        export/dataset_export.cc
+        export/summary/load_summary.cc
+        export/materialize/csr_export.cc
+        export/snapshot/global_metadata_snapshot.cc
     )
     add_library(CellShard::export ALIAS cellshard_export)
     set_target_properties(cellshard_export PROPERTIES EXPORT_NAME export)
     target_include_directories(cellshard_export
-        PUBLIC
-            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
-            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
-            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/export>
-            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/CellShard>
         PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}
+            ${CMAKE_CURRENT_SOURCE_DIR}/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+            ${CMAKE_CURRENT_SOURCE_DIR}/export
             ${HDF5_INCLUDE_DIRS}
     )
     target_link_libraries(cellshard_export
@@ -285,12 +305,11 @@ if(CELLSHARD_ENABLE_PYTHON)
     add_library(CellShard::h5ad_python ALIAS cellshard_h5ad_python)
     set_target_properties(cellshard_h5ad_python PROPERTIES EXPORT_NAME h5ad_python)
     target_include_directories(cellshard_h5ad_python
-        PUBLIC
-            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
-            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
-            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/export>
-            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/CellShard>
         PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}
+            ${CMAKE_CURRENT_SOURCE_DIR}/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+            ${CMAKE_CURRENT_SOURCE_DIR}/export
             ${Python3_INCLUDE_DIRS}
     )
     target_link_libraries(cellshard_h5ad_python
@@ -309,9 +328,14 @@ if(CELLSHARD_ENABLE_PYTHON)
     list(APPEND CELLSHARD_INSTALL_TARGETS cellshard_h5ad_python)
     list(APPEND CELLSHARD_PACKAGE_COMPONENTS h5ad_python)
 
-    pybind11_add_module(_cellshard python/module.cc)
+    pybind11_add_module(_cellshard
+        python/module.cc
+        python/bind_types.cc
+        python/bind_handles.cc
+    )
     target_include_directories(_cellshard PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/src
         ${CMAKE_CURRENT_SOURCE_DIR}/export
     )
@@ -332,6 +356,7 @@ if(CELLSHARD_ENABLE_PYTHON)
         )
         target_include_directories(cellshardH5adExport PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}
+            ${CMAKE_CURRENT_SOURCE_DIR}/include
             ${CMAKE_CURRENT_SOURCE_DIR}/src
             ${CMAKE_CURRENT_SOURCE_DIR}/export
         )
@@ -359,6 +384,7 @@ if(CELLSHARD_BUILD_TESTS AND CELLSHARD_BUILD_EXPORT)
     )
     target_include_directories(cellShardExportRuntimeTest PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/src
         ${CMAKE_CURRENT_SOURCE_DIR}/export
     )
@@ -442,20 +468,12 @@ if(TARGET cellshardH5adExport)
     )
 endif()
 
-install(DIRECTORY src/
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/CellShard/src
+install(DIRECTORY include/
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     FILES_MATCHING
         PATTERN "*.hh"
         PATTERN "*.cuh"
 )
-
-if(CELLSHARD_BUILD_EXPORT)
-    install(DIRECTORY export/
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/CellShard/export
-        FILES_MATCHING
-            PATTERN "*.hh"
-    )
-endif()
 
 install(EXPORT CellShardTargets
     FILE CellShardTargets.cmake

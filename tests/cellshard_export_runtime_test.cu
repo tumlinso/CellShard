@@ -1,5 +1,5 @@
-#include "../export/dataset_export.hh"
-#include "../src/CellShard.hh"
+#include <CellShard/export/dataset_export.hh>
+#include <CellShard/CellShard.hh>
 
 #include <cmath>
 #include <cstdio>
@@ -196,6 +196,24 @@ int main() {
         embedded_row_end,
         &embedded_table
     };
+    const owned_text_column var_chr_values = make_text_column({"chr1", "chr2", "chr3", "chr4"});
+    const owned_text_column var_short_values = make_text_column({"G0", "G1", "G2", "G3"});
+    const cs::dataset_observation_metadata_column_view var_columns[] = {
+        { "chr", cs::dataset_observation_metadata_type_text, var_chr_values.view(), nullptr, nullptr },
+        { "gene_short_name", cs::dataset_observation_metadata_type_text, var_short_values.view(), nullptr, nullptr }
+    };
+    const cs::dataset_feature_metadata_view feature_metadata{
+        4u,
+        2u,
+        var_columns
+    };
+    const owned_text_column attribute_keys = make_text_column({"preprocess.pipeline_scope", "study"});
+    const owned_text_column attribute_values = make_text_column({"qc_only", "demo"});
+    const cs::dataset_user_attribute_view dataset_attributes{
+        2u,
+        attribute_keys.view(),
+        attribute_values.view()
+    };
     const std::uint32_t partition_execution_formats[] = { cs::dataset_execution_format_bucketed_blocked_ell };
     const std::uint32_t partition_block_sizes[] = { 2u };
     const std::uint32_t partition_bucket_counts[] = { 1u };
@@ -255,6 +273,8 @@ int main() {
     require(cs::append_blocked_ell_partition_h5(path, 0ul, &part) != 0, "append_blocked_ell_partition_h5 failed");
     require(cs::append_dataset_embedded_metadata_h5(path, &embedded_metadata) != 0, "append_dataset_embedded_metadata_h5 failed");
     require(cs::append_dataset_observation_metadata_h5(path, &obs_metadata) != 0, "append_dataset_observation_metadata_h5 failed");
+    require(cs::append_dataset_feature_metadata_h5(path, &feature_metadata) != 0, "append_dataset_feature_metadata_h5 failed");
+    require(cs::append_dataset_user_attributes_h5(path, &dataset_attributes) != 0, "append_dataset_user_attributes_h5 failed");
     require(cs::append_dataset_execution_h5(path, &execution) != 0, "append_dataset_execution_h5 failed");
     require(cs::append_dataset_runtime_service_h5(path, &runtime_service) != 0, "append_dataset_runtime_service_h5 failed");
 
@@ -270,6 +290,12 @@ int main() {
     require(summary.shards.size() == 1u && summary.shards[0].row_end == 2u, "summary shard metadata mismatch");
     require(summary.obs_names.size() == 2u && summary.obs_names[1] == "cell_b", "summary obs names mismatch");
     require(summary.var_names.size() == 4u && summary.var_names[2] == "G2", "summary var names mismatch");
+    require(summary.observation_annotations.available, "summary observation annotation summary missing");
+    require(summary.observation_annotations.extent == 2u, "summary observation annotation extent mismatch");
+    require(summary.feature_annotations.available, "summary feature annotation summary missing");
+    require(summary.feature_annotations.extent == 4u, "summary feature annotation extent mismatch");
+    require(summary.dataset_attributes.available, "summary dataset attributes missing");
+    require(summary.dataset_attributes.keys.size() == 2u, "summary dataset attribute key count mismatch");
 
     cse::csr_matrix_export csr;
     error.clear();
@@ -307,20 +333,35 @@ int main() {
     require(snapshot.obs_columns[1].name == "quality", "anndata quality column missing");
     require(snapshot.obs_columns[1].float32_values.size() == 2u, "anndata quality values missing");
     require(close_float(snapshot.obs_columns[1].float32_values[1], 2.5f), "anndata quality value mismatch");
+    require(snapshot.var_columns.size() == 2u, "anndata var column count mismatch");
+    require(snapshot.var_columns[0].name == "chr", "anndata chr column missing");
+    require(snapshot.var_columns[0].text_values[3] == "chr4", "anndata chr values mismatch");
+    require(snapshot.uns.size() == 2u, "anndata uns entry count mismatch");
     require(snapshot.x.indptr == csr.indptr, "anndata csr indptr mismatch");
     require(snapshot.x.indices == csr.indices, "anndata csr indices mismatch");
     require(snapshot.x.data.size() == csr.data.size(), "anndata csr values mismatch");
+
+    std::vector<cse::observation_metadata_column> loaded_obs_columns;
+    error.clear();
+    require(cse::load_observation_metadata(path, &loaded_obs_columns, &error), error.c_str());
+    require(loaded_obs_columns.size() == 2u, "explicit observation metadata load mismatch");
+    std::vector<cse::annotation_column> loaded_var_columns;
+    error.clear();
+    require(cse::load_feature_metadata(path, &loaded_var_columns, &error), error.c_str());
+    require(loaded_var_columns.size() == 2u, "explicit feature metadata load mismatch");
+    std::vector<cse::dataset_attribute> loaded_attributes;
+    error.clear();
+    require(cse::load_dataset_attributes(path, &loaded_attributes, &error), error.c_str());
+    require(loaded_attributes.size() == 2u, "explicit dataset attribute load mismatch");
+    require(loaded_attributes[1].value == "demo", "explicit dataset attribute value mismatch");
 
     cse::global_metadata_snapshot owner_snapshot;
     error.clear();
     require(cse::load_dataset_global_metadata_snapshot(path, &owner_snapshot, &error), error.c_str());
     require(owner_snapshot.snapshot_id != 0u, "owner snapshot id missing");
-    require(owner_snapshot.embedded_metadata.size() == 1u, "owner embedded metadata count mismatch");
-    require(owner_snapshot.embedded_metadata[0].column_names.size() == 2u, "owner embedded metadata columns missing");
-    require(owner_snapshot.embedded_metadata[0].field_values.size() == 4u, "owner embedded metadata values missing");
-    require(owner_snapshot.embedded_metadata[0].field_values[2] == "P0", "owner embedded metadata contents mismatch");
-    require(owner_snapshot.observation_metadata_rows == 2u, "owner observation metadata rows mismatch");
-    require(owner_snapshot.observation_metadata.size() == 2u, "owner observation metadata count mismatch");
+    require(owner_snapshot.summary.observation_annotations.available, "owner snapshot observation annotation summary missing");
+    require(owner_snapshot.summary.feature_annotations.available, "owner snapshot feature annotation summary missing");
+    require(owner_snapshot.summary.dataset_attributes.available, "owner snapshot dataset attribute summary missing");
     require(owner_snapshot.execution_partitions.size() == 1u, "owner execution partition count mismatch");
     require(owner_snapshot.execution_partitions[0].execution_format == cs::dataset_execution_format_bucketed_blocked_ell,
             "owner execution partition format mismatch");
@@ -366,7 +407,8 @@ int main() {
     require(cse::describe_pack_delivery(owner_snapshot, delivery_request, &delivery, &error), error.c_str());
     require(delivery.snapshot_id == owner_snapshot.snapshot_id, "delivery snapshot id mismatch");
     require(delivery.owner_node_id == 7u && delivery.owner_rank_id == 3u, "delivery owner route mismatch");
-    require(delivery.relative_pack_path == "packs/execution/shard.0.exec.pack", "execution delivery path mismatch");
+    require(delivery.relative_pack_path == "packs/execution/plan.12-pack.13-epoch.14/shard.0.exec.pack",
+            "execution delivery path mismatch");
     require(delivery.pack_kind == "execution", "execution delivery kind mismatch");
 
     delivery_request.prefer_execution_pack = 0u;
@@ -389,10 +431,12 @@ int main() {
     require(decoded_snapshot.snapshot_id == owner_snapshot.snapshot_id, "decoded snapshot id mismatch");
     require(decoded_snapshot.runtime_service.service_epoch == owner_snapshot.runtime_service.service_epoch,
             "decoded snapshot runtime service mismatch");
-    require(decoded_snapshot.observation_metadata.size() == owner_snapshot.observation_metadata.size(),
-            "decoded snapshot observation metadata mismatch");
-    require(decoded_snapshot.embedded_metadata[0].row_offsets == owner_snapshot.embedded_metadata[0].row_offsets,
-            "decoded snapshot embedded metadata row offsets mismatch");
+    require(decoded_snapshot.summary.observation_annotations.names == owner_snapshot.summary.observation_annotations.names,
+            "decoded snapshot observation annotation summary mismatch");
+    require(decoded_snapshot.summary.feature_annotations.names == owner_snapshot.summary.feature_annotations.names,
+            "decoded snapshot feature annotation summary mismatch");
+    require(decoded_snapshot.summary.dataset_attributes.keys == owner_snapshot.summary.dataset_attributes.keys,
+            "decoded snapshot dataset attribute summary mismatch");
 
     cs::sparse::clear(&part);
     std::remove(path);

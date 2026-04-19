@@ -1,6 +1,6 @@
 #include "h5ad_writer.hh"
 
-#include "../src/disk/csh5.cuh"
+#include "../include/CellShard/io/csh5/api.cuh"
 
 #include <pybind11/embed.h>
 #include <pybind11/numpy.h>
@@ -61,10 +61,22 @@ inline py::object build_var_dataframe(const anndata_export &input, py::module_ &
     if (var_index.empty()) var_index = input.summary.var_names;
     if (var_index.empty()) var_index = default_names("feature_", (std::size_t) input.summary.cols);
 
-    if (!input.summary.var_names.empty()) columns[py::str("feature_name")] = py::cast(input.summary.var_names);
-    if (!input.summary.var_types.empty()) columns[py::str("feature_type")] = py::cast(input.summary.var_types);
-    if (!input.summary.var_ids.empty() && input.summary.var_ids != var_index) {
-        columns[py::str("feature_id")] = py::cast(input.summary.var_ids);
+    if (!input.var_columns.empty()) {
+        for (const annotation_column &column : input.var_columns) {
+            if (column.type == cellshard::dataset_observation_metadata_type_text) {
+                columns[py::str(column.name)] = py::cast(column.text_values);
+            } else if (column.type == cellshard::dataset_observation_metadata_type_float32) {
+                columns[py::str(column.name)] = copy_1d_array(column.float32_values);
+            } else if (column.type == cellshard::dataset_observation_metadata_type_uint8) {
+                columns[py::str(column.name)] = copy_1d_array(column.uint8_values);
+            }
+        }
+    } else {
+        if (!input.summary.var_names.empty()) columns[py::str("feature_name")] = py::cast(input.summary.var_names);
+        if (!input.summary.var_types.empty()) columns[py::str("feature_type")] = py::cast(input.summary.var_types);
+        if (!input.summary.var_ids.empty() && input.summary.var_ids != var_index) {
+            columns[py::str("feature_id")] = py::cast(input.summary.var_ids);
+        }
     }
 
     return pandas.attr("DataFrame")(columns, py::arg("index") = py::cast(var_index));
@@ -116,6 +128,9 @@ inline py::dict build_uns_dict(const anndata_export &input) {
 
     py::dict uns;
     uns[py::str("cellshard")] = cellshard_dict;
+    for (const dataset_attribute &attribute : input.uns) {
+        uns[py::str(attribute.key)] = py::str(attribute.value);
+    }
     return uns;
 }
 

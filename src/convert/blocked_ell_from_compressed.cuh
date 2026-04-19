@@ -175,9 +175,9 @@ inline int choose_blocked_ell_block_size(
         if (!detail::count_blocked_ell_shape_(src->rows, src->cols, block_size, accessor, &ell_width, &fill_ratio)) return 0;
         padded_bytes = (std::size_t) src->rows * (std::size_t) ell_width * (std::size_t) block_size * sizeof(real::storage_t);
         if (best.block_size == 0u ||
-            fill_ratio > best.fill_ratio + 1.0e-9 ||
-            (fill_ratio + 1.0e-9 >= best.fill_ratio && padded_bytes < best.padded_bytes) ||
-            (fill_ratio + 1.0e-9 >= best.fill_ratio && padded_bytes == best.padded_bytes && block_size > best.block_size)) {
+            padded_bytes + 1u < best.padded_bytes ||
+            (padded_bytes == best.padded_bytes && fill_ratio > best.fill_ratio + 1.0e-9) ||
+            (padded_bytes == best.padded_bytes && fill_ratio + 1.0e-9 >= best.fill_ratio && block_size > best.block_size)) {
             best.block_size = block_size;
             best.fill_ratio = fill_ratio;
             best.padded_bytes = padded_bytes;
@@ -241,9 +241,9 @@ inline int choose_blocked_ell_block_size_from_coo(
             : (double) total_blocks / (double) ((unsigned long) row_blocks * (unsigned long) ell_width);
 
         if (best.block_size == 0u ||
-            fill_ratio > best.fill_ratio + 1.0e-9 ||
-            (fill_ratio + 1.0e-9 >= best.fill_ratio && padded_bytes < best.padded_bytes) ||
-            (fill_ratio + 1.0e-9 >= best.fill_ratio && padded_bytes == best.padded_bytes && block_size > best.block_size)) {
+            padded_bytes + 1u < best.padded_bytes ||
+            (padded_bytes == best.padded_bytes && fill_ratio > best.fill_ratio + 1.0e-9) ||
+            (padded_bytes == best.padded_bytes && fill_ratio + 1.0e-9 >= best.fill_ratio && block_size > best.block_size)) {
             best.block_size = block_size;
             best.fill_ratio = fill_ratio;
             best.padded_bytes = padded_bytes;
@@ -265,6 +265,7 @@ inline int blocked_ell_from_compressed(const sparse::compressed *src, unsigned i
     std::unique_ptr<types::u32[]> slot_map;
     std::unique_ptr<types::u32[]> block_cols;
     types::u32 epoch = 1u;
+    types::nnz_t actual_nnz = 0u;
 
     if (src == 0 || dst == 0 || block_size == 0u) return 0;
     if (src->axis != sparse::compressed_by_row) return 0;
@@ -326,10 +327,21 @@ inline int blocked_ell_from_compressed(const sparse::compressed *src, unsigned i
                 const types::u32 block_col = src->minorIdx[i] / block_size;
                 const types::u32 slot = slot_map[block_col];
                 const types::u32 col_in_block = src->minorIdx[i] % block_size;
-                dst->val[(std::size_t) row * dst->ell_cols + (std::size_t) slot * block_size + col_in_block] = src->val[i];
+                real::storage_t *dst_value =
+                    dst->val + (std::size_t) row * dst->ell_cols + (std::size_t) slot * block_size + col_in_block;
+                const float prev = __half2float(*dst_value);
+                const float next = __half2float(src->val[i]);
+                if (prev == 0.0f && next != 0.0f) {
+                    ++actual_nnz;
+                } else if (prev != 0.0f && next == 0.0f) {
+                    --actual_nnz;
+                }
+                *dst_value = src->val[i];
             }
         }
     }
+
+    dst->nnz = actual_nnz;
 
     return 1;
 }
@@ -342,12 +354,11 @@ inline int blocked_ell_from_coo(
     sparse::blocked_ell *dst
 ) {
     const types::u32 row_blocks = block_size == 0u ? 0u : (src->rows + block_size - 1u) / block_size;
-    const types::u32 col_blocks = block_size == 0u ? 0u : (cols + block_size - 1u) / block_size;
     std::unique_ptr<types::ptr_t[]> row_block_offsets;
     std::unique_ptr<types::u32[]> block_cols;
-    std::unique_ptr<types::u32[]> slot_map;
     blocked_ell_tune_result tune = { 0u, 0.0, 0u };
     types::u32 ell_width = 0u;
+    types::nnz_t actual_nnz = 0u;
 
     if (src == 0 || dst == 0 || cols == 0u || block_size == 0u) return 0;
     if (!choose_blocked_ell_block_size_from_coo(src, cols, feature_to_global, &block_size, 1u, &tune)) return 0;
@@ -360,10 +371,6 @@ inline int blocked_ell_from_coo(
     ell_width = (src->rows == 0u || block_size == 0u)
         ? 0u
         : (types::u32) (tune.padded_bytes / ((std::size_t) src->rows * (std::size_t) block_size * sizeof(real::storage_t)));
-    if (row_blocks != 0u && col_blocks != 0u) {
-        slot_map.reset(new types::u32[col_blocks]());
-        if (!slot_map) return 0;
-    }
 
     sparse::clear(dst);
     sparse::init(dst, src->rows, cols, src->nnz, block_size, ell_width * block_size);
@@ -385,7 +392,6 @@ inline int blocked_ell_from_coo(
             for (types::ptr_t j = begin; j < end; ++j) {
                 if (j == begin || block_cols[j] != block_cols[j - 1u]) {
                     dst->blockColIdx[(std::size_t) rb * ell_width + unique] = block_cols[j];
-                    slot_map[block_cols[j]] = unique;
                     ++unique;
                 }
             }
@@ -395,11 +401,47 @@ inline int blocked_ell_from_coo(
     for (types::nnz_t i = 0; i < src->nnz; ++i) {
         const types::u32 row = src->rowIdx[i];
         const types::u32 col = detail::mapped_col_(src->colIdx[i], feature_to_global);
+        const types::u32 row_block = row / block_size;
         const types::u32 block_col = col / block_size;
-        const types::u32 slot = slot_map[block_col];
+        const types::idx_t *slots = dst->blockColIdx + (std::size_t) row_block * ell_width;
+        types::u32 slot = 0u;
+        types::u32 left = 0u;
+        types::u32 right = ell_width;
         const types::u32 col_in_block = col % block_size;
-        dst->val[(std::size_t) row * dst->ell_cols + (std::size_t) slot * block_size + col_in_block] = src->val[i];
+        int found = 0;
+
+        while (left < right) {
+            const types::u32 mid = left + (right - left) / 2u;
+            const types::u32 current = (types::u32) slots[mid];
+            if (current == block_col) {
+                slot = mid;
+                found = 1;
+                break;
+            }
+            if (current == sparse::blocked_ell_invalid_col || current > block_col) {
+                right = mid;
+            } else {
+                left = mid + 1u;
+            }
+        }
+        if (!found) {
+            sparse::clear(dst);
+            return 0;
+        }
+
+        real::storage_t *dst_value =
+            dst->val + (std::size_t) row * dst->ell_cols + (std::size_t) slot * block_size + col_in_block;
+        const float prev = __half2float(*dst_value);
+        const float next = __half2float(src->val[i]);
+        if (prev == 0.0f && next != 0.0f) {
+            ++actual_nnz;
+        } else if (prev != 0.0f && next == 0.0f) {
+            --actual_nnz;
+        }
+        *dst_value = src->val[i];
     }
+
+    dst->nnz = actual_nnz;
 
     return 1;
 }

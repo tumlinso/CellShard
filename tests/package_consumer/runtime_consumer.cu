@@ -1,4 +1,4 @@
-#include "src/CellShard.hh"
+#include <CellShard/CellShard.hh>
 
 int main() {
     ::cellshard::sharded<::cellshard::sparse::compressed> matrix;

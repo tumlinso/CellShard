@@ -34,7 +34,7 @@ CellShard does not own:
 
 ## Source Layout
 
-CellShard is mainly a header-first C++/CUDA library. Most reusable surfaces are defined in headers under `src/`.
+CellShard is mainly a header-first C++/CUDA library. Public reusable surfaces live under `include/CellShard/`, while implementation files live under `src/`, `export/`, and `python/`.
 
 Common file roles:
 
@@ -47,29 +47,30 @@ Naming is mostly `snake_case` for files, functions, variables, and structs.
 
 Main source areas:
 
-- `src/CellShard.hh`: umbrella include for the main library surface
-- `src/formats/`: concrete matrix layouts such as `compressed`, `blocked_ell`, `dense`, `triplet`, and `diagonal`
-- `src/sharded/`: sharded metadata, host fetch/drop, device staging, dataset-container backends, shard-pack cache generation, and local multi-GPU helpers
-- `src/disk/`: standalone matrix persistence helpers
+- `include/CellShard/CellShard.hh`: thin umbrella include for the main public surface
+- `include/CellShard/core/`: core types, spans, compatibility, and scalar helpers
+- `include/CellShard/formats/`: concrete matrix layouts such as `compressed`, `blocked_ell`, `dense`, `triplet`, and `diagonal`
+- `include/CellShard/runtime/`: public sharded layout, host fetch/drop, device staging, storage dispatch, and local multi-GPU headers
+- `include/CellShard/io/`: public `.pack` and `.csh5` entry headers
+- `include/CellShard/export/`: public dataset export and metadata snapshot APIs
+- `src/io/pack/`: the per-partition packed payload codec used inside shard `.pack` cache files
+- `src/io/csh5/`: the `.csh5` container backend plus runtime cache materialization and fetch
+- `src/runtime/layout/`, `src/runtime/host/`, `src/runtime/device/`, `src/runtime/distributed/`, and `src/runtime/storage/`: internal runtime layout and staging implementation surfaces
 - `src/convert/`: sparse conversion helpers and raw conversion kernels
 - `src/bucket/`: row/major-axis nnz bucketing helpers
-- `src/offset_span.cuh`: small boundary and offset-span helpers
-- `export/`: non-Torch export surfaces such as dataset export and H5AD writing
+- `export/summary/`, `export/materialize/`, and `export/snapshot/`: non-Torch export implementation split by responsibility
 - `python/`: optional pybind module and Python package wrapper
 - `tests/`: focused runtime and package-consumer checks
 
-Useful `src/sharded/` waypoints:
+Useful public/runtime waypoints:
 
-- `src/sharded/sharded.cuh`: the metadata-only `sharded<T>` view and partition/shard boundary helpers
-- `src/sharded/sharded_host.cuh`: host-side fetch/drop and shard regrouping
-- `src/sharded/sharded_device.cuh`: single-GPU upload and staging
-- `src/sharded/distributed.cuh`: local multi-GPU shard placement and owner staging
-- `src/sharded/disk.cuh`: `load_header()` dispatch for CellShard dataset files
-- `src/disk/csh5.cuh` and `src/disk/csh5.cc`: the `.csh5` container backend plus `.pack` cache materialization and fetch
-
-Useful `src/disk/` waypoint:
-
-- `src/disk/packfile.cuh` and `src/disk/packfile.cu`: the per-partition packed payload codec used inside shard `.pack` cache files
+- `include/CellShard/runtime/layout/sharded.cuh`: the metadata-only `sharded<T>` view and partition/shard boundary helpers
+- `include/CellShard/runtime/host/sharded_host.cuh`: host-side fetch/drop and shard regrouping
+- `include/CellShard/runtime/device/sharded_device.cuh`: single-GPU upload and staging
+- `include/CellShard/runtime/distributed/distributed.cuh`: local multi-GPU shard placement and owner staging
+- `include/CellShard/runtime/storage/disk.cuh`: `load_header()` dispatch for CellShard dataset files
+- `include/CellShard/io/csh5/api.cuh`, `src/io/csh5/create.cc`, `src/io/csh5/metadata.cc`, `src/io/csh5/finalize_preprocess.cc`, `src/io/csh5/write.cc`, and `src/io/csh5/runtime/`: the `.csh5` container backend plus shard `.pack` runtime caches
+- `include/CellShard/io/pack/packfile.cuh` and `src/io/pack/packfile.cu`: the per-partition packed payload codec used inside shard `.pack` cache files
 
 ## Core Concepts
 
@@ -124,12 +125,13 @@ intended layout is:
         canonical/
           shard.<id>.pack
         execution/
-          shard.<id>.exec.pack
+          plan.<execution_plan_generation>-pack.<pack_generation>-epoch.<service_epoch>/
+            shard.<id>.exec.pack
 ```
 
 The fingerprinted instance keeps source identity stable, while the directory
-names around it make it obvious where manifests, canonical packs, and execution
-packs live.
+names around it make it obvious where manifests, canonical packs, and the
+currently published execution-pack generation live.
 
 Do not think of `.csh5` as the final hot execution substrate. `.csh5` is the durable canonical source and append target, while `.pack` is the runtime format used for high-throughput repeated access and delivery.
 
@@ -139,7 +141,7 @@ The intended workflow is:
 2. inspect partitions and shard boundaries
 3. ensure the needed pack generation exists for the active execution epoch
 4. serve or fetch host partitions or shards from the active pack generation
-5. optionally upload or stage them to GPU
+5. optionally upload or stage them to GPU, and keep repeated hot readers on device-resident execution partitions when the generation is unchanged
 6. run higher-level compute outside CellShard
 
 For large or remote MTX ingest, the practical write-side workflow is:
@@ -177,6 +179,11 @@ On one machine, CellShard should still behave like a service with clear roles:
   multithreaded random access
 - spool-write workers may receive new canonical or derived data and stage it
   without mutating the active generation in place
+
+Executor-facing runtime APIs should therefore fail when the required published
+pack is absent instead of reopening `.csh5` and rebuilding execution state on
+the fly. Owner-side runtime code may still perform that recovery when it is
+explicitly acting as the canonical reader and pack-preparation authority.
 
 The network layer is absent in this mode, but the synchronization model should
 stay the same as distributed mode:
@@ -258,6 +265,9 @@ Generation handling should follow these rules:
 - `execution_plan_generation` identifies the execution ownership/layout plan
 - `pack_generation` identifies the currently prepared runtime pack set
 - `service_epoch` identifies the currently published read epoch
+- the active execution pack path should be generation-qualified so read-only
+  pack reuse is tied to the published runtime generation, not only to source
+  file timestamps
 - staged appends may create newer canonical or execution generations before
   they become the published read generation
 
@@ -281,14 +291,14 @@ target_link_libraries(my_tool PRIVATE CellShard::inspect)
 Inspect-only include:
 
 ```cpp
-#include <src/cuda_compat.cuh>
-#include <src/sharded/sharded.cuh>
+#include <CellShard/core/cuda_compat.cuh>
+#include <CellShard/runtime/layout/sharded.cuh>
 ```
 
 CUDA/runtime umbrella include:
 
 ```cpp
-#include <src/CellShard.hh>
+#include <CellShard/CellShard.hh>
 ```
 
 If CellShard is configured with `CELLSHARD_ENABLE_CUDA=OFF`, the install does not export `CellShard::runtime`.
@@ -351,13 +361,13 @@ python -c "import cellshard; print(cellshard.__version__)"
 
 If you are browsing the code for the first time:
 
-- start with `src/CellShard.hh`
-- read `src/formats/` to understand the matrix types
-- read `src/disk/packfile.cuh` and `src/disk/packfile.cu` if you care about the packed part codec used inside shard `.pack` files
-- read `src/sharded/sharded.cuh` and `src/sharded/sharded_host.cuh` for the host-side model
-- read `src/sharded/sharded_device.cuh` for upload and staging
-- read `src/disk/csh5.cuh` and `src/disk/csh5.cc` if you care about the `.csh5` container and shard `.pack` runtime caches
-- read `src/sharded/distributed.cuh` if you care about local multi-GPU placement
+- start with `include/CellShard/CellShard.hh`
+- read `include/CellShard/formats/` to understand the matrix types
+- read `include/CellShard/io/pack/packfile.cuh` and `src/io/pack/packfile.cu` if you care about the packed part codec used inside shard `.pack` files
+- read `include/CellShard/runtime/layout/sharded.cuh` and `include/CellShard/runtime/host/sharded_host.cuh` for the host-side model
+- read `include/CellShard/runtime/device/sharded_device.cuh` for upload and staging
+- read `include/CellShard/io/csh5/api.cuh`, `src/io/csh5/create.cc`, `src/io/csh5/metadata.cc`, `src/io/csh5/finalize_preprocess.cc`, `src/io/csh5/write.cc`, and `src/io/csh5/runtime/` if you care about the `.csh5` container and shard `.pack` runtime caches
+- read `include/CellShard/runtime/distributed/distributed.cuh` if you care about local multi-GPU placement
 
 ## Notes
 

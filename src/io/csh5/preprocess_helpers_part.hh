@@ -208,6 +208,118 @@ done:
     return 0;
 }
 
+inline int build_filtered_sliced_ell_part_from_sliced(const sparse::sliced_ell *src,
+                                                      const std::uint8_t *keep_rows,
+                                                      std::uint64_t global_row_begin,
+                                                      const std::uint32_t *col_remap,
+                                                      std::uint32_t out_cols,
+                                                      sparse::sliced_ell *dst,
+                                                      std::uint32_t *rows_out,
+                                                      std::uint32_t *nnz_out) {
+    std::vector<std::uint32_t> row_widths;
+    std::vector<std::uint32_t> slice_row_offsets;
+    std::vector<std::uint32_t> slice_widths;
+    std::uint32_t live_rows = 0u;
+    std::uint32_t live_nnz = 0u;
+    std::uint32_t slice_rows = 0u;
+
+    if (src == nullptr || dst == nullptr || rows_out == nullptr || nnz_out == nullptr) return 0;
+    *rows_out = 0u;
+    *nnz_out = 0u;
+    sparse::clear(dst);
+    sparse::init(dst);
+
+    row_widths.reserve((std::size_t) src->rows);
+    for (std::uint32_t row = 0u; row < src->rows; ++row) {
+        const std::uint64_t global_row = global_row_begin + row;
+        const std::uint32_t slice = sparse::find_slice(src, row);
+        const std::uint32_t row_begin = slice < src->slice_count ? src->slice_row_offsets[slice] : 0u;
+        const std::uint32_t width = slice < src->slice_count ? src->slice_widths[slice] : 0u;
+        const std::size_t row_base = sparse::slice_slot_base(src, slice) + (std::size_t) (row - row_begin) * (std::size_t) width;
+        std::uint32_t filtered_row_nnz = 0u;
+        if (keep_rows == nullptr || keep_rows[global_row] == 0u) continue;
+        for (std::uint32_t slot = 0u; slot < width; ++slot) {
+            const std::uint32_t col = src->col_idx[row_base + slot];
+            if (col == sparse::sliced_ell_invalid_col || col >= src->cols) continue;
+            if (col_remap == nullptr || col_remap[col] == std::numeric_limits<std::uint32_t>::max()) continue;
+            ++filtered_row_nnz;
+        }
+        row_widths.push_back(filtered_row_nnz);
+        ++live_rows;
+        live_nnz += filtered_row_nnz;
+    }
+
+    *rows_out = live_rows;
+    *nnz_out = live_nnz;
+    if (live_rows == 0u) return 1;
+
+    slice_rows = sparse::uniform_slice_rows(src);
+    if (slice_rows == 0u) {
+        if (src->slice_count != 0u && src->slice_row_offsets != nullptr) {
+            for (std::uint32_t slice = 0u; slice < src->slice_count; ++slice) {
+                slice_rows = std::max<std::uint32_t>(slice_rows, src->slice_row_offsets[slice + 1u] - src->slice_row_offsets[slice]);
+            }
+        }
+        if (slice_rows == 0u) slice_rows = live_rows;
+    }
+
+    slice_row_offsets.push_back(0u);
+    for (std::uint32_t row_begin = 0u; row_begin < live_rows; row_begin += slice_rows) {
+        const std::uint32_t row_end = std::min<std::uint32_t>(live_rows, row_begin + slice_rows);
+        std::uint32_t width = 0u;
+        for (std::uint32_t row = row_begin; row < row_end; ++row) width = std::max<std::uint32_t>(width, row_widths[(std::size_t) row]);
+        slice_widths.push_back(width);
+        slice_row_offsets.push_back(row_end);
+    }
+
+    sparse::init(dst, live_rows, out_cols, live_nnz);
+    if (!sparse::allocate(dst, (std::uint32_t) slice_widths.size(), slice_row_offsets.data(), slice_widths.data())) {
+        sparse::clear(dst);
+        sparse::init(dst);
+        return 0;
+    }
+
+    {
+        std::uint32_t out_row = 0u;
+        for (std::uint32_t row = 0u; row < src->rows; ++row) {
+            const std::uint64_t global_row = global_row_begin + row;
+            const std::uint32_t src_slice = sparse::find_slice(src, row);
+            const std::uint32_t src_row_begin = src_slice < src->slice_count ? src->slice_row_offsets[src_slice] : 0u;
+            const std::uint32_t src_width = src_slice < src->slice_count ? src->slice_widths[src_slice] : 0u;
+            const std::size_t src_row_base =
+                sparse::slice_slot_base(src, src_slice) + (std::size_t) (row - src_row_begin) * (std::size_t) src_width;
+            std::uint32_t emitted = 0u;
+            if (keep_rows == nullptr || keep_rows[global_row] == 0u) continue;
+            if (out_row >= live_rows) break;
+            {
+                const std::uint32_t dst_slice = sparse::find_slice(dst, out_row);
+                const std::uint32_t dst_row_begin =
+                    dst_slice < dst->slice_count ? dst->slice_row_offsets[dst_slice] : 0u;
+                const std::uint32_t dst_width =
+                    dst_slice < dst->slice_count ? dst->slice_widths[dst_slice] : 0u;
+                const std::size_t dst_row_base =
+                    sparse::slice_slot_base(dst, dst_slice) + (std::size_t) (out_row - dst_row_begin) * (std::size_t) dst_width;
+                for (std::uint32_t slot = 0u; slot < src_width; ++slot) {
+                    const std::uint32_t col = src->col_idx[src_row_base + slot];
+                    const std::uint32_t mapped =
+                        (col_remap != nullptr && col < src->cols) ? col_remap[col] : std::numeric_limits<std::uint32_t>::max();
+                    if (col == sparse::sliced_ell_invalid_col || col >= src->cols || mapped == std::numeric_limits<std::uint32_t>::max()) continue;
+                    if (emitted >= dst_width) {
+                        sparse::clear(dst);
+                        sparse::init(dst);
+                        return 0;
+                    }
+                    dst->col_idx[dst_row_base + emitted] = mapped;
+                    dst->val[dst_row_base + emitted] = src->val[src_row_base + slot];
+                    ++emitted;
+                }
+            }
+            ++out_row;
+        }
+    }
+    return 1;
+}
+
 inline std::size_t blocked_ell_part_block_index_count(std::uint64_t rows, std::uint64_t aux) {
     const types::u32 block_size = sparse::unpack_blocked_ell_block_size((unsigned long) aux);
     const std::uint64_t ell_width = sparse::unpack_blocked_ell_ell_width((unsigned long) aux);
@@ -669,7 +781,7 @@ inline void default_execution_metadata(dataset_h5_state *state) {
     std::uint64_t shard_id = 0u;
     std::uint64_t partition_id = 0u;
     const std::uint32_t default_format =
-        state != 0 && state->matrix_family == dataset_matrix_family_optimized_blocked_ell
+        blocked_ell_uses_execution_payload(state)
             ? dataset_execution_format_bucketed_blocked_ell
             : (state != 0 && state->matrix_family == dataset_matrix_family_quantized_blocked_ell
                    ? dataset_execution_format_quantized_blocked_ell
@@ -865,16 +977,6 @@ inline std::uint64_t estimate_shard_pack_bytes(const dataset_h5_state *state, un
                                                                         local_count,
                                                                         local_offsets,
                                                                         local_sizes)) {
-            goto done;
-        }
-    } else if (state->matrix_family == dataset_matrix_family_optimized_blocked_ell) {
-        if (!compute_shard_pack_locators<sparse::blocked_ell>(state->partition_rows + begin,
-                                                              state->partition_nnz + begin,
-                                                              state->partition_aux + begin,
-                                                              state->cols,
-                                                              local_count,
-                                                              local_offsets,
-                                                              local_sizes)) {
             goto done;
         }
     } else if (state->matrix_family == dataset_matrix_family_sliced_ell) {

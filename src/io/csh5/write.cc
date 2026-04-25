@@ -10,6 +10,7 @@ int append_blocked_ell_partition_h5(const char *filename,
     std::uint64_t *partition_block_idx_offsets = 0;
     std::uint64_t *partition_value_offsets = 0;
     std::uint64_t num_partitions = 0;
+    char payload_layout[64];
     const std::size_t row_blocks = sparse::row_block_count(part);
     const std::size_t ell_width = sparse::ell_width_blocks(part);
     int ok = 0;
@@ -19,6 +20,13 @@ int append_blocked_ell_partition_h5(const char *filename,
     file = H5Fopen(filename, H5F_ACC_RDWR, H5P_DEFAULT);
     if (file < 0) return 0;
     if (!ensure_dataset_identity(file)) goto done;
+    payload_layout[0] = '\0';
+    if (!read_attr_string(file, "payload_layout", payload_layout, sizeof(payload_layout))) goto done;
+    if (std::strcmp(payload_layout, payload_layout_shard_packed) != 0) {
+        std::fprintf(stderr,
+                     "cellshard: append_blocked_ell_partition_h5 only supports legacy shard_packed blocked files; blocked now defaults to optimized execution payload\n");
+        goto done;
+    }
     if (!read_attr_u64(file, "num_partitions", &num_partitions)) goto done;
     if (partition_id >= num_partitions) goto done;
 
@@ -198,10 +206,10 @@ int append_bucketed_blocked_ell_shard_h5(const char *filename,
     payload_root = H5Gopen2(file, payload_group, H5P_DEFAULT);
     if (payload_root < 0) payload_root = create_group(file, payload_group);
     if (payload_root < 0) goto done;
-    if (H5Lexists(payload_root, "optimized_blocked_ell", H5P_DEFAULT) > 0) {
-        payload = H5Gopen2(payload_root, "optimized_blocked_ell", H5P_DEFAULT);
+    if (H5Lexists(payload_root, "blocked_ell", H5P_DEFAULT) > 0) {
+        payload = H5Gopen2(payload_root, "blocked_ell", H5P_DEFAULT);
     } else {
-        payload = create_group(payload_root, "optimized_blocked_ell");
+        payload = create_group(payload_root, "blocked_ell");
     }
     if (payload < 0) goto done;
     if (!build_optimized_shard_dataset_name(shard_id, dataset_name, sizeof(dataset_name))) goto done;

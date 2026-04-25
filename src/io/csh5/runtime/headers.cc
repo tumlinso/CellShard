@@ -103,8 +103,8 @@ int load_dataset_blocked_ell_h5_header(const char *filename,
         0,
         [](hid_t file, dataset_h5_state *state, const char *payload_layout) -> int {
             const int optimized_codec = std::strcmp(payload_layout, payload_layout_optimized_blocked_ell) == 0;
-            state->matrix_family =
-                optimized_codec ? dataset_matrix_family_optimized_blocked_ell : dataset_matrix_family_blocked_ell;
+            state->matrix_family = dataset_matrix_family_blocked_ell;
+            state->blocked_ell_optimized_payload = optimized_codec;
             if (optimized_codec) return 1;
 
             state->partition_block_idx_offsets =

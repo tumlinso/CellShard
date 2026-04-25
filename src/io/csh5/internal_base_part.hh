@@ -197,6 +197,7 @@ struct dataset_h5_state {
     std::uint64_t num_shards;
     std::uint32_t num_codecs;
     std::uint32_t matrix_family;
+    int blocked_ell_optimized_payload;
     std::uint64_t *partition_block_idx_offsets;
     std::uint64_t *partition_value_offsets;
     std::uint64_t *shard_block_idx_offsets;
@@ -283,6 +284,7 @@ inline void dataset_h5_state_init(dataset_h5_state *state) {
     state->num_shards = 0;
     state->num_codecs = 0;
     state->matrix_family = dataset_matrix_family_none;
+    state->blocked_ell_optimized_payload = 0;
     state->partition_block_idx_offsets = 0;
     state->partition_value_offsets = 0;
     state->shard_block_idx_offsets = 0;
@@ -525,6 +527,12 @@ inline void dataset_h5_state_clear(dataset_h5_state *state) {
     state->num_shards = 0;
     state->num_codecs = 0;
     state->matrix_family = dataset_matrix_family_none;
+    state->blocked_ell_optimized_payload = 0;
+}
+
+inline int blocked_ell_uses_execution_payload(const dataset_h5_state *state) {
+    return state != nullptr && state->matrix_family == dataset_matrix_family_blocked_ell
+        && state->blocked_ell_optimized_payload != 0;
 }
 
 inline hid_t create_group(hid_t parent, const char *path) {

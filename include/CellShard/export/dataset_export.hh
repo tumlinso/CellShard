@@ -72,6 +72,12 @@ struct dataset_attribute {
     std::string value;
 };
 
+struct derivation_group_span {
+    std::string name;
+    std::uint64_t begin = 0u;
+    std::uint64_t end = 0u;
+};
+
 struct dataset_attribute_summary {
     bool available = false;
     std::vector<std::string> keys;
@@ -216,6 +222,30 @@ struct global_metadata_snapshot {
     runtime_service_metadata runtime_service;
 };
 
+struct derived_materialization_request {
+    std::string output_path;
+    std::string cache_root;
+    std::string derived_pack_name;
+    std::vector<std::uint64_t> row_indices;
+    std::vector<std::uint64_t> feature_indices;
+    std::vector<derivation_group_span> row_groups;
+    std::vector<derivation_group_span> feature_groups;
+    bool materialize_dataset = true;
+    bool materialize_execution_pack = false;
+};
+
+struct derived_materialization_result {
+    bool materialized_dataset = false;
+    bool materialized_execution_pack = false;
+    std::string materialized_dataset_path;
+    std::string execution_cache_root;
+    std::string derived_pack_name;
+    std::uint64_t rows = 0u;
+    std::uint64_t cols = 0u;
+    std::uint64_t nnz = 0u;
+    runtime_service_metadata runtime_service;
+};
+
 bool load_dataset_summary(const char *path, dataset_summary *out, std::string *error = nullptr);
 bool load_dataset_as_csr(const char *path, csr_matrix_export *out, std::string *error = nullptr);
 bool load_dataset_rows_as_csr(const char *path,
@@ -223,6 +253,10 @@ bool load_dataset_rows_as_csr(const char *path,
                               std::size_t row_count,
                               csr_matrix_export *out,
                               std::string *error = nullptr);
+bool materialize_derived_dataset(const char *source_path,
+                                 const derived_materialization_request &request,
+                                 derived_materialization_result *out,
+                                 std::string *error = nullptr);
 bool load_observation_metadata(const char *path,
                                std::vector<observation_metadata_column> *out,
                                std::string *error = nullptr);

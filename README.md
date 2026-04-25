@@ -82,6 +82,7 @@ Useful public/runtime waypoints:
 - `sharded<T>`: metadata plus optional loaded payload pointers for a partitioned matrix collection
 - `shard_storage`: the bound storage backend used for lazy fetch/materialization
 - `.csh5`: the canonical CellShard dataset container and archive format
+- `.cspool`: the local ingest-spool part format used before final `.csh5` assembly
 - `.pack`: the generated execution artifact used for fast multithreaded fetch and delivery
 
 ## Ownership Boundary
@@ -99,7 +100,7 @@ CellShard has two different storage roles, and the distinction matters:
 
 In the current Cellerator ingest path there is also a bounded local ingest spool:
 
-- ingest can spill intermediate canonical or execution-ready build artifacts to a machine-local SSD spool before the final `.csh5` is assembled
+- ingest can spill intermediate `.cspool` partition artifacts to a machine-local SSD spool before the final `.csh5` is assembled
 - that spool is not an archive format and is not part of the steady-state runtime contract
 - its purpose is to avoid rereading an expensive source MTX while preserving `.csh5` as the durable source of truth
 - row-aligned parts and shard-aligned fetch units are still the persistent contract; ingest does not split one cell across parts or shards
@@ -141,7 +142,10 @@ row maps and canonical slice metadata needed to reconstruct logical canonical
 row order. The runtime still publishes that unified sliced payload on the usual
 `shard.<id>.exec.pack` path, but the bytes in that file are the same native
 bucketed sliced partition payload that `.csh5` stores, not a second
-execution-only sliced codec.
+execution-only sliced codec. Inside each partition, rows are stably sorted by
+row width and segmented with variable cut points chosen to minimize packed
+bytes for the requested segment-count cap; the codec is no longer limited to
+equal-row-count bucket boundaries.
 
 Do not think of `.csh5` as the final hot execution substrate. `.csh5` is the durable canonical source and append target, while `.pack` is the runtime format used for high-throughput repeated access and delivery.
 
@@ -164,7 +168,7 @@ For large or remote MTX ingest, the practical write-side workflow is:
 
 1. stream the source matrix once through bounded conversion windows
 2. finish all filtering and shape-changing decisions before CellShard emission
-3. spill bounded build artifacts to machine-local spool storage
+3. spill bounded `.cspool` part artifacts to machine-local spool storage
 4. assemble or append the final `.csh5` from that local spool
 5. build or refresh the active pack generation on the machine that owns the `.csh5` source
 
@@ -341,6 +345,7 @@ The Python package exposes an easy high-level facade plus lower-level owner/clie
 - `load_dataset_summary`
 - `load_dataset_as_csr`
 - `load_dataset_rows_as_csr`
+- `materialize_derived_dataset`
 - `load_dataset_global_metadata_snapshot`
 - `serialize_global_metadata_snapshot`
 - `deserialize_global_metadata_snapshot`

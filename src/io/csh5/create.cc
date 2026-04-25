@@ -245,8 +245,8 @@ inline int create_dataset_blocked_ell_h5_impl(const char *filename,
                                                                    : payload_layout_shard_packed)) {
         goto done;
     }
-    payload = (!optimized_payload_only && payload_root >= 0) ? create_group(payload_root, "blocked_ell") : (hid_t) -1;
-    if (!optimized_payload_only && payload < 0) goto done;
+    payload = payload_root >= 0 ? create_group(payload_root, "blocked_ell") : (hid_t) -1;
+    if (payload < 0) goto done;
 
     if (!write_common_matrix_tables(matrix, layout, partition_aux.data(), partition_axes.data())
         || !write_dataset_table_group(dsets, datasets)
@@ -347,7 +347,7 @@ int create_dataset_blocked_ell_h5(const char *filename,
                                   const dataset_layout_view *layout,
                                   const dataset_dataset_table_view *datasets,
                                   const dataset_provenance_view *provenance) {
-    return create_dataset_blocked_ell_h5_impl(filename, layout, datasets, provenance, 0);
+    return create_dataset_blocked_ell_h5_impl(filename, layout, datasets, provenance, 1);
 }
 
 int create_dataset_optimized_blocked_ell_h5(const char *filename,

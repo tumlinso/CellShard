@@ -41,7 +41,10 @@ inline int ensure_quantized_blocked_ell_payload_open(dataset_h5_state *state) {
 inline int ensure_optimized_blocked_ell_payload_open(dataset_h5_state *state) {
     if (state == 0 || state->file < 0) return 0;
     if (state->payload_optimized_blocked_ell >= 0) return 1;
-    state->payload_optimized_blocked_ell = H5Gopen2(state->file, payload_optimized_blocked_ell_group, H5P_DEFAULT);
+    state->payload_optimized_blocked_ell = H5Gopen2(state->file, payload_blocked_ell_group, H5P_DEFAULT);
+    if (state->payload_optimized_blocked_ell < 0) {
+        state->payload_optimized_blocked_ell = H5Gopen2(state->file, payload_optimized_blocked_ell_group, H5P_DEFAULT);
+    }
     return state->payload_optimized_blocked_ell >= 0;
 }
 
@@ -1280,12 +1283,41 @@ inline std::uint32_t count_valid_sliced_slots(const sparse::sliced_ell *part, st
     return part != 0 ? sparse::row_nnz(part, row) : 0u;
 }
 
+inline std::uint64_t packed_single_slice_segment_bytes(std::uint32_t rows, std::uint32_t width) {
+    return (std::uint64_t) packed_sliced_ell_bytes(1u,
+                                                   rows == 0u || width == 0u ? 0u : rows * width,
+                                                   sizeof(real::storage_t));
+}
+
+struct sliced_bucket_dp_line {
+    std::int64_t slope;
+    std::int64_t intercept;
+    std::uint32_t cut_rows;
+};
+
+inline std::int64_t eval_sliced_bucket_dp_line(const sliced_bucket_dp_line &line, std::uint32_t x) {
+    return line.intercept + line.slope * (std::int64_t) x;
+}
+
+inline bool sliced_bucket_dp_line_is_redundant(const sliced_bucket_dp_line &lhs,
+                                               const sliced_bucket_dp_line &mid,
+                                               const sliced_bucket_dp_line &rhs) {
+    const __int128 left = (__int128) (rhs.intercept - lhs.intercept) * (__int128) (lhs.slope - mid.slope);
+    const __int128 right = (__int128) (mid.intercept - lhs.intercept) * (__int128) (lhs.slope - rhs.slope);
+    return left <= right;
+}
+
 inline int build_sliced_execution_bucket_layout(const sparse::sliced_ell *part,
                                                 std::uint32_t requested_bucket_count,
                                                 sliced_execution_bucket_layout *layout) {
     const std::uint32_t row_count = part != 0 ? part->rows : 0u;
-    std::uint32_t bucket_count = 0u;
-    std::uint32_t bucket = 0u;
+    const std::uint32_t max_segments = std::max<std::uint32_t>(1u, std::min<std::uint32_t>(requested_bucket_count, row_count));
+    const std::uint64_t segment_fixed_bytes = packed_single_slice_segment_bytes(0u, 0u);
+    const std::uint64_t slot_bytes = sizeof(types::idx_t) + sizeof(real::storage_t);
+    static constexpr std::uint64_t inf_cost = std::numeric_limits<std::uint64_t>::max() / 4u;
+    std::vector<std::uint64_t> prev_costs, curr_costs;
+    std::vector<std::vector<std::uint32_t>> cut_rows;
+    std::vector<std::uint32_t> sorted_widths;
     if (part == 0 || layout == 0) return 0;
     layout->row_order.clear();
     layout->row_widths.clear();
@@ -1301,7 +1333,6 @@ inline int build_sliced_execution_bucket_layout(const sparse::sliced_ell *part,
         layout->row_order[row] = row;
         layout->row_widths[row] = count_valid_sliced_slots(part, row);
     }
-    bucket_count = std::max<std::uint32_t>(1u, std::min<std::uint32_t>(requested_bucket_count, row_count));
     std::stable_sort(layout->row_order.begin(),
                      layout->row_order.end(),
                      [&](std::uint32_t lhs, std::uint32_t rhs) {
@@ -1310,31 +1341,86 @@ inline int build_sliced_execution_bucket_layout(const sparse::sliced_ell *part,
                          if (lhs_width != rhs_width) return lhs_width < rhs_width;
                          return lhs < rhs;
                      });
-    layout->segment_row_offsets.reserve((std::size_t) bucket_count + 1u);
-    layout->segment_widths.reserve(bucket_count);
-    layout->segment_row_offsets.push_back(0u);
-    for (bucket = 0u; bucket < bucket_count; ++bucket) {
-        const std::uint32_t row_begin = (bucket * row_count) / bucket_count;
-        const std::uint32_t row_end = ((bucket + 1u) * row_count) / bucket_count;
-        std::uint32_t seg_width = 0u;
-        for (std::uint32_t pos = row_begin; pos < row_end; ++pos) {
-            seg_width = std::max(seg_width, layout->row_widths[layout->row_order[pos]]);
-        }
-        layout->segment_widths.push_back(seg_width);
-        layout->segment_row_offsets.push_back(row_end);
+    sorted_widths.resize(row_count);
+    for (std::uint32_t row = 0u; row < row_count; ++row) {
+        sorted_widths[row] = layout->row_widths[layout->row_order[row]];
     }
-    if (layout->segment_widths.size() > 1u) {
-        bool all_same = true;
-        for (std::size_t i = 1; i < layout->segment_widths.size(); ++i) {
-            if (layout->segment_widths[i] != layout->segment_widths[0]) {
-                all_same = false;
-                break;
+
+    prev_costs.assign((std::size_t) row_count + 1u, inf_cost);
+    curr_costs.assign((std::size_t) row_count + 1u, inf_cost);
+    cut_rows.assign((std::size_t) max_segments + 1u, std::vector<std::uint32_t>((std::size_t) row_count + 1u, 0u));
+    prev_costs[0] = 0u;
+
+    for (std::uint32_t segments = 1u; segments <= max_segments; ++segments) {
+        std::vector<sliced_bucket_dp_line> hull;
+        std::size_t head = 0u;
+        curr_costs.assign((std::size_t) row_count + 1u, inf_cost);
+        hull.reserve((std::size_t) row_count + 1u);
+        if (prev_costs[segments - 1u] != inf_cost) {
+            const std::uint32_t prefix_rows = segments - 1u;
+            hull.push_back({
+                -((std::int64_t) slot_bytes * (std::int64_t) prefix_rows),
+                (std::int64_t) prev_costs[prefix_rows],
+                prefix_rows
+            });
+        }
+
+        for (std::uint32_t rows = segments; rows <= row_count; ++rows) {
+            const std::uint32_t width = sorted_widths[(std::size_t) rows - 1u];
+            while (head + 1u < hull.size()
+                   && eval_sliced_bucket_dp_line(hull[head + 1u], width)
+                          < eval_sliced_bucket_dp_line(hull[head], width)) {
+                ++head;
+            }
+            if (head < hull.size()) {
+                const sliced_bucket_dp_line best = hull[head];
+                curr_costs[rows] =
+                    segment_fixed_bytes
+                    + slot_bytes * (std::uint64_t) width * (std::uint64_t) rows
+                    + (std::uint64_t) eval_sliced_bucket_dp_line(best, width);
+                cut_rows[segments][rows] = best.cut_rows;
+            }
+            if (prev_costs[rows] != inf_cost) {
+                const sliced_bucket_dp_line line = {
+                    -((std::int64_t) slot_bytes * (std::int64_t) rows),
+                    (std::int64_t) prev_costs[rows],
+                    rows
+                };
+                while (hull.size() >= head + 2u
+                       && sliced_bucket_dp_line_is_redundant(hull[hull.size() - 2u], hull[hull.size() - 1u], line)) {
+                    hull.pop_back();
+                }
+                hull.push_back(line);
             }
         }
-        if (all_same) {
-            layout->segment_row_offsets.assign(2u, 0u);
-            layout->segment_row_offsets[1] = row_count;
-            layout->segment_widths.assign(1u, layout->segment_widths[0]);
+        prev_costs.swap(curr_costs);
+    }
+
+    if (prev_costs[row_count] == inf_cost) return 0;
+
+    {
+        std::vector<std::uint32_t> raw_offsets((std::size_t) max_segments + 1u, 0u);
+        std::vector<std::uint32_t> raw_widths(max_segments, 0u);
+        std::uint32_t rows = row_count;
+        raw_offsets[(std::size_t) max_segments] = row_count;
+        for (std::uint32_t segments = max_segments; segments != 0u; --segments) {
+            const std::uint32_t row_begin = cut_rows[segments][rows];
+            raw_offsets[(std::size_t) segments - 1u] = row_begin;
+            raw_widths[(std::size_t) segments - 1u] = sorted_widths[(std::size_t) rows - 1u];
+            rows = row_begin;
+        }
+        layout->segment_row_offsets.reserve((std::size_t) max_segments + 1u);
+        layout->segment_widths.reserve(max_segments);
+        layout->segment_row_offsets.push_back(0u);
+        for (std::uint32_t segment = 0u; segment < max_segments; ++segment) {
+            const std::uint32_t row_end = raw_offsets[(std::size_t) segment + 1u];
+            const std::uint32_t seg_width = raw_widths[segment];
+            if (!layout->segment_widths.empty() && layout->segment_widths.back() == seg_width) {
+                layout->segment_row_offsets.back() = row_end;
+            } else {
+                layout->segment_widths.push_back(seg_width);
+                layout->segment_row_offsets.push_back(row_end);
+            }
         }
     }
     return 1;

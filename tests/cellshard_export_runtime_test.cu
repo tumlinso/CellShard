@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <filesystem>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -72,6 +73,8 @@ void fill_blocked_ell_part(cs::sparse::blocked_ell *part) {
 
 int main() {
     char path[] = "/tmp/cellshard_export_runtimeXXXXXX.csh5";
+    const std::string derived_path = std::string(path) + ".derived.csh5";
+    const std::string derived_cache_root = std::string(path) + ".derived.cache";
     const int fd = ::mkstemps(path, 5);
     require(fd >= 0, "mkstemps failed");
     ::close(fd);
@@ -253,9 +256,13 @@ int main() {
     execution.shard_owner_rank_ids = shard_owner_rank_ids;
     execution.preferred_base_format = cs::dataset_execution_format_bucketed_blocked_ell;
     cs::dataset_runtime_service_view runtime_service{};
+    cs::bucketed_blocked_ell_shard optimized_shard{};
+    cs::bucketed_blocked_ell_partition bucketed_part{};
 
     fill_blocked_ell_part(&part);
     cs::init(&runtime_service);
+    cs::init(&optimized_shard);
+    cs::init(&bucketed_part);
     runtime_service.service_mode = cs::dataset_runtime_service_mode_owner_hosted;
     runtime_service.live_write_mode = cs::dataset_live_write_mode_append_only;
     runtime_service.prefer_pack_delivery = 1u;
@@ -270,7 +277,37 @@ int main() {
     runtime_service.staged_write_generation = 16u;
 
     require(cs::create_dataset_blocked_ell_h5(path, &layout, &datasets, &provenance) != 0, "create_dataset_blocked_ell_h5 failed");
-    require(cs::append_blocked_ell_partition_h5(path, 0ul, &part) != 0, "append_blocked_ell_partition_h5 failed");
+    require(cs::build_bucketed_blocked_ell_partition(&bucketed_part, &part, 1u, nullptr) != 0,
+            "build_bucketed_blocked_ell_partition failed");
+    bucketed_part.exec_to_canonical_cols = (std::uint32_t *) std::calloc(4u, sizeof(std::uint32_t));
+    bucketed_part.canonical_to_exec_cols = (std::uint32_t *) std::calloc(4u, sizeof(std::uint32_t));
+    require(bucketed_part.exec_to_canonical_cols != nullptr && bucketed_part.canonical_to_exec_cols != nullptr,
+            "optimized blocked partition col-map allocation failed");
+    optimized_shard.rows = 2u;
+    optimized_shard.cols = 4u;
+    optimized_shard.nnz = 4u;
+    optimized_shard.partition_count = 1u;
+    optimized_shard.partitions = (cs::bucketed_blocked_ell_partition *) std::calloc(1u, sizeof(cs::bucketed_blocked_ell_partition));
+    optimized_shard.partition_row_offsets = (std::uint32_t *) std::calloc(2u, sizeof(std::uint32_t));
+    optimized_shard.exec_to_canonical_cols = (std::uint32_t *) std::calloc(4u, sizeof(std::uint32_t));
+    optimized_shard.canonical_to_exec_cols = (std::uint32_t *) std::calloc(4u, sizeof(std::uint32_t));
+    require(optimized_shard.partitions != nullptr
+                && optimized_shard.partition_row_offsets != nullptr
+                && optimized_shard.exec_to_canonical_cols != nullptr
+                && optimized_shard.canonical_to_exec_cols != nullptr,
+            "optimized blocked shard allocation failed");
+    optimized_shard.partitions[0] = bucketed_part;
+    std::memset(&bucketed_part, 0, sizeof(bucketed_part));
+    optimized_shard.partition_row_offsets[0] = 0u;
+    optimized_shard.partition_row_offsets[1] = 2u;
+    for (std::uint32_t col = 0u; col < 4u; ++col) {
+        optimized_shard.partitions[0].exec_to_canonical_cols[col] = col;
+        optimized_shard.partitions[0].canonical_to_exec_cols[col] = col;
+        optimized_shard.exec_to_canonical_cols[col] = col;
+        optimized_shard.canonical_to_exec_cols[col] = col;
+    }
+    require(cs::append_bucketed_blocked_ell_shard_h5(path, 0ul, &optimized_shard) != 0,
+            "append_bucketed_blocked_ell_shard_h5 failed");
     require(cs::append_dataset_embedded_metadata_h5(path, &embedded_metadata) != 0, "append_dataset_embedded_metadata_h5 failed");
     require(cs::append_dataset_observation_metadata_h5(path, &obs_metadata) != 0, "append_dataset_observation_metadata_h5 failed");
     require(cs::append_dataset_feature_metadata_h5(path, &feature_metadata) != 0, "append_dataset_feature_metadata_h5 failed");
@@ -282,7 +319,7 @@ int main() {
     std::string error;
     require(cse::load_dataset_summary(path, &summary, &error), error.c_str());
     require(summary.matrix_format == "blocked_ell", "summary matrix_format mismatch");
-    require(summary.payload_layout == "shard_packed", "summary payload_layout mismatch");
+    require(summary.payload_layout == "optimized_bucketed_blocked_ell", "summary payload_layout mismatch");
     require(summary.rows == 2u && summary.cols == 4u && summary.nnz == 4u, "summary shape mismatch");
     require(summary.datasets.size() == 1u, "summary dataset count mismatch");
     require(summary.datasets[0].dataset_id == "dataset0", "summary dataset id mismatch");
@@ -354,6 +391,98 @@ int main() {
     require(cse::load_dataset_attributes(path, &loaded_attributes, &error), error.c_str());
     require(loaded_attributes.size() == 2u, "explicit dataset attribute load mismatch");
     require(loaded_attributes[1].value == "demo", "explicit dataset attribute value mismatch");
+
+    cse::derived_materialization_request derive_request;
+    derive_request.output_path = derived_path;
+    derive_request.cache_root = derived_cache_root;
+    derive_request.derived_pack_name = "manual_group";
+    derive_request.row_indices = {1u, 0u};
+    derive_request.feature_indices = {3u, 2u, 0u};
+    derive_request.row_groups = {
+        {"late", 0u, 1u},
+        {"early", 1u, 2u}
+    };
+    derive_request.feature_groups = {
+        {"selected", 0u, 3u}
+    };
+    derive_request.materialize_dataset = true;
+    derive_request.materialize_execution_pack = true;
+    cse::derived_materialization_result derive_result;
+    error.clear();
+    require(cse::materialize_derived_dataset(path, derive_request, &derive_result, &error), error.c_str());
+    require(derive_result.materialized_dataset, "derived dataset output missing");
+    require(derive_result.materialized_execution_pack, "derived execution pack output missing");
+    require(derive_result.rows == 2u && derive_result.cols == 3u, "derived shape mismatch");
+
+    cse::dataset_summary derived_summary;
+    error.clear();
+    require(cse::load_dataset_summary(derived_path.c_str(), &derived_summary, &error), error.c_str());
+    require(derived_summary.rows == 2u && derived_summary.cols == 3u, "derived summary shape mismatch");
+    require(derived_summary.observation_annotations.available, "derived observation annotations missing");
+    require(derived_summary.feature_annotations.available, "derived feature annotations missing");
+    require(derived_summary.dataset_attributes.available, "derived dataset attributes missing");
+
+    cse::csr_matrix_export derived_csr;
+    error.clear();
+    require(cse::load_dataset_as_csr(derived_path.c_str(), &derived_csr, &error), error.c_str());
+    require(derived_csr.rows == 2u && derived_csr.cols == 3u, "derived csr shape mismatch");
+    require(derived_csr.indptr == std::vector<std::int64_t>({0, 1, 3}), "derived csr indptr mismatch");
+    require(derived_csr.indices == std::vector<std::int64_t>({0, 1, 2}), "derived csr indices mismatch");
+    require(derived_csr.data.size() == 3u, "derived csr data count mismatch");
+    require(close_float(derived_csr.data[0], 4.0f), "derived csr data[0] mismatch");
+    require(close_float(derived_csr.data[1], 2.0f), "derived csr data[1] mismatch");
+    require(close_float(derived_csr.data[2], 1.0f), "derived csr data[2] mismatch");
+
+    std::vector<cse::observation_metadata_column> derived_obs_columns;
+    error.clear();
+    require(cse::load_observation_metadata(derived_path.c_str(), &derived_obs_columns, &error), error.c_str());
+    require(derived_obs_columns.size() == 3u, "derived observation metadata column count mismatch");
+    require(derived_obs_columns[2].name == "derived.row_group", "derived row-group column missing");
+    require(derived_obs_columns[2].text_values == std::vector<std::string>({"late", "early"}),
+            "derived row-group values mismatch");
+
+    std::vector<cse::annotation_column> derived_var_columns;
+    error.clear();
+    require(cse::load_feature_metadata(derived_path.c_str(), &derived_var_columns, &error), error.c_str());
+    require(derived_var_columns.size() == 3u, "derived feature metadata column count mismatch");
+    require(derived_var_columns[2].name == "derived.feature_group", "derived feature-group column missing");
+
+    std::vector<cse::dataset_attribute> derived_attributes;
+    error.clear();
+    require(cse::load_dataset_attributes(derived_path.c_str(), &derived_attributes, &error), error.c_str());
+    bool found_parent_path = false;
+    bool found_pack_name = false;
+    for (const cse::dataset_attribute &entry : derived_attributes) {
+        if (entry.key == "derived.parent_path" && entry.value == path) found_parent_path = true;
+        if (entry.key == "derived.pack_name" && entry.value == "manual_group") found_pack_name = true;
+    }
+    require(found_parent_path, "derived parent path attribute missing");
+    require(found_pack_name, "derived pack-name attribute missing");
+
+    {
+        cs::sharded<cs::sparse::blocked_ell> derived_matrix;
+        cs::shard_storage derived_storage;
+        cs::bucketed_blocked_ell_partition derived_exec_part;
+        cs::dataset_execution_view derived_execution{};
+        cs::init(&derived_matrix);
+        cs::init(&derived_storage);
+        cs::init(&derived_exec_part);
+        require(cs::load_dataset_blocked_ell_h5_header(derived_path.c_str(), &derived_matrix, &derived_storage) != 0,
+                "load derived blocked header failed");
+        require(cs::bind_dataset_h5_cache(&derived_storage, derived_cache_root.c_str()) != 0,
+                "bind derived cache failed");
+        require(cs::get_dataset_h5_execution_metadata(&derived_storage, &derived_execution) != 0,
+                "get derived execution metadata failed");
+        require(cs::fetch_dataset_blocked_ell_h5_execution_partition(&derived_exec_part, &derived_matrix, &derived_storage, 0u) != 0,
+                "fetch derived execution partition failed");
+        require(derived_execution.partition_count == 1u && derived_execution.shard_count == 1u,
+                "derived execution metadata counts mismatch");
+        require(derived_exec_part.rows == 2u && derived_exec_part.cols == 3u,
+                "derived execution partition shape mismatch");
+        cs::clear(&derived_exec_part);
+        cs::clear(&derived_storage);
+        cs::clear(&derived_matrix);
+    }
 
     cse::global_metadata_snapshot owner_snapshot;
     error.clear();
@@ -438,7 +567,13 @@ int main() {
     require(decoded_snapshot.summary.dataset_attributes.keys == owner_snapshot.summary.dataset_attributes.keys,
             "decoded snapshot dataset attribute summary mismatch");
 
+    cs::clear(&bucketed_part);
+    cs::clear(&optimized_shard);
     cs::sparse::clear(&part);
+    std::remove(derived_path.c_str());
+    std::remove((derived_path + ".cache").c_str());
+    std::error_code derived_ec;
+    std::filesystem::remove_all(derived_cache_root, derived_ec);
     std::remove(path);
     return 0;
 }

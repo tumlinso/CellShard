@@ -4,6 +4,10 @@ inline int load_sliced_bucketed_partition_from_exec_pack(const dataset_h5_state 
                                                          unsigned long shard_id,
                                                          unsigned long partition_id,
                                                          bucketed_sliced_ell_partition *out);
+inline int load_execution_partition_from_pack(const dataset_h5_state *state,
+                                              unsigned long shard_id,
+                                              unsigned long partition_id,
+                                              bucketed_blocked_ell_partition *out);
 
 inline int load_optimized_partition_blob(std::FILE *fp, bucketed_blocked_ell_partition *part) {
     std::uint32_t segment = 0u;
@@ -582,6 +586,79 @@ done:
     return ok;
 }
 
+inline int load_blocked_ell_part_from_execution_pack(sharded<sparse::blocked_ell> *m,
+                                                     dataset_h5_state *state,
+                                                     unsigned long partition_id) {
+    const unsigned long shard_id = state != 0 && state->partition_shard_ids != 0 ? (unsigned long) state->partition_shard_ids[partition_id] : 0ul;
+    bucketed_blocked_ell_partition stored;
+    sparse::blocked_ell *part = 0;
+    const std::uint32_t block_size =
+        state != 0 ? sparse::unpack_blocked_ell_block_size((unsigned long) state->partition_aux[partition_id]) : 0u;
+    int ok = 0;
+
+    init(&stored);
+    if (m == 0 || state == 0 || partition_id >= m->num_partitions || block_size == 0u) return 0;
+    part = new sparse::blocked_ell;
+    sparse::init(part);
+    if (!load_execution_partition_from_pack(state, shard_id, partition_id, &stored)) goto done;
+    if (!reconstruct_canonical_blocked_ell_part(&stored, stored.exec_to_canonical_cols, block_size, part)) goto done;
+    if (part->rows != m->partition_rows[partition_id]) goto done;
+    if (part->cols != m->cols) goto done;
+    if (part->nnz != m->partition_nnz[partition_id]) goto done;
+    if (::cellshard::partition_aux(part) != m->partition_aux[partition_id]) goto done;
+    if (m->parts[partition_id] != 0) destroy(m->parts[partition_id]);
+    m->parts[partition_id] = part;
+    part = 0;
+    ok = 1;
+
+done:
+    clear(&stored);
+    if (part != 0) {
+        sparse::clear(part);
+        delete part;
+    }
+    return ok;
+}
+
+inline int load_blocked_ell_part_from_optimized_shard(sharded<sparse::blocked_ell> *m,
+                                                      dataset_h5_state *state,
+                                                      unsigned long partition_id) {
+    const unsigned long shard_id = state != 0 && state->partition_shard_ids != 0 ? (unsigned long) state->partition_shard_ids[partition_id] : 0ul;
+    const std::uint64_t begin = state != 0 && state->shard_part_begin != 0 ? state->shard_part_begin[shard_id] : 0u;
+    const std::uint64_t local_partition = partition_id >= begin ? (partition_id - begin) : std::numeric_limits<std::uint64_t>::max();
+    sparse::blocked_ell *part = 0;
+    const std::uint32_t block_size =
+        state != 0 ? sparse::unpack_blocked_ell_block_size((unsigned long) state->partition_aux[partition_id]) : 0u;
+    int ok = 0;
+
+    if (m == 0 || state == 0 || partition_id >= m->num_partitions || block_size == 0u) return 0;
+    if (!load_optimized_blocked_ell_shard_payload(state, shard_id)) return 0;
+    if (local_partition >= state->loaded_optimized_shard.partition_count) return 0;
+    part = new sparse::blocked_ell;
+    sparse::init(part);
+    if (!reconstruct_canonical_blocked_ell_part(state->loaded_optimized_shard.partitions + local_partition,
+                                                state->loaded_optimized_shard.exec_to_canonical_cols,
+                                                block_size,
+                                                part)) {
+        goto done;
+    }
+    if (part->rows != m->partition_rows[partition_id]) goto done;
+    if (part->cols != m->cols) goto done;
+    if (part->nnz != m->partition_nnz[partition_id]) goto done;
+    if (::cellshard::partition_aux(part) != m->partition_aux[partition_id]) goto done;
+    if (m->parts[partition_id] != 0) destroy(m->parts[partition_id]);
+    m->parts[partition_id] = part;
+    part = 0;
+    ok = 1;
+
+done:
+    if (part != 0) {
+        sparse::clear(part);
+        delete part;
+    }
+    return ok;
+}
+
 inline int load_execution_partition_from_pack(const dataset_h5_state *state,
                                               unsigned long shard_id,
                                               unsigned long partition_id,
@@ -714,7 +791,7 @@ inline int materialize_blocked_ell_execution_pack(shard_storage *s, dataset_h5_s
         partition_offsets = (std::uint64_t *) std::calloc((std::size_t) partition_count, sizeof(std::uint64_t));
         if (partition_offsets == 0) goto done;
     }
-    if (state->matrix_family == dataset_matrix_family_optimized_blocked_ell) {
+    if (blocked_ell_uses_execution_payload(state)) {
         if (!load_optimized_blocked_ell_shard_payload(state, shard_id)) goto done;
         optimized_shard = &state->loaded_optimized_shard;
         if (optimized_shard->partition_count != partition_count) goto done;
@@ -877,7 +954,7 @@ inline int materialize_blocked_ell_shard_pack(shard_storage *s, dataset_h5_state
         parts = (sparse::blocked_ell **) std::calloc((std::size_t) partition_count, sizeof(sparse::blocked_ell *));
         if (parts == 0) return 0;
     }
-    if (state->matrix_family == dataset_matrix_family_optimized_blocked_ell) {
+    if (blocked_ell_uses_execution_payload(state)) {
         if (!load_optimized_blocked_ell_shard_payload(state, shard_id)) {
             std::fprintf(stderr, "cellshard: failed to load optimized blocked shard payload %lu while materializing canonical pack\n", shard_id);
             goto done;
@@ -1069,7 +1146,6 @@ inline int materialize_shard_pack(shard_storage *s, dataset_h5_state *state, uns
     if (state == 0) return 0;
     if (state->matrix_family == dataset_matrix_family_blocked_ell) return materialize_blocked_ell_shard_pack(s, state, shard_id);
     if (state->matrix_family == dataset_matrix_family_quantized_blocked_ell) return materialize_quantized_blocked_ell_shard_pack(s, state, shard_id);
-    if (state->matrix_family == dataset_matrix_family_optimized_blocked_ell) return materialize_blocked_ell_shard_pack(s, state, shard_id);
     if (state->matrix_family == dataset_matrix_family_sliced_ell) return materialize_sliced_ell_shard_pack(s, state, shard_id);
     return 0;
 }

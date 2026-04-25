@@ -3,13 +3,48 @@
 int fetch_dataset_blocked_ell_h5_partition(sharded<sparse::blocked_ell> *m,
                                            const shard_storage *s,
                                            unsigned long partition_id) {
-    return fetch_cached_partition_common(m, s, partition_id, load_blocked_ell_part_from_cached_pack);
+    shard_storage *storage = const_cast<shard_storage *>(s);
+    dataset_h5_state *state = dataset_h5_state_from_storage(storage);
+    const unsigned long shard_id = state != 0 && state->partition_shard_ids != 0
+        ? (unsigned long) state->partition_shard_ids[partition_id]
+        : 0ul;
+    if (m == 0 || storage == 0 || state == 0 || partition_id >= m->num_partitions) return 0;
+    if (ensure_execution_pack_ready(storage, state, shard_id)) {
+        return load_blocked_ell_part_from_execution_pack(m, state, partition_id);
+    }
+    if (!shard_storage_has_capability(storage, shard_storage_cap_canonical_read) || !open_dataset_h5_backend(storage)) return 0;
+    if (blocked_ell_uses_execution_payload(state)) return load_blocked_ell_part_from_optimized_shard(m, state, partition_id);
+    return load_or_materialize_blocked_ell_parts(m, state, shard_id, partition_id, partition_id + 1u, 1, 0, 0);
 }
 
 int fetch_dataset_blocked_ell_h5_shard(sharded<sparse::blocked_ell> *m,
                                        const shard_storage *s,
                                        unsigned long shard_id) {
-    return fetch_cached_shard_common(m, s, shard_id, load_blocked_ell_part_from_cached_pack);
+    unsigned long begin = 0ul;
+    unsigned long end = 0ul;
+    shard_storage *storage = const_cast<shard_storage *>(s);
+    dataset_h5_state *state = dataset_h5_state_from_storage(storage);
+    if (m == 0 || storage == 0 || state == 0 || shard_id >= m->num_shards) return 0;
+    begin = first_partition_in_shard(m, shard_id);
+    end = last_partition_in_shard(m, shard_id);
+    if (ensure_execution_pack_ready(storage, state, shard_id)) {
+        for (unsigned long i = begin; i < end; ++i) {
+            if (!load_blocked_ell_part_from_execution_pack(m, state, i)) return 0;
+        }
+        return 1;
+    }
+    if (!shard_storage_has_capability(storage, shard_storage_cap_canonical_read) || !open_dataset_h5_backend(storage)) return 0;
+    if (blocked_ell_uses_execution_payload(state)) {
+        for (unsigned long i = begin; i < end; ++i) {
+            if (!load_blocked_ell_part_from_optimized_shard(m, state, i)) return 0;
+        }
+        return 1;
+    }
+    if (!load_or_materialize_blocked_ell_parts(m, state, shard_id, begin, end, 1, 0, 0)) return 0;
+    for (unsigned long i = begin; i < end; ++i) {
+        if (m->parts[i] == nullptr) return 0;
+    }
+    return 1;
 }
 
 int fetch_dataset_quantized_blocked_ell_h5_partition(sharded<sparse::quantized_blocked_ell> *m,
@@ -196,13 +231,20 @@ int clear_all_dataset_sliced_ell_h5_bucketed_device_caches() {
 int prefetch_dataset_blocked_ell_h5_partition_cache(const sharded<sparse::blocked_ell> *m,
                                                     shard_storage *s,
                                                     unsigned long partition_id) {
-    return prefetch_partition_cache_common(m, s, partition_id);
+    dataset_h5_state *state = dataset_h5_state_from_storage(s);
+    const unsigned long shard_id = state != 0 && state->partition_shard_ids != 0
+        ? (unsigned long) state->partition_shard_ids[partition_id]
+        : 0ul;
+    if (m == 0 || s == 0 || state == 0 || partition_id >= m->num_partitions) return 0;
+    return ensure_execution_pack_ready(s, state, shard_id);
 }
 
 int prefetch_dataset_blocked_ell_h5_shard_cache(const sharded<sparse::blocked_ell> *m,
                                                 shard_storage *s,
                                                 unsigned long shard_id) {
-    return prefetch_shard_cache_common(m, s, shard_id);
+    dataset_h5_state *state = dataset_h5_state_from_storage(s);
+    if (m == 0 || s == 0 || state == 0 || shard_id >= m->num_shards) return 0;
+    return ensure_execution_pack_ready(s, state, shard_id);
 }
 
 int prefetch_dataset_quantized_blocked_ell_h5_partition_cache(const sharded<sparse::quantized_blocked_ell> *m,
@@ -264,11 +306,10 @@ int fetch_dataset_blocked_ell_h5_execution_partition(bucketed_blocked_ell_partit
     shard_id = (unsigned long) state->partition_shard_ids[partition_id];
     if (!ensure_execution_pack_ready(storage, state, shard_id)) return 0;
     if (load_execution_partition_from_pack(state, shard_id, partition_id, out)) return 1;
-    if (!shard_storage_has_capability(storage,
-                                      shard_storage_cap_materialize_execution_pack | shard_storage_cap_canonical_read)) {
+    if (!shard_storage_has_capability(storage, shard_storage_cap_materialize_execution_pack | shard_storage_cap_canonical_read)) {
         return 0;
     }
-    if (state->matrix_family == dataset_matrix_family_optimized_blocked_ell) {
+    if (blocked_ell_uses_execution_payload(state)) {
         const std::uint64_t begin = state->shard_part_begin[shard_id];
         const std::uint64_t local_partition = partition_id - begin;
         if (!open_dataset_h5_backend(storage) || !load_optimized_blocked_ell_shard_payload(state, shard_id)) return 0;

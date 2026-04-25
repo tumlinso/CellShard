@@ -16,22 +16,27 @@ the local ingest staging artifact.
 - Not the hot execution format consumed by Cellerator.
 - Not a metadata-rich analysis container.
 - Not a stable remote interchange format.
-- Not a multi-layout sparse container.
+- Not a general-purpose sparse container.
 - Not intended for long-term compatibility promises beyond the local ingest path.
 
-## v1 Supported Layout
+## v1 Supported Layouts
 
-CSPOOL v1 supports exactly one layout:
+CSPOOL v1 supports exactly two layouts:
 
+- Blocked-ELL
 - Sliced-ELL
 - FP16 values
-- `uint32` rows, cols, nnz, slice metadata, and column indices
+- `uint32` rows, cols, nnz, layout metadata, and column-addressing indices
 - little-endian host-native encoding
 - fixed per-file header
 - one partition payload per file
 
 CSPOOL v1 is intentionally narrow and machine-local. It should be treated as a
 bounded ingest cache, not as a durable published interface.
+
+CSPOOL files may be emitted in either layout during ingest. A blocked or sliced
+spool artifact is valid as long as the ingest pipeline reoptimizes as needed
+before converting the staged payload into the canonical artifact.
 
 ## Filename Convention
 
@@ -45,6 +50,18 @@ The spool root naming is an implementation convention. The `.cspool` suffix is
 the part-file format marker.
 
 ## File Layout
+
+Blocked-ELL payload:
+
+```text
+[disk_header]
+[block_size]
+[ell_cols]
+[block_col_idx]
+[values]
+```
+
+Sliced-ELL payload:
 
 ```text
 [disk_header]
@@ -63,7 +80,7 @@ Every CSPOOL v1 file must encode:
 - rows
 - cols
 - nnz
-- slice_count
+- layout-specific descriptor fields
 
 There is no separate metadata table in v1.
 
@@ -76,11 +93,26 @@ The fixed header matches the current CellShard raw disk codec:
 - `cols` : `uint32`
 - `nnz` : `uint32`
 
-For CSPOOL v1, `format` must equal the CellShard `disk_format_sliced_ell` tag.
+For CSPOOL v1, `format` must equal either the CellShard
+`disk_format_blocked_ell` tag or the CellShard `disk_format_sliced_ell` tag.
 
 ## Payload Region
 
-Immediately after the header, the file stores:
+Blocked-ELL files store:
+
+- `block_size` : `uint32`
+- `ell_cols` : `uint32`
+- `block_col_idx[row_blocks * ell_width]` : `uint32`
+- `values[rows * ell_cols]` : FP16
+
+where:
+
+```text
+row_blocks = ceil(rows / block_size)
+ell_width = ell_cols / block_size
+```
+
+Sliced-ELL files store:
 
 - `slice_count` : `uint32`
 - `slice_row_offsets[slice_count + 1]` : `uint32`
@@ -99,12 +131,15 @@ for i in [0, slice_count)
 
 A valid CSPOOL v1 file must:
 
-1. Have the correct `disk_format_sliced_ell` format tag.
-2. Use the declared v1 layout constraints: Sliced-ELL, FP16 values, and `uint32`
-   dimensions/indexing.
-3. Have `slice_row_offsets[0] == 0`.
-4. Have nondecreasing `slice_row_offsets`.
-5. Have `slice_row_offsets[slice_count] == rows`.
-6. Have payload arrays fully contained within file bounds.
-7. Have `total_slots` derived consistently from the slice offsets and widths.
+1. Have either the `disk_format_blocked_ell` or `disk_format_sliced_ell`
+   format tag.
+2. Use the declared v1 layout constraints: Blocked-ELL or Sliced-ELL, FP16
+   values, and `uint32` dimensions/indexing.
+3. For Blocked-ELL files, have nonzero layout metadata only when the payload is
+   nonempty, and have payload array sizes consistent with `rows`, `block_size`,
+   and `ell_cols`.
+4. For Sliced-ELL files, have `slice_row_offsets[0] == 0`.
+5. For Sliced-ELL files, have nondecreasing `slice_row_offsets`.
+6. For Sliced-ELL files, have `slice_row_offsets[slice_count] == rows`.
+7. Have payload arrays fully contained within file bounds.
 8. Load without touching HDF5.

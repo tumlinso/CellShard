@@ -128,15 +128,15 @@ It is not a durable archive and not a hot runtime contract.
 
 Supported in v1:
 
+- Blocked-ELL layout.
 - Sliced-ELL layout.
 - FP16 values.
-- `uint32` rows, cols, nnz, slice metadata, and column indices.
+- `uint32` rows, cols, nnz, layout metadata, and column-addressing indices.
 - Little-endian host-native encoding.
 - One partition payload per file.
 
 Not supported in v1:
 
-- Blocked-ELL spool files.
 - Quantized spool files.
 - Multi-part container files.
 - Rich metadata tables.
@@ -145,6 +145,10 @@ Not supported in v1:
 ### Policy
 
 `.cspool` is a local ingest cache, not a user-facing storage promise.
+
+Current ingest generally emits sliced spool parts, but blocked spool parts are
+also in scope for v1 as long as the staged payload is reoptimized as needed
+before canonical conversion.
 
 The intended flow is:
 

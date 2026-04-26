@@ -1,6 +1,7 @@
 #include "../internal/common.hh"
 
 #include "../../include/CellShard/io/pack/packfile.cuh"
+#include "../../include/CellShard/io/common/layout_policy.hh"
 #include "../../src/convert/blocked_ell_from_compressed.cuh"
 
 #include <algorithm>
@@ -128,8 +129,8 @@ inline std::string default_derived_dataset_path(const char *source_path,
     return std::string(source_path != nullptr ? source_path : "derived.csh5") + "." + pack_name + ".derived.csh5";
 }
 
-inline std::string default_execution_cache_root(const std::string &dataset_path,
-                                                const derived_materialization_request &request) {
+inline std::string default_pack_cache_root(const std::string &dataset_path,
+                                           const derived_materialization_request &request) {
     const std::string pack_name = sanitize_label(request.derived_pack_name, "derived");
     if (!request.cache_root.empty()) {
         fs::path path = fs::path(request.cache_root) / "derived" / (pack_name + ".cache");
@@ -647,7 +648,6 @@ bool materialize_derived_dataset(const char *source_path,
                                  const derived_materialization_request &request,
                                  derived_materialization_result *out,
                                  std::string *error) {
-    static const unsigned int blocked_ell_candidates[] = {4u, 8u, 16u, 32u};
     dataset_summary source_summary;
     runtime_service_metadata source_runtime;
     source_provenance_vectors source_provenance;
@@ -741,8 +741,8 @@ bool materialize_derived_dataset(const char *source_path,
     sparse::init(&blocked);
     init(&optimized_shard);
     *out = derived_materialization_result{};
-    if (!request.materialize_dataset && !request.materialize_execution_pack) {
-        set_error(error, "derived materialization requested neither dataset nor execution pack output");
+    if (!request.materialize_dataset && !request.materialize_pack) {
+        set_error(error, "derived materialization requested neither dataset nor pack output");
         return false;
     }
     if (!load_dataset_summary(source_path, &source_summary, error)) return false;
@@ -753,7 +753,7 @@ bool materialize_derived_dataset(const char *source_path,
         return false;
     }
     output_path = default_derived_dataset_path(source_path, request);
-    cache_root = default_execution_cache_root(output_path, request);
+    cache_root = default_pack_cache_root(output_path, request);
     pack_name = sanitize_label(request.derived_pack_name, "derived");
 
     if (!load_runtime_service_metadata(source_path, &source_runtime, error)
@@ -774,8 +774,8 @@ bool materialize_derived_dataset(const char *source_path,
     }
 
     if (!(::cellshard::convert::choose_blocked_ell_block_size)(&compressed,
-                                                               blocked_ell_candidates,
-                                                               4u,
+                                                               blocked_ell_block_size_candidates,
+                                                               blocked_ell_block_size_candidate_count,
                                                                &tune)
         || !(::cellshard::convert::blocked_ell_from_compressed)(&compressed, tune.block_size, &blocked)) {
         sparse::clear(&compressed);
@@ -923,7 +923,7 @@ bool materialize_derived_dataset(const char *source_path,
     init(&runtime_service);
     runtime_service.service_mode = dataset_runtime_service_mode_owner_hosted;
     runtime_service.live_write_mode = dataset_live_write_mode_append_only;
-    runtime_service.prefer_pack_delivery = request.materialize_execution_pack ? 1u : 0u;
+    runtime_service.prefer_pack_delivery = request.materialize_pack ? 1u : 0u;
     runtime_service.single_reader_coordinator = 1u;
     runtime_service.maintenance_lock_blocks_overwrite = 1u;
     runtime_service.canonical_generation = 1u;
@@ -969,19 +969,19 @@ bool materialize_derived_dataset(const char *source_path,
     attribute_keys.push_back("derived.parent_path");
     attribute_values.push_back(source_path);
     attribute_keys.push_back("derived.parent_canonical_generation");
-    attribute_values.push_back(std::to_string(source_runtime.canonical_generation));
+    attribute_values.push_back(std::to_string(source_runtime.runtime_generation.generation.canonical_generation));
     attribute_keys.push_back("derived.parent_execution_plan_generation");
-    attribute_values.push_back(std::to_string(source_runtime.execution_plan_generation));
+    attribute_values.push_back(std::to_string(source_runtime.runtime_generation.generation.execution_plan_generation));
     attribute_keys.push_back("derived.parent_pack_generation");
-    attribute_values.push_back(std::to_string(source_runtime.pack_generation));
+    attribute_values.push_back(std::to_string(source_runtime.runtime_generation.generation.pack_generation));
     attribute_keys.push_back("derived.parent_service_epoch");
-    attribute_values.push_back(std::to_string(source_runtime.service_epoch));
+    attribute_values.push_back(std::to_string(source_runtime.runtime_generation.generation.service_epoch));
     attribute_keys.push_back("derived.pack_name");
     attribute_values.push_back(pack_name);
     attribute_keys.push_back("derived.requested_dataset_output");
     attribute_values.push_back(request.materialize_dataset ? "1" : "0");
     attribute_keys.push_back("derived.requested_pack_output");
-    attribute_values.push_back(request.materialize_execution_pack ? "1" : "0");
+    attribute_values.push_back(request.materialize_pack ? "1" : "0");
     attribute_keys_column = make_text_column(attribute_keys);
     attribute_values_column = make_text_column(attribute_values);
     attribute_view.count = (std::uint32_t) attribute_keys.size();
@@ -1010,20 +1010,19 @@ bool materialize_derived_dataset(const char *source_path,
     clear(&optimized_shard);
     sparse::clear(&blocked);
 
-    if (request.materialize_execution_pack) {
+    if (request.materialize_pack) {
         std::error_code ec;
         fs::create_directories(cache_root, ec);
-        if (!warm_dataset_blocked_ell_h5_cache(output_path.c_str(), cache_root.c_str())
-            || !warm_dataset_blocked_ell_h5_execution_cache(output_path.c_str(), cache_root.c_str())) {
-            set_error(error, "failed to warm derived execution packs");
+        if (!warm_dataset_blocked_ell_h5_cache(output_path.c_str(), cache_root.c_str())) {
+            set_error(error, "failed to warm derived cspack");
             return false;
         }
     }
 
     out->materialized_dataset = true;
-    out->materialized_execution_pack = request.materialize_execution_pack;
+    out->materialized_pack = request.materialize_pack;
     out->materialized_dataset_path = output_path;
-    out->execution_cache_root = request.materialize_execution_pack ? cache_root : std::string();
+    out->pack_cache_root = request.materialize_pack ? cache_root : std::string();
     out->derived_pack_name = pack_name;
     out->rows = feature_subset.rows;
     out->cols = feature_subset.cols;
@@ -1034,12 +1033,16 @@ bool materialize_derived_dataset(const char *source_path,
     out->runtime_service.remote_pack_delivery = runtime_service.remote_pack_delivery;
     out->runtime_service.single_reader_coordinator = runtime_service.single_reader_coordinator;
     out->runtime_service.maintenance_lock_blocks_overwrite = runtime_service.maintenance_lock_blocks_overwrite;
-    out->runtime_service.canonical_generation = runtime_service.canonical_generation;
-    out->runtime_service.execution_plan_generation = runtime_service.execution_plan_generation;
-    out->runtime_service.pack_generation = runtime_service.pack_generation;
-    out->runtime_service.service_epoch = runtime_service.service_epoch;
-    out->runtime_service.active_read_generation = runtime_service.active_read_generation;
-    out->runtime_service.staged_write_generation = runtime_service.staged_write_generation;
+    out->runtime_service.runtime_generation = {
+        {
+            runtime_service.canonical_generation,
+            runtime_service.execution_plan_generation,
+            runtime_service.pack_generation,
+            runtime_service.service_epoch
+        },
+        runtime_service.active_read_generation,
+        runtime_service.staged_write_generation
+    };
     return true;
 }
 

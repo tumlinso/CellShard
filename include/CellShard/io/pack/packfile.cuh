@@ -14,88 +14,20 @@
 #include "../../formats/diagonal.cuh"
 #include "../../formats/triplet.cuh"
 
+#include "packfile_header.cuh"
+#include "../common/matrix_traits.hh"
+#include "../common/raw_format.hh"
+
 namespace cellshard {
 
-// Per-part binary format tags used inside the native disk payload.
-enum {
-    disk_format_none       = 0,
-    disk_format_dense      = 1,
-    disk_format_compressed = 2,
-    disk_format_coo        = 3,
-    disk_format_dia        = 4,
-    disk_format_ell        = 5,
-    disk_format_blocked_ell = 6,
-    disk_format_sliced_ell = 7,
-    disk_format_quantized_blocked_ell = 8
-};
-
-// Minimal fixed header stored at the front of every packed part.
-struct disk_header {
-    unsigned char format;
-    types::dim_t rows;
-    types::dim_t cols;
-    types::nnz_t nnz;
-};
-
-// Fail loudly on disk-format mismatches instead of silently decoding garbage.
-inline int check_disk_format(unsigned char expected, unsigned char actual, const char *name) {
-    if (expected == actual) return 1;
-    std::fprintf(stderr,
-                 "Error: expected format %u, got %u for %s\n",
-                 (unsigned int) expected,
-                 (unsigned int) actual,
-                 name);
-    return 0;
-}
-
-// Compile-time map from in-memory matrix type to disk format code.
+// Backward-compatible spelling for pack payload writers.
 template<typename MatrixT>
-struct disk_format_code;
-
-template<>
-struct disk_format_code<dense> {
-    enum { value = disk_format_dense };
-    static inline const char *name() { return "dense matrix"; }
+struct disk_format_code {
+    static constexpr disk_format value = matrix_traits<MatrixT>::raw_disk_format;
+    static inline const char *name() { return matrix_traits<MatrixT>::name(); }
 };
 
-template<>
-struct disk_format_code<sparse::compressed> {
-    enum { value = disk_format_compressed };
-    static inline const char *name() { return "compressed matrix"; }
-};
-
-template<>
-struct disk_format_code<sparse::blocked_ell> {
-    enum { value = disk_format_blocked_ell };
-    static inline const char *name() { return "blocked ell matrix"; }
-};
-
-template<>
-struct disk_format_code<sparse::quantized_blocked_ell> {
-    enum { value = disk_format_quantized_blocked_ell };
-    static inline const char *name() { return "quantized blocked ell matrix"; }
-};
-
-template<>
-struct disk_format_code<sparse::sliced_ell> {
-    enum { value = disk_format_sliced_ell };
-    static inline const char *name() { return "sliced ell matrix"; }
-};
-
-template<>
-struct disk_format_code<sparse::coo> {
-    enum { value = disk_format_coo };
-    static inline const char *name() { return "coo matrix"; }
-};
-
-template<>
-struct disk_format_code<sparse::dia> {
-    enum { value = disk_format_dia };
-    static inline const char *name() { return "dia matrix"; }
-};
-
-// Temporary raw load results own host allocations until a typed matrix adopts
-// them.
+// Temporary raw load results own host allocations until a typed matrix adopts them.
 struct dense_load_result {
     disk_header h;
     void *storage;

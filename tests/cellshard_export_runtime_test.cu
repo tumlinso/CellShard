@@ -324,7 +324,7 @@ int main() {
     require(summary.datasets.size() == 1u, "summary dataset count mismatch");
     require(summary.datasets[0].dataset_id == "dataset0", "summary dataset id mismatch");
     require(summary.partitions.size() == 1u && summary.partitions[0].aux == partition_aux[0], "summary partition metadata mismatch");
-    require(summary.shards.size() == 1u && summary.shards[0].row_end == 2u, "summary shard metadata mismatch");
+    require(summary.shards.size() == 1u && summary.shards[0].row_span.row_end == 2u, "summary shard metadata mismatch");
     require(summary.obs_names.size() == 2u && summary.obs_names[1] == "cell_b", "summary obs names mismatch");
     require(summary.var_names.size() == 4u && summary.var_names[2] == "G2", "summary var names mismatch");
     require(summary.observation_annotations.available, "summary observation annotation summary missing");
@@ -406,12 +406,12 @@ int main() {
         {"selected", 0u, 3u}
     };
     derive_request.materialize_dataset = true;
-    derive_request.materialize_execution_pack = true;
+    derive_request.materialize_pack = true;
     cse::derived_materialization_result derive_result;
     error.clear();
     require(cse::materialize_derived_dataset(path, derive_request, &derive_result, &error), error.c_str());
     require(derive_result.materialized_dataset, "derived dataset output missing");
-    require(derive_result.materialized_execution_pack, "derived execution pack output missing");
+    require(derive_result.materialized_pack, "derived cspack output missing");
     require(derive_result.rows == 2u && derive_result.cols == 3u, "derived shape mismatch");
 
     cse::dataset_summary derived_summary;
@@ -473,12 +473,12 @@ int main() {
                 "bind derived cache failed");
         require(cs::get_dataset_h5_execution_metadata(&derived_storage, &derived_execution) != 0,
                 "get derived execution metadata failed");
-        require(cs::fetch_dataset_blocked_ell_h5_execution_partition(&derived_exec_part, &derived_matrix, &derived_storage, 0u) != 0,
-                "fetch derived execution partition failed");
+        require(cs::fetch_dataset_blocked_ell_h5_pack_partition(&derived_exec_part, &derived_matrix, &derived_storage, 0u) != 0,
+                "fetch derived pack partition failed");
         require(derived_execution.partition_count == 1u && derived_execution.shard_count == 1u,
                 "derived execution metadata counts mismatch");
         require(derived_exec_part.rows == 2u && derived_exec_part.cols == 3u,
-                "derived execution partition shape mismatch");
+                "derived pack partition shape mismatch");
         cs::clear(&derived_exec_part);
         cs::clear(&derived_storage);
         cs::clear(&derived_matrix);
@@ -491,20 +491,22 @@ int main() {
     require(owner_snapshot.summary.observation_annotations.available, "owner snapshot observation annotation summary missing");
     require(owner_snapshot.summary.feature_annotations.available, "owner snapshot feature annotation summary missing");
     require(owner_snapshot.summary.dataset_attributes.available, "owner snapshot dataset attribute summary missing");
-    require(owner_snapshot.execution_partitions.size() == 1u, "owner execution partition count mismatch");
+    require(owner_snapshot.execution_partitions.size() == 1u, "owner pack partition count mismatch");
     require(owner_snapshot.execution_partitions[0].execution_format == cs::dataset_execution_format_bucketed_blocked_ell,
-            "owner execution partition format mismatch");
+            "owner pack partition format mismatch");
     require(owner_snapshot.execution_shards.size() == 1u, "owner execution shard count mismatch");
     require(owner_snapshot.execution_shards[0].owner_node_id == 7u, "owner shard owner node mismatch");
     require(owner_snapshot.execution_shards[0].owner_rank_id == 3u, "owner shard owner rank mismatch");
-    require(owner_snapshot.runtime_service.canonical_generation == 11u, "owner runtime canonical generation mismatch");
-    require(owner_snapshot.runtime_service.pack_generation == 13u, "owner runtime pack generation mismatch");
+    require(owner_snapshot.runtime_service.runtime_generation.generation.canonical_generation == 11u,
+            "owner runtime canonical generation mismatch");
+    require(owner_snapshot.runtime_service.runtime_generation.generation.pack_generation == 13u,
+            "owner runtime pack generation mismatch");
 
     const cse::client_snapshot_ref request_ref = cse::make_client_snapshot_ref(owner_snapshot);
     error.clear();
     require(cse::validate_client_snapshot_ref(owner_snapshot, request_ref, &error), error.c_str());
     cse::client_snapshot_ref stale_ref = request_ref;
-    stale_ref.pack_generation += 1u;
+    stale_ref.generation.pack_generation += 1u;
     error.clear();
     require(!cse::validate_client_snapshot_ref(owner_snapshot, stale_ref, &error), "stale request ref unexpectedly validated");
     require(error.find("pack_generation") != std::string::npos, "stale request ref error mismatch");
@@ -512,39 +514,31 @@ int main() {
     cse::runtime_service_metadata staged_runtime;
     error.clear();
     require(cse::stage_append_only_runtime_service(owner_snapshot.runtime_service, &staged_runtime, &error), error.c_str());
-    require(staged_runtime.canonical_generation == 17u, "staged canonical generation mismatch");
-    require(staged_runtime.execution_plan_generation == 17u, "staged execution-plan generation mismatch");
-    require(staged_runtime.pack_generation == 17u, "staged pack generation mismatch");
-    require(staged_runtime.staged_write_generation == 17u, "staged write generation mismatch");
-    require(staged_runtime.active_read_generation == owner_snapshot.runtime_service.active_read_generation,
+    require(staged_runtime.runtime_generation.generation.canonical_generation == 17u, "staged canonical generation mismatch");
+    require(staged_runtime.runtime_generation.generation.execution_plan_generation == 17u, "staged execution-plan generation mismatch");
+    require(staged_runtime.runtime_generation.generation.pack_generation == 17u, "staged pack generation mismatch");
+    require(staged_runtime.runtime_generation.staged_write_generation == 17u, "staged write generation mismatch");
+    require(staged_runtime.runtime_generation.active_read_generation == owner_snapshot.runtime_service.runtime_generation.active_read_generation,
             "staged active read generation should not change before publish");
 
     cse::runtime_service_metadata published_runtime;
     error.clear();
     require(cse::publish_runtime_service_cutover(owner_snapshot.runtime_service, staged_runtime, &published_runtime, &error),
             error.c_str());
-    require(published_runtime.active_read_generation == 17u, "published active read generation mismatch");
-    require(published_runtime.staged_write_generation == 17u, "published staged write generation mismatch");
-    require(published_runtime.service_epoch == 15u, "published service epoch mismatch");
+    require(published_runtime.runtime_generation.active_read_generation == 17u, "published active read generation mismatch");
+    require(published_runtime.runtime_generation.staged_write_generation == 17u, "published staged write generation mismatch");
+    require(published_runtime.runtime_generation.generation.service_epoch == 15u, "published service epoch mismatch");
 
     cse::pack_delivery_request delivery_request;
     delivery_request.request = request_ref;
     delivery_request.shard_id = 0u;
-    delivery_request.prefer_execution_pack = 1u;
     cse::pack_delivery_descriptor delivery;
     error.clear();
     require(cse::describe_pack_delivery(owner_snapshot, delivery_request, &delivery, &error), error.c_str());
     require(delivery.snapshot_id == owner_snapshot.snapshot_id, "delivery snapshot id mismatch");
     require(delivery.owner_node_id == 7u && delivery.owner_rank_id == 3u, "delivery owner route mismatch");
-    require(delivery.relative_pack_path == "packs/execution/plan.12-pack.13-epoch.14/shard.0.exec.pack",
-            "execution delivery path mismatch");
-    require(delivery.pack_kind == "execution", "execution delivery kind mismatch");
-
-    delivery_request.prefer_execution_pack = 0u;
-    error.clear();
-    require(cse::describe_pack_delivery(owner_snapshot, delivery_request, &delivery, &error), error.c_str());
-    require(delivery.relative_pack_path == "packs/canonical/shard.0.pack", "canonical delivery path mismatch");
-    require(delivery.pack_kind == "canonical", "canonical delivery kind mismatch");
+    require(delivery.relative_pack_path == "packs/plan.12-pack.13-epoch.14/shard.0.cspack",
+            "pack delivery path mismatch");
 
     std::vector<std::uint8_t> serialized_snapshot;
     cse::global_metadata_snapshot decoded_snapshot;
@@ -558,7 +552,8 @@ int main() {
                                                       &error),
             error.c_str());
     require(decoded_snapshot.snapshot_id == owner_snapshot.snapshot_id, "decoded snapshot id mismatch");
-    require(decoded_snapshot.runtime_service.service_epoch == owner_snapshot.runtime_service.service_epoch,
+    require(decoded_snapshot.runtime_service.runtime_generation.generation.service_epoch
+                == owner_snapshot.runtime_service.runtime_generation.generation.service_epoch,
             "decoded snapshot runtime service mismatch");
     require(decoded_snapshot.summary.observation_annotations.names == owner_snapshot.summary.observation_annotations.names,
             "decoded snapshot observation annotation summary mismatch");

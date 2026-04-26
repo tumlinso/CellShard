@@ -29,7 +29,7 @@ inline void configure_stream(std::FILE *fp) {
     std::setvbuf(fp, 0, _IOFBF, (std::size_t) 8u << 20u);
 }
 
-inline int write_header(std::FILE *fp, unsigned char format, types::dim_t rows, types::dim_t cols, types::nnz_t nnz) {
+inline int write_header(std::FILE *fp, disk_format format, types::dim_t rows, types::dim_t cols, types::nnz_t nnz) {
     if (!write_block(fp, &format, sizeof(format), 1)) return 0;
     if (!write_block(fp, &rows, sizeof(rows), 1)) return 0;
     if (!write_block(fp, &cols, sizeof(cols), 1)) return 0;

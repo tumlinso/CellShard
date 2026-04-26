@@ -10,8 +10,8 @@ void bind_dataset_export_types(py::module_ &m) {
         .def_readonly("barcode_path", &cse::source_dataset_summary::barcode_path)
         .def_readonly("metadata_path", &cse::source_dataset_summary::metadata_path)
         .def_readonly("format", &cse::source_dataset_summary::format)
-        .def_readonly("row_begin", &cse::source_dataset_summary::row_begin)
-        .def_readonly("row_end", &cse::source_dataset_summary::row_end)
+        .def_property_readonly("row_begin", [](const cse::source_dataset_summary &self) { return self.row_span.row_begin; })
+        .def_property_readonly("row_end", [](const cse::source_dataset_summary &self) { return self.row_span.row_end; })
         .def_readonly("rows", &cse::source_dataset_summary::rows)
         .def_readonly("cols", &cse::source_dataset_summary::cols)
         .def_readonly("nnz", &cse::source_dataset_summary::nnz);
@@ -26,8 +26,8 @@ void bind_dataset_export_types(py::module_ &m) {
 
     py::class_<cse::dataset_partition_summary>(m, "DatasetPartitionSummary")
         .def_readonly("partition_id", &cse::dataset_partition_summary::partition_id)
-        .def_readonly("row_begin", &cse::dataset_partition_summary::row_begin)
-        .def_readonly("row_end", &cse::dataset_partition_summary::row_end)
+        .def_property_readonly("row_begin", [](const cse::dataset_partition_summary &self) { return self.row_span.row_begin; })
+        .def_property_readonly("row_end", [](const cse::dataset_partition_summary &self) { return self.row_span.row_end; })
         .def_readonly("rows", &cse::dataset_partition_summary::rows)
         .def_readonly("nnz", &cse::dataset_partition_summary::nnz)
         .def_readonly("aux", &cse::dataset_partition_summary::aux)
@@ -39,8 +39,8 @@ void bind_dataset_export_types(py::module_ &m) {
         .def_readonly("shard_id", &cse::dataset_shard_summary::shard_id)
         .def_readonly("partition_begin", &cse::dataset_shard_summary::partition_begin)
         .def_readonly("partition_end", &cse::dataset_shard_summary::partition_end)
-        .def_readonly("row_begin", &cse::dataset_shard_summary::row_begin)
-        .def_readonly("row_end", &cse::dataset_shard_summary::row_end);
+        .def_property_readonly("row_begin", [](const cse::dataset_shard_summary &self) { return self.row_span.row_begin; })
+        .def_property_readonly("row_end", [](const cse::dataset_shard_summary &self) { return self.row_span.row_end; });
 
     py::class_<cse::dataset_summary>(m, "DatasetSummary")
         .def_readonly("path", &cse::dataset_summary::path)
@@ -87,8 +87,8 @@ void bind_dataset_export_types(py::module_ &m) {
 
     py::class_<cse::embedded_metadata_table>(m, "EmbeddedMetadataTable")
         .def_readonly("dataset_index", &cse::embedded_metadata_table::dataset_index)
-        .def_readonly("row_begin", &cse::embedded_metadata_table::row_begin)
-        .def_readonly("row_end", &cse::embedded_metadata_table::row_end)
+        .def_property_readonly("row_begin", [](const cse::embedded_metadata_table &self) { return self.row_span.row_begin; })
+        .def_property_readonly("row_end", [](const cse::embedded_metadata_table &self) { return self.row_span.row_end; })
         .def_readonly("rows", &cse::embedded_metadata_table::rows)
         .def_readonly("cols", &cse::embedded_metadata_table::cols)
         .def_readonly("column_names", &cse::embedded_metadata_table::column_names)
@@ -97,8 +97,8 @@ void bind_dataset_export_types(py::module_ &m) {
 
     py::class_<cse::execution_partition_metadata>(m, "ExecutionPartitionMetadata")
         .def_readonly("partition_id", &cse::execution_partition_metadata::partition_id)
-        .def_readonly("row_begin", &cse::execution_partition_metadata::row_begin)
-        .def_readonly("row_end", &cse::execution_partition_metadata::row_end)
+        .def_property_readonly("row_begin", [](const cse::execution_partition_metadata &self) { return self.row_span.row_begin; })
+        .def_property_readonly("row_end", [](const cse::execution_partition_metadata &self) { return self.row_span.row_end; })
         .def_readonly("rows", &cse::execution_partition_metadata::rows)
         .def_readonly("nnz", &cse::execution_partition_metadata::nnz)
         .def_readonly("aux", &cse::execution_partition_metadata::aux)
@@ -117,8 +117,8 @@ void bind_dataset_export_types(py::module_ &m) {
         .def_readonly("shard_id", &cse::execution_shard_metadata::shard_id)
         .def_readonly("partition_begin", &cse::execution_shard_metadata::partition_begin)
         .def_readonly("partition_end", &cse::execution_shard_metadata::partition_end)
-        .def_readonly("row_begin", &cse::execution_shard_metadata::row_begin)
-        .def_readonly("row_end", &cse::execution_shard_metadata::row_end)
+        .def_property_readonly("row_begin", [](const cse::execution_shard_metadata &self) { return self.row_span.row_begin; })
+        .def_property_readonly("row_end", [](const cse::execution_shard_metadata &self) { return self.row_span.row_end; })
         .def_readonly("execution_format", &cse::execution_shard_metadata::execution_format)
         .def_readonly("blocked_ell_block_size", &cse::execution_shard_metadata::blocked_ell_block_size)
         .def_readonly("bucketed_partition_count", &cse::execution_shard_metadata::bucketed_partition_count)
@@ -137,38 +137,63 @@ void bind_dataset_export_types(py::module_ &m) {
         .def_readonly("remote_pack_delivery", &cse::runtime_service_metadata::remote_pack_delivery)
         .def_readonly("single_reader_coordinator", &cse::runtime_service_metadata::single_reader_coordinator)
         .def_readonly("maintenance_lock_blocks_overwrite", &cse::runtime_service_metadata::maintenance_lock_blocks_overwrite)
-        .def_readonly("canonical_generation", &cse::runtime_service_metadata::canonical_generation)
-        .def_readonly("execution_plan_generation", &cse::runtime_service_metadata::execution_plan_generation)
-        .def_readonly("pack_generation", &cse::runtime_service_metadata::pack_generation)
-        .def_readonly("service_epoch", &cse::runtime_service_metadata::service_epoch)
-        .def_readonly("active_read_generation", &cse::runtime_service_metadata::active_read_generation)
-        .def_readonly("staged_write_generation", &cse::runtime_service_metadata::staged_write_generation);
+        .def_property_readonly("canonical_generation", [](const cse::runtime_service_metadata &self) {
+            return self.runtime_generation.generation.canonical_generation;
+        })
+        .def_property_readonly("execution_plan_generation", [](const cse::runtime_service_metadata &self) {
+            return self.runtime_generation.generation.execution_plan_generation;
+        })
+        .def_property_readonly("pack_generation", [](const cse::runtime_service_metadata &self) {
+            return self.runtime_generation.generation.pack_generation;
+        })
+        .def_property_readonly("service_epoch", [](const cse::runtime_service_metadata &self) {
+            return self.runtime_generation.generation.service_epoch;
+        })
+        .def_property_readonly("active_read_generation", [](const cse::runtime_service_metadata &self) {
+            return self.runtime_generation.active_read_generation;
+        })
+        .def_property_readonly("staged_write_generation", [](const cse::runtime_service_metadata &self) {
+            return self.runtime_generation.staged_write_generation;
+        });
 
     py::class_<cse::client_snapshot_ref>(m, "ClientSnapshotRef")
         .def_readonly("snapshot_id", &cse::client_snapshot_ref::snapshot_id)
-        .def_readonly("canonical_generation", &cse::client_snapshot_ref::canonical_generation)
-        .def_readonly("execution_plan_generation", &cse::client_snapshot_ref::execution_plan_generation)
-        .def_readonly("pack_generation", &cse::client_snapshot_ref::pack_generation)
-        .def_readonly("service_epoch", &cse::client_snapshot_ref::service_epoch);
+        .def_property_readonly("canonical_generation", [](const cse::client_snapshot_ref &self) {
+            return self.generation.canonical_generation;
+        })
+        .def_property_readonly("execution_plan_generation", [](const cse::client_snapshot_ref &self) {
+            return self.generation.execution_plan_generation;
+        })
+        .def_property_readonly("pack_generation", [](const cse::client_snapshot_ref &self) {
+            return self.generation.pack_generation;
+        })
+        .def_property_readonly("service_epoch", [](const cse::client_snapshot_ref &self) {
+            return self.generation.service_epoch;
+        });
 
     py::class_<cse::pack_delivery_request>(m, "PackDeliveryRequest")
         .def(py::init<>())
         .def_readwrite("request", &cse::pack_delivery_request::request)
-        .def_readwrite("shard_id", &cse::pack_delivery_request::shard_id)
-        .def_readwrite("prefer_execution_pack", &cse::pack_delivery_request::prefer_execution_pack);
+        .def_readwrite("shard_id", &cse::pack_delivery_request::shard_id);
 
     py::class_<cse::pack_delivery_descriptor>(m, "PackDeliveryDescriptor")
         .def_readonly("snapshot_id", &cse::pack_delivery_descriptor::snapshot_id)
         .def_readonly("shard_id", &cse::pack_delivery_descriptor::shard_id)
-        .def_readonly("canonical_generation", &cse::pack_delivery_descriptor::canonical_generation)
-        .def_readonly("execution_plan_generation", &cse::pack_delivery_descriptor::execution_plan_generation)
-        .def_readonly("pack_generation", &cse::pack_delivery_descriptor::pack_generation)
-        .def_readonly("service_epoch", &cse::pack_delivery_descriptor::service_epoch)
+        .def_property_readonly("canonical_generation", [](const cse::pack_delivery_descriptor &self) {
+            return self.generation.canonical_generation;
+        })
+        .def_property_readonly("execution_plan_generation", [](const cse::pack_delivery_descriptor &self) {
+            return self.generation.execution_plan_generation;
+        })
+        .def_property_readonly("pack_generation", [](const cse::pack_delivery_descriptor &self) {
+            return self.generation.pack_generation;
+        })
+        .def_property_readonly("service_epoch", [](const cse::pack_delivery_descriptor &self) {
+            return self.generation.service_epoch;
+        })
         .def_readonly("owner_node_id", &cse::pack_delivery_descriptor::owner_node_id)
         .def_readonly("owner_rank_id", &cse::pack_delivery_descriptor::owner_rank_id)
         .def_readonly("execution_format", &cse::pack_delivery_descriptor::execution_format)
-        .def_readonly("prefer_execution_pack", &cse::pack_delivery_descriptor::prefer_execution_pack)
-        .def_readonly("pack_kind", &cse::pack_delivery_descriptor::pack_kind)
         .def_readonly("relative_pack_path", &cse::pack_delivery_descriptor::relative_pack_path);
 
     py::class_<cse::global_metadata_snapshot>(m, "GlobalMetadataSnapshot")
@@ -187,6 +212,39 @@ void bind_dataset_export_types(py::module_ &m) {
         .def("data_array", [](const cse::csr_matrix_export &self) { return copy_1d_array(self.data); })
         .def("to_scipy_csr", [](const cse::csr_matrix_export &self) { return build_scipy_csr(self); })
         .def("to_torch_sparse_csr", [](const cse::csr_matrix_export &self) { return build_torch_sparse_csr(self); });
+
+    py::class_<cellshard::cshard::table_view::column>(m, "CshardTableColumn")
+        .def_readonly("name", &cellshard::cshard::table_view::column::name)
+        .def_readonly("type", &cellshard::cshard::table_view::column::type)
+        .def_readonly("text_values", &cellshard::cshard::table_view::column::text_values)
+        .def_readonly("float32_values", &cellshard::cshard::table_view::column::float32_values)
+        .def_readonly("uint8_values", &cellshard::cshard::table_view::column::uint8_values);
+
+    py::class_<cellshard::cshard::table_view>(m, "CshardTable")
+        .def_readonly("rows", &cellshard::cshard::table_view::rows)
+        .def_readonly("columns", &cellshard::cshard::table_view::columns)
+        .def("head", &cellshard::cshard::table_view::head);
+
+    py::class_<cellshard::cshard::description>(m, "CshardDescription")
+        .def_readonly("path", &cellshard::cshard::description::path)
+        .def_readonly("version_major", &cellshard::cshard::description::version_major)
+        .def_readonly("version_minor", &cellshard::cshard::description::version_minor)
+        .def_readonly("rows", &cellshard::cshard::description::rows)
+        .def_readonly("cols", &cellshard::cshard::description::cols)
+        .def_readonly("nnz", &cellshard::cshard::description::nnz)
+        .def_readonly("partitions", &cellshard::cshard::description::partitions)
+        .def_readonly("feature_order_hash", &cellshard::cshard::description::feature_order_hash)
+        .def_readonly("canonical_layout", &cellshard::cshard::description::canonical_layout)
+        .def_readonly("has_pack_manifest", &cellshard::cshard::description::has_pack_manifest);
+
+    py::class_<cellshard::cshard::cshard_file>(m, "CshardFile")
+        .def_static("open", &cellshard::cshard::cshard_file::open)
+        .def_property_readonly("path", [](const cellshard::cshard::cshard_file &self) { return self.path(); })
+        .def("describe", &cellshard::cshard::cshard_file::describe)
+        .def("read_rows", &cellshard::cshard::cshard_file::read_rows)
+        .def("obs", &cellshard::cshard::cshard_file::obs)
+        .def("var", &cellshard::cshard::cshard_file::var)
+        .def("has_pack_manifest", &cellshard::cshard::cshard_file::has_pack_manifest);
 
     m.def("load_dataset_summary", [](const std::string &path) {
         cse::dataset_summary out;
@@ -226,6 +284,14 @@ void bind_dataset_export_types(py::module_ &m) {
             throw std::runtime_error(error);
         }
         return out;
+    });
+    m.def("open_cshard", [](const std::string &path) {
+        return cellshard::cshard::cshard_file::open(path);
+    });
+    m.def("validate_cshard", [](const std::string &path) {
+        std::string error;
+        if (!cellshard::cshard::cshard_file::validate(path, &error)) throw std::runtime_error(error);
+        return true;
     });
     m.def("load_dataset_global_metadata_snapshot", [](const std::string &path) {
         cse::global_metadata_snapshot out;

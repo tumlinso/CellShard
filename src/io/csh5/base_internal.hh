@@ -5,6 +5,7 @@
 
 #include "api.cuh"
 
+#include "../../../include/CellShard/io/common/layout_policy.hh"
 #include "../../bucket/blocked_ell_bipartite_optimize_host.cuh"
 #include "../../convert/blocked_ell_from_compressed.cuh"
 #include "../../sharded/disk.cuh"

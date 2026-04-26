@@ -99,11 +99,11 @@ int load_dataset_blocked_ell_h5_header(const char *filename,
         filename,
         m,
         s,
-        "blocked_ell",
+        matrix_traits<sparse::blocked_ell>::matrix_format_name(),
         0,
         [](hid_t file, dataset_h5_state *state, const char *payload_layout) -> int {
             const int optimized_codec = std::strcmp(payload_layout, payload_layout_optimized_blocked_ell) == 0;
-            state->matrix_family = dataset_matrix_family_blocked_ell;
+            state->matrix_family = matrix_traits<sparse::blocked_ell>::matrix_family;
             state->blocked_ell_optimized_payload = optimized_codec;
             if (optimized_codec) return 1;
 
@@ -159,10 +159,10 @@ int load_dataset_quantized_blocked_ell_h5_header(const char *filename,
         filename,
         m,
         s,
-        "quantized_blocked_ell",
+        matrix_traits<sparse::quantized_blocked_ell>::matrix_format_name(),
         payload_layout_shard_packed,
         [](hid_t, dataset_h5_state *state, const char *) -> int {
-            state->matrix_family = dataset_matrix_family_quantized_blocked_ell;
+            state->matrix_family = matrix_traits<sparse::quantized_blocked_ell>::matrix_family;
             return 1;
         });
     if (!ok) clear(m);
@@ -176,10 +176,10 @@ int load_dataset_sliced_ell_h5_header(const char *filename,
         filename,
         m,
         s,
-        "sliced_ell",
+        matrix_traits<sparse::sliced_ell>::matrix_format_name(),
         payload_layout_optimized_sliced_ell,
         [](hid_t, dataset_h5_state *state, const char *) -> int {
-            state->matrix_family = dataset_matrix_family_sliced_ell;
+            state->matrix_family = matrix_traits<sparse::sliced_ell>::matrix_family;
             return 1;
         });
 }

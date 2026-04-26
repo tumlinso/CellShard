@@ -39,7 +39,6 @@ inline int build_filtered_blocked_ell_part_from_sliced(const sparse::sliced_ell 
     sparse::coo coo;
     std::uint32_t live_rows = 0u;
     std::uint32_t live_nnz = 0u;
-    static constexpr unsigned int candidates[] = {4u, 8u, 16u, 32u};
 
     if (src == nullptr || dst == nullptr || rows_out == nullptr || nnz_out == nullptr) return 0;
     *rows_out = 0u;
@@ -101,8 +100,8 @@ inline int build_filtered_blocked_ell_part_from_sliced(const sparse::sliced_ell 
     if (!convert::blocked_ell_from_coo_auto(&coo,
                                             out_cols,
                                             nullptr,
-                                            candidates,
-                                            (unsigned int) (sizeof(candidates) / sizeof(candidates[0])),
+                                            blocked_ell_block_size_candidates,
+                                            blocked_ell_block_size_candidate_count,
                                             dst,
                                             nullptr)) {
         sparse::clear(&coo);
@@ -124,7 +123,6 @@ inline int build_filtered_blocked_ell_part_from_blocked(const sparse::blocked_el
     sparse::coo filtered;
     std::uint32_t live_rows = 0u;
     std::uint32_t live_nnz = 0u;
-    static constexpr unsigned int candidates[] = {4u, 8u, 16u, 32u};
 
     if (src == nullptr || dst == nullptr || rows_out == nullptr || nnz_out == nullptr) return 0;
     *rows_out = 0u;
@@ -190,8 +188,8 @@ inline int build_filtered_blocked_ell_part_from_blocked(const sparse::blocked_el
     if (!convert::blocked_ell_from_coo_auto(&filtered,
                                             out_cols,
                                             nullptr,
-                                            candidates,
-                                            (unsigned int) (sizeof(candidates) / sizeof(candidates[0])),
+                                            blocked_ell_block_size_candidates,
+                                            blocked_ell_block_size_candidate_count,
                                             dst,
                                             nullptr)) {
         goto done;
@@ -520,27 +518,13 @@ inline int build_cache_pack_root_path(const char *cache_instance_dir,
     return std::snprintf(path, cap, "%s/packs", cache_instance_dir) > 0;
 }
 
-inline int build_cache_canonical_pack_dir_path(const char *cache_instance_dir,
-                                               char *path,
-                                               std::size_t cap) {
-    if (cache_instance_dir == 0 || path == 0 || cap == 0u) return 0;
-    return std::snprintf(path, cap, "%s/packs/canonical", cache_instance_dir) > 0;
-}
-
-inline int build_cache_execution_pack_dir_path(const char *cache_instance_dir,
-                                               char *path,
-                                               std::size_t cap) {
-    if (cache_instance_dir == 0 || path == 0 || cap == 0u) return 0;
-    return std::snprintf(path, cap, "%s/packs/execution", cache_instance_dir) > 0;
-}
-
-inline int build_active_execution_pack_dir_path(const dataset_h5_state *state,
-                                                char *path,
-                                                std::size_t cap) {
+inline int build_active_cspack_dir_path(const dataset_h5_state *state,
+                                        char *path,
+                                        std::size_t cap) {
     if (state == 0 || state->cache_instance_dir == 0 || path == 0 || cap == 0u) return 0;
     return std::snprintf(path,
                          cap,
-                         "%s/packs/execution/plan.%llu-pack.%llu-epoch.%llu",
+                         "%s/packs/plan.%llu-pack.%llu-epoch.%llu",
                          state->cache_instance_dir,
                          (unsigned long long) state->runtime_service.execution_plan_generation,
                          (unsigned long long) state->runtime_service.pack_generation,
@@ -554,78 +538,22 @@ inline int build_cache_manifest_path(const char *cache_instance_dir,
     return std::snprintf(path, cap, "%s/metadata/manifest.txt", cache_instance_dir) > 0;
 }
 
-inline int build_shard_pack_path(const dataset_h5_state *state,
-                                 unsigned long shard_id,
-                                 char *path,
-                                 std::size_t cap) {
-    if (state == 0 || state->cache_instance_dir == 0 || path == 0 || cap == 0u) return 0;
-    return std::snprintf(path, cap, "%s/packs/canonical/shard.%lu.pack", state->cache_instance_dir, shard_id) > 0;
-}
-
-inline int build_shard_pack_temp_path(const dataset_h5_state *state,
-                                      unsigned long shard_id,
-                                      char *path,
-                                      std::size_t cap) {
-    if (state == 0 || state->cache_instance_dir == 0 || path == 0 || cap == 0u) return 0;
-    return std::snprintf(path, cap, "%s/packs/canonical/shard.%lu.pack.tmp", state->cache_instance_dir, shard_id) > 0;
-}
-
-inline int build_execution_pack_path(const dataset_h5_state *state,
-                                     unsigned long shard_id,
-                                     char *path,
-                                     std::size_t cap) {
+inline int build_cspack_path(const dataset_h5_state *state,
+                             unsigned long shard_id,
+                             char *path,
+                             std::size_t cap) {
     char dir[4096];
-    if (!build_active_execution_pack_dir_path(state, dir, sizeof(dir)) || path == 0 || cap == 0u) return 0;
-    return std::snprintf(path, cap, "%s/shard.%lu.exec.pack", dir, shard_id) > 0;
+    if (!build_active_cspack_dir_path(state, dir, sizeof(dir)) || path == 0 || cap == 0u) return 0;
+    return std::snprintf(path, cap, "%s/shard.%lu.cspack", dir, shard_id) > 0;
 }
 
-inline int build_execution_pack_temp_path(const dataset_h5_state *state,
-                                          unsigned long shard_id,
-                                          char *path,
-                                          std::size_t cap) {
+inline int build_cspack_temp_path(const dataset_h5_state *state,
+                                  unsigned long shard_id,
+                                  char *path,
+                                  std::size_t cap) {
     char dir[4096];
-    if (!build_active_execution_pack_dir_path(state, dir, sizeof(dir)) || path == 0 || cap == 0u) return 0;
-    return std::snprintf(path, cap, "%s/shard.%lu.exec.pack.tmp", dir, shard_id) > 0;
-}
-
-inline std::uint64_t sharded_pack_payload_offset(std::uint64_t partition_count,
-                                                 std::uint64_t shard_count,
-                                                 std::uint64_t payload_alignment) {
-    std::uint64_t offset = 8u
-        + sizeof(unsigned char)
-        + 7u
-        + sizeof(std::uint64_t) * 7u
-        + sizeof(std::uint64_t) * partition_count * 3u
-        + sizeof(std::uint64_t) * (shard_count + 1u)
-        + sizeof(std::uint64_t) * partition_count * 2u;
-    offset = (offset + payload_alignment - 1u) & ~(payload_alignment - 1u);
-    return offset;
-}
-
-template<typename MatrixT>
-inline int compute_shard_pack_locators(const std::uint64_t *partition_rows,
-                                       const std::uint64_t *partition_nnz,
-                                       const std::uint64_t *partition_aux,
-                                       std::uint64_t cols,
-                                       std::uint64_t partition_count,
-                                       std::uint64_t *partition_offsets,
-                                       std::uint64_t *part_sizes) {
-    std::uint64_t cursor = sharded_pack_payload_offset(partition_count, 1u, shard_pack_payload_alignment);
-    std::uint64_t i = 0u;
-    if ((partition_count != 0u) && (partition_rows == 0 || partition_nnz == 0 || partition_offsets == 0 || part_sizes == 0)) return 0;
-    for (i = 0u; i < partition_count; ++i) {
-        const std::size_t bytes = packed_bytes((const MatrixT *) 0,
-                                               (types::dim_t) partition_rows[i],
-                                               (types::dim_t) cols,
-                                               (types::nnz_t) partition_nnz[i],
-                                               partition_aux != 0 ? (unsigned long) partition_aux[i] : 0ul,
-                                               sizeof(real::storage_t));
-        partition_offsets[i] = cursor;
-        part_sizes[i] = (std::uint64_t) bytes;
-        cursor += (std::uint64_t) bytes;
-        cursor = (cursor + shard_pack_payload_alignment - 1u) & ~(shard_pack_payload_alignment - 1u);
-    }
-    return 1;
+    if (!build_active_cspack_dir_path(state, dir, sizeof(dir)) || path == 0 || cap == 0u) return 0;
+    return std::snprintf(path, cap, "%s/shard.%lu.cspack.tmp", dir, shard_id) > 0;
 }
 
 inline dataset_h5_cache_runtime *cache_runtime(dataset_h5_state *state) {
@@ -780,15 +708,9 @@ inline int ensure_execution_metadata_allocated(dataset_h5_state *state) {
 inline void default_execution_metadata(dataset_h5_state *state) {
     std::uint64_t shard_id = 0u;
     std::uint64_t partition_id = 0u;
-    const std::uint32_t default_format =
-        blocked_ell_uses_execution_payload(state)
-            ? dataset_execution_format_bucketed_blocked_ell
-            : (state != 0 && state->matrix_family == dataset_matrix_family_quantized_blocked_ell
-                   ? dataset_execution_format_quantized_blocked_ell
-                   : (state != 0 && state->matrix_family == dataset_matrix_family_sliced_ell
-                   ? dataset_execution_format_bucketed_sliced_ell
-                   : dataset_execution_format_blocked_ell));
     if (state == 0) return;
+    const std::uint32_t default_format =
+        default_execution_format_for_matrix_family(state->matrix_family, blocked_ell_uses_execution_payload(state));
     state->preferred_base_format = default_format;
     for (partition_id = 0u; partition_id < state->num_partitions; ++partition_id) {
         state->partition_execution_formats[partition_id] = default_format;
@@ -936,70 +858,37 @@ done:
     return 0;
 }
 
-inline std::uint64_t estimate_shard_pack_bytes(const dataset_h5_state *state, unsigned long shard_id) {
+inline std::uint64_t estimate_cspack_bytes(const dataset_h5_state *state, unsigned long shard_id) {
     std::uint64_t begin = 0u;
     std::uint64_t end = 0u;
-    std::uint64_t local_count = 0u;
-    std::uint64_t rows = 0u;
-    std::uint64_t nnz = 0u;
-    std::uint64_t *local_offsets = 0;
-    std::uint64_t *local_sizes = 0;
-    std::uint64_t bytes = 0u;
     std::uint64_t i = 0u;
+    std::uint64_t bytes = 0u;
+    char path[4096];
+    struct stat st;
 
     if (state == 0 || shard_id >= state->num_shards || state->shard_part_begin == 0 || state->shard_part_end == 0) return 0u;
+    if (build_cspack_path(state, shard_id, path, sizeof(path)) && ::stat(path, &st) == 0 && st.st_size > 0) {
+        return (std::uint64_t) st.st_size;
+    }
     begin = state->shard_part_begin[shard_id];
     end = state->shard_part_end[shard_id];
-    local_count = end >= begin ? (end - begin) : 0u;
-    if (local_count == 0u) return sharded_pack_payload_offset(0u, 1u, shard_pack_payload_alignment);
-    local_offsets = (std::uint64_t *) std::calloc((std::size_t) local_count, sizeof(std::uint64_t));
-    local_sizes = (std::uint64_t *) std::calloc((std::size_t) local_count, sizeof(std::uint64_t));
-    if (local_offsets == 0 || local_sizes == 0) goto done;
+    bytes = sizeof(cspack_magic) + sizeof(std::uint64_t) * (2u + (end >= begin ? (end - begin) : 0u));
     for (i = begin; i < end; ++i) {
-        rows += state->partition_rows[i];
-        nnz += state->partition_nnz[i];
+        if (state->partition_execution_bytes != 0 && state->partition_execution_bytes[i] != 0u) {
+            bytes += state->partition_execution_bytes[i];
+        } else if (state->matrix_family == dataset_matrix_family_blocked_ell && state->partition_bucketed_blocked_ell_bytes != 0) {
+            bytes += state->partition_bucketed_blocked_ell_bytes[i];
+        } else if (state->matrix_family == dataset_matrix_family_sliced_ell && state->partition_bucketed_sliced_ell_bytes != 0) {
+            bytes += state->partition_bucketed_sliced_ell_bytes[i];
+        } else if (state->matrix_family == dataset_matrix_family_quantized_blocked_ell) {
+            bytes += (std::uint64_t) packed_bytes((const sparse::quantized_blocked_ell *) 0,
+                                                  (types::dim_t) state->partition_rows[i],
+                                                  (types::dim_t) state->cols,
+                                                  (types::nnz_t) state->partition_nnz[i],
+                                                  (unsigned long) state->partition_aux[i],
+                                                  sizeof(real::storage_t));
+        }
     }
-    if (state->matrix_family == dataset_matrix_family_blocked_ell) {
-        if (!compute_shard_pack_locators<sparse::blocked_ell>(state->partition_rows + begin,
-                                                              state->partition_nnz + begin,
-                                                              state->partition_aux + begin,
-                                                              state->cols,
-                                                              local_count,
-                                                              local_offsets,
-                                                              local_sizes)) {
-            goto done;
-        }
-    } else if (state->matrix_family == dataset_matrix_family_quantized_blocked_ell) {
-        if (!compute_shard_pack_locators<sparse::quantized_blocked_ell>(state->partition_rows + begin,
-                                                                        state->partition_nnz + begin,
-                                                                        state->partition_aux + begin,
-                                                                        state->cols,
-                                                                        local_count,
-                                                                        local_offsets,
-                                                                        local_sizes)) {
-            goto done;
-        }
-    } else if (state->matrix_family == dataset_matrix_family_sliced_ell) {
-        if (!compute_shard_pack_locators<sparse::sliced_ell>(state->partition_rows + begin,
-                                                             state->partition_nnz + begin,
-                                                             state->partition_aux + begin,
-                                                             state->cols,
-                                                             local_count,
-                                                             local_offsets,
-                                                             local_sizes)) {
-            goto done;
-        }
-    } else {
-        goto done;
-    }
-    bytes = sharded_pack_payload_offset(local_count, 1u, shard_pack_payload_alignment);
-    if (local_count != 0u) bytes = local_offsets[local_count - 1u] + local_sizes[local_count - 1u];
-    (void) rows;
-    (void) nnz;
-
-done:
-    std::free(local_offsets);
-    std::free(local_sizes);
     return bytes;
 }
 
@@ -1007,27 +896,19 @@ inline int write_dataset_cache_manifest(const char *source_path,
                                        const dataset_h5_state *state) {
     std::FILE *fp = 0;
     unsigned long shard_id = 0ul;
-    char canonical_pack_dir[4096];
-    char execution_pack_root_dir[4096];
-    char execution_pack_dir[4096];
+    char pack_dir[4096];
     if (source_path == 0 || state == 0 || state->cache_manifest_path == 0) return 0;
     fp = std::fopen(state->cache_manifest_path, "wb");
     if (fp == 0) return 0;
-    canonical_pack_dir[0] = '\0';
-    execution_pack_root_dir[0] = '\0';
-    execution_pack_dir[0] = '\0';
+    pack_dir[0] = '\0';
     if (state->cache_instance_dir != 0) {
-        (void) build_cache_canonical_pack_dir_path(state->cache_instance_dir, canonical_pack_dir, sizeof(canonical_pack_dir));
-        (void) build_cache_execution_pack_dir_path(state->cache_instance_dir, execution_pack_root_dir, sizeof(execution_pack_root_dir));
-        (void) build_active_execution_pack_dir_path(state, execution_pack_dir, sizeof(execution_pack_dir));
+        (void) build_active_cspack_dir_path(state, pack_dir, sizeof(pack_dir));
     }
     std::fprintf(fp, "cache_schema_version=%u\n", (unsigned int) dataset_cache_schema_version);
     std::fprintf(fp, "source_path=%s\n", source_path);
     std::fprintf(fp, "cache_root=%s\n", state->cache_root != 0 ? state->cache_root : "");
     std::fprintf(fp, "cache_instance_dir=%s\n", state->cache_instance_dir != 0 ? state->cache_instance_dir : "");
-    std::fprintf(fp, "canonical_pack_dir=%s\n", canonical_pack_dir);
-    std::fprintf(fp, "execution_pack_root_dir=%s\n", execution_pack_root_dir);
-    std::fprintf(fp, "execution_pack_dir=%s\n", execution_pack_dir);
+    std::fprintf(fp, "pack_dir=%s\n", pack_dir);
     std::fprintf(fp, "source_size_bytes=%llu\n", (unsigned long long) state->source_size_bytes);
     std::fprintf(fp, "source_mtime_ns=%llu\n", (unsigned long long) state->source_mtime_ns);
     std::fprintf(fp, "matrix_family=%u\n", (unsigned int) state->matrix_family);
@@ -1045,7 +926,7 @@ inline int write_dataset_cache_manifest(const char *source_path,
                      shard_id,
                      (unsigned long long) state->shard_part_begin[shard_id],
                      (unsigned long long) state->shard_part_end[shard_id],
-                     (unsigned long long) estimate_shard_pack_bytes(state, shard_id));
+                     (unsigned long long) estimate_cspack_bytes(state, shard_id));
     }
     std::fclose(fp);
     return 1;
@@ -1057,8 +938,7 @@ inline int ensure_dataset_cache_layout(shard_storage *s) {
     char instances_root[4096];
     char metadata_dir[4096];
     char pack_root_dir[4096];
-    char canonical_pack_dir[4096];
-    char execution_pack_dir[4096];
+    char active_pack_dir[4096];
     std::uint64_t fingerprint = 0u;
     unsigned long shard_id = 0ul;
     struct statvfs vfs;
@@ -1070,13 +950,13 @@ inline int ensure_dataset_cache_layout(shard_storage *s) {
         if (!build_default_cache_root(s->source_path, path, sizeof(path))) return 0;
         if (!assign_owned_string(&state->cache_root, path)) return 0;
     }
-    if (shard_storage_has_capability(s, shard_storage_cap_materialize_canonical_pack | shard_storage_cap_materialize_execution_pack)) {
+    if (shard_storage_has_capability(s, shard_storage_cap_materialize_pack)) {
         if (!ensure_directory_exists(state->cache_root)) return 0;
     } else if (!directory_exists(state->cache_root)) {
         return 0;
     }
     if (!build_cache_instances_root_path(state->cache_root, instances_root, sizeof(instances_root))) return 0;
-    if (shard_storage_has_capability(s, shard_storage_cap_materialize_canonical_pack | shard_storage_cap_materialize_execution_pack)) {
+    if (shard_storage_has_capability(s, shard_storage_cap_materialize_pack)) {
         if (!ensure_directory_exists(instances_root)) return 0;
     } else if (!directory_exists(instances_root)) {
         return 0;
@@ -1091,38 +971,26 @@ inline int ensure_dataset_cache_layout(shard_storage *s) {
     if (state->cache_instance_dir == 0 || std::strcmp(state->cache_instance_dir, path) != 0) {
         if (!assign_owned_string(&state->cache_instance_dir, path)) return 0;
     }
-    if (shard_storage_has_capability(s, shard_storage_cap_materialize_canonical_pack | shard_storage_cap_materialize_execution_pack)) {
+    if (shard_storage_has_capability(s, shard_storage_cap_materialize_pack)) {
         if (!ensure_directory_exists(state->cache_instance_dir)) return 0;
     } else if (!directory_exists(state->cache_instance_dir)) {
         return 0;
     }
     if (!build_cache_metadata_dir_path(state->cache_instance_dir, metadata_dir, sizeof(metadata_dir))) return 0;
-    if (shard_storage_has_capability(s, shard_storage_cap_materialize_canonical_pack | shard_storage_cap_materialize_execution_pack)
+    if (shard_storage_has_capability(s, shard_storage_cap_materialize_pack)
         && !ensure_directory_exists(metadata_dir)) {
         return 0;
     }
     if (!build_cache_pack_root_path(state->cache_instance_dir, pack_root_dir, sizeof(pack_root_dir))) return 0;
-    if (shard_storage_has_capability(s, shard_storage_cap_materialize_canonical_pack | shard_storage_cap_materialize_execution_pack)) {
+    if (shard_storage_has_capability(s, shard_storage_cap_materialize_pack)) {
         if (!ensure_directory_exists(pack_root_dir)) return 0;
     } else if (!directory_exists(pack_root_dir)) {
         return 0;
     }
-    if (!build_cache_canonical_pack_dir_path(state->cache_instance_dir, canonical_pack_dir, sizeof(canonical_pack_dir))) return 0;
-    if (shard_storage_has_capability(s, shard_storage_cap_materialize_canonical_pack)) {
-        if (!ensure_directory_exists(canonical_pack_dir)) return 0;
-    } else if (!directory_exists(canonical_pack_dir)) {
-        return 0;
-    }
-    if (!build_cache_execution_pack_dir_path(state->cache_instance_dir, execution_pack_dir, sizeof(execution_pack_dir))) return 0;
-    if (shard_storage_has_capability(s, shard_storage_cap_materialize_execution_pack)) {
-        if (!ensure_directory_exists(execution_pack_dir)) return 0;
-    } else if (!directory_exists(execution_pack_dir)) {
-        return 0;
-    }
-    if (!build_active_execution_pack_dir_path(state, execution_pack_dir, sizeof(execution_pack_dir))) return 0;
-    if (shard_storage_has_capability(s, shard_storage_cap_materialize_execution_pack)) {
-        if (!ensure_directory_exists(execution_pack_dir)) return 0;
-    } else if (!directory_exists(execution_pack_dir)) {
+    if (!build_active_cspack_dir_path(state, active_pack_dir, sizeof(active_pack_dir))) return 0;
+    if (shard_storage_has_capability(s, shard_storage_cap_materialize_pack)) {
+        if (!ensure_directory_exists(active_pack_dir)) return 0;
+    } else if (!directory_exists(active_pack_dir)) {
         return 0;
     }
     if (!build_cache_manifest_path(state->cache_instance_dir, path, sizeof(path))) return 0;
@@ -1130,18 +998,18 @@ inline int ensure_dataset_cache_layout(shard_storage *s) {
     if (!ensure_cache_tracking_allocated(state)) return 0;
     for (shard_id = 0ul; shard_id < (unsigned long) state->num_shards; ++shard_id) {
         if (state->shard_cache_paths[shard_id] == 0) {
-            if (!build_shard_pack_path(state, shard_id, path, sizeof(path))) return 0;
+            if (!build_cspack_path(state, shard_id, path, sizeof(path))) return 0;
             if (!assign_owned_string(state->shard_cache_paths + shard_id, path)) return 0;
         }
         if (::access(state->shard_cache_paths[shard_id], R_OK) == 0) {
             if (state->shard_cache_state[shard_id] != dataset_cache_shard_ready) {
                 state->shard_cache_state[shard_id] = dataset_cache_shard_ready;
-                state->shard_cache_bytes[shard_id] = estimate_shard_pack_bytes(state, shard_id);
+                state->shard_cache_bytes[shard_id] = estimate_cspack_bytes(state, shard_id);
                 state->cache_resident_bytes += state->shard_cache_bytes[shard_id];
             }
         }
     }
-    if (shard_storage_has_capability(s, shard_storage_cap_materialize_canonical_pack | shard_storage_cap_materialize_execution_pack)
+    if (shard_storage_has_capability(s, shard_storage_cap_materialize_pack)
         && !write_dataset_cache_manifest(s->source_path, state)) {
         return 0;
     }
@@ -1152,7 +1020,7 @@ inline int ensure_dataset_cache_layout(shard_storage *s) {
             free_half = ((std::uint64_t) vfs.f_bavail * (std::uint64_t) vfs.f_frsize) / 2u;
         }
         for (shard_id = 0ul; shard_id < (unsigned long) state->num_shards; ++shard_id) {
-            estimated_total += estimate_shard_pack_bytes(state, shard_id);
+            estimated_total += estimate_cspack_bytes(state, shard_id);
         }
         state->cache_budget_bytes = free_half == 0u ? estimated_total : (estimated_total < free_half ? estimated_total : free_half);
     }
@@ -1180,90 +1048,6 @@ inline int build_shard_partition_spans(dataset_h5_state *state) {
         state->shard_part_end[shard_id] = partition_id;
     }
     return 1;
-}
-
-template<typename MatrixT>
-inline int write_shard_pack_file(const char *filename,
-                                 std::uint64_t cols,
-                                 const std::uint64_t *partition_rows,
-                                 const std::uint64_t *partition_nnz,
-                                 const std::uint64_t *partition_aux,
-                                 std::uint64_t partition_count,
-                                 MatrixT *const *parts) {
-    static const unsigned char magic[8] = { 'C', 'S', 'P', 'A', 'C', 'K', '0', '1' };
-    std::uint64_t *partition_offsets = 0;
-    std::uint64_t *part_sizes = 0;
-    std::uint64_t *shard_offsets = 0;
-    std::FILE *fp = 0;
-    std::uint64_t rows = 0u;
-    std::uint64_t nnz = 0u;
-    std::uint64_t payload_offset = 0u;
-    std::uint64_t i = 0u;
-    int ok = 0;
-
-    if (filename == 0 || ((partition_count != 0u) && (partition_rows == 0 || partition_nnz == 0 || parts == 0))) return 0;
-    if (partition_count != 0u) {
-        partition_offsets = (std::uint64_t *) std::calloc((std::size_t) partition_count, sizeof(std::uint64_t));
-        part_sizes = (std::uint64_t *) std::calloc((std::size_t) partition_count, sizeof(std::uint64_t));
-        if (partition_offsets == 0 || part_sizes == 0) goto done;
-    }
-    shard_offsets = (std::uint64_t *) std::calloc(2u, sizeof(std::uint64_t));
-    if (shard_offsets == 0) goto done;
-    if (!compute_shard_pack_locators<MatrixT>(partition_rows, partition_nnz, partition_aux, cols, partition_count, partition_offsets, part_sizes)) goto done;
-    payload_offset = sharded_pack_payload_offset(partition_count, 1u, shard_pack_payload_alignment);
-    for (i = 0u; i < partition_count; ++i) {
-        rows += partition_rows[i];
-        nnz += partition_nnz[i];
-    }
-    shard_offsets[0] = 0u;
-    shard_offsets[1] = rows;
-
-    fp = std::fopen(filename, "wb");
-    if (fp == 0) goto done;
-    std::setvbuf(fp, 0, _IOFBF, (std::size_t) 8u << 20u);
-    if (!write_sharded_block(fp, magic, sizeof(magic), 1u)) goto done;
-    {
-        const unsigned char format = (unsigned char) disk_format_code<MatrixT>::value;
-        const unsigned char reserved[7] = { 0, 0, 0, 0, 0, 0, 0 };
-        const std::uint64_t num_partitions = partition_count;
-        const std::uint64_t num_shards = 1u;
-        if (!write_sharded_block(fp, &format, sizeof(format), 1u)) goto done;
-        if (!write_sharded_block(fp, reserved, sizeof(reserved), 1u)) goto done;
-        if (!write_sharded_block(fp, &rows, sizeof(rows), 1u)) goto done;
-        if (!write_sharded_block(fp, &cols, sizeof(cols), 1u)) goto done;
-        if (!write_sharded_block(fp, &nnz, sizeof(nnz), 1u)) goto done;
-        if (!write_sharded_block(fp, &num_partitions, sizeof(num_partitions), 1u)) goto done;
-        if (!write_sharded_block(fp, &num_shards, sizeof(num_shards), 1u)) goto done;
-        if (!write_sharded_block(fp, &shard_pack_payload_alignment, sizeof(shard_pack_payload_alignment), 1u)) goto done;
-        if (!write_sharded_block(fp, &payload_offset, sizeof(payload_offset), 1u)) goto done;
-        if (!write_sharded_block(fp, partition_rows, sizeof(std::uint64_t), (std::size_t) partition_count)) goto done;
-        if (!write_sharded_block(fp, partition_nnz, sizeof(std::uint64_t), (std::size_t) partition_count)) goto done;
-        if (partition_aux != 0) {
-            if (!write_sharded_block(fp, partition_aux, sizeof(std::uint64_t), (std::size_t) partition_count)) goto done;
-        } else {
-            const std::uint64_t zero = 0u;
-            for (i = 0u; i < partition_count; ++i) {
-                if (!write_sharded_block(fp, &zero, sizeof(zero), 1u)) goto done;
-            }
-        }
-        if (!write_sharded_block(fp, shard_offsets, sizeof(std::uint64_t), 2u)) goto done;
-        if (!write_sharded_block(fp, partition_offsets, sizeof(std::uint64_t), (std::size_t) partition_count)) goto done;
-        if (!write_sharded_block(fp, part_sizes, sizeof(std::uint64_t), (std::size_t) partition_count)) goto done;
-    }
-    if (std::fflush(fp) != 0) goto done;
-    for (i = 0u; i < partition_count; ++i) {
-        if (parts[i] == 0) goto done;
-        if (std::fseek(fp, (long) partition_offsets[i], SEEK_SET) != 0) goto done;
-        if (!::cellshard::store(fp, parts[i])) goto done;
-    }
-    ok = 1;
-
-done:
-    if (fp != 0) std::fclose(fp);
-    std::free(partition_offsets);
-    std::free(part_sizes);
-    std::free(shard_offsets);
-    return ok;
 }
 
 inline int load_codec_table(hid_t codecs, dataset_codec_descriptor *descs, std::uint32_t count) {

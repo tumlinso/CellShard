@@ -47,8 +47,8 @@ CellShard `0.1.x` is intentionally narrow.
 - CUDA-enabled release validation should use the same host/toolchain class as the main CellShard development environment.
 - Binary wheels are Linux-only.
 - The standalone `cellshardH5adExport` app is part of CMake builds, but wheel builds package the Python extension only.
-- `.csh5` is the canonical archive/container format. High-throughput repeated fetch is expected to run through generated shard `.pack` cache files built from that container.
-- The normal runtime path is therefore `bind .csh5` -> `materialize shard pack` -> `fetch from .pack` -> `stage to GPU`, not repeated direct HDF5 payload reads as the final execution substrate.
+- `.csh5` is the canonical archive/container format. High-throughput repeated fetch is expected to run through generated shard `.cspack` cache files built from that container.
+- The normal runtime path is therefore `bind .csh5` -> `materialize cspack` -> `fetch from .cspack` -> `stage to GPU`, not repeated direct HDF5 payload reads as the final execution substrate.
 - Cellerator-side ingest may use bounded local `.cspool` part files, generally sliced-ELL but also blocked-ELL when appropriate, to avoid rereading an expensive source MTX before `.csh5` assembly. That spool is an implementation detail, not a supported archival surface.
 - Persisted parts and shards remain row-aligned. One cell is not split across parts or shards.
 

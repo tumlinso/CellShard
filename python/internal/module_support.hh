@@ -4,6 +4,7 @@
 #include "../../export/h5ad_writer.hh"
 #include "../../include/CellShard/formats/blocked_ell.cuh"
 #include "../../include/CellShard/formats/compressed.cuh"
+#include "../../include/CellShard/io/cshard.hh"
 #include "../../include/CellShard/io/csh5/api.cuh"
 #include "../../include/CellShard/runtime/host/sharded_host.cuh"
 #include "../../include/CellShard/runtime/storage/shard_storage.cuh"

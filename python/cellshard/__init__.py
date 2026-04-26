@@ -1,6 +1,10 @@
 from ._cellshard import (
     ClientSnapshotRef,
     CsrMatrixExport,
+    CshardDescription,
+    CshardFile,
+    CshardTable,
+    CshardTableColumn,
     DatasetClient,
     DatasetCodecSummary,
     SourceDatasetSummary,
@@ -27,10 +31,12 @@ from ._cellshard import (
     make_client_snapshot_ref,
     open_dataset,
     open_dataset_owner,
+    open_cshard,
     publish_runtime_service_cutover,
     serialize_global_metadata_snapshot,
     stage_append_only_runtime_service,
     validate_client_snapshot_ref,
+    validate_cshard,
     write_h5ad,
 )
 
@@ -183,7 +189,53 @@ class Dataset:
         return self.rows(item, format="torch")
 
 
+class CshardDataset:
+    """High-level facade for experimental standby .cshard archives."""
+
+    def __init__(self, path: str):
+        self._path = path
+        self._file = open_cshard(path)
+
+    @property
+    def path(self) -> str:
+        return self._path
+
+    @property
+    def obs(self):
+        return self._file.obs()
+
+    @property
+    def var(self):
+        return self._file.var()
+
+    def describe(self) -> dict:
+        desc = self._file.describe()
+        return {
+            "path": desc.path,
+            "version": (desc.version_major, desc.version_minor),
+            "shape": (desc.rows, desc.cols),
+            "nnz": desc.nnz,
+            "partitions": desc.partitions,
+            "canonical_layout": desc.canonical_layout,
+            "feature_order_hash": desc.feature_order_hash,
+            "has_pack_manifest": desc.has_pack_manifest,
+        }
+
+    def read_rows(self, start: int, count: int, format: str = "csr"):
+        if start < 0 or count < 0:
+            raise ValueError("start and count must be non-negative")
+        csr = self._file.read_rows(start, count)
+        normalized = _normalize_format(format)
+        if normalized == "torch":
+            return csr.to_torch_sparse_csr()
+        if normalized == "scipy":
+            return csr.to_scipy_csr()
+        return csr
+
+
 def open(path: str) -> Dataset:
+    if str(path).endswith(".cshard"):
+        return CshardDataset(path)
     return Dataset(path)
 
 __all__ = [
@@ -192,6 +244,11 @@ __all__ = [
     "DatasetClient",
     "DatasetCodecSummary",
     "SourceDatasetSummary",
+    "CshardDescription",
+    "CshardFile",
+    "CshardTable",
+    "CshardTableColumn",
+    "CshardDataset",
     "Dataset",
     "DatasetFile",
     "DatasetOwner",
@@ -215,12 +272,14 @@ __all__ = [
     "load_dataset_summary",
     "make_client_snapshot_ref",
     "open",
+    "open_cshard",
     "open_dataset",
     "open_dataset_owner",
     "publish_runtime_service_cutover",
     "serialize_global_metadata_snapshot",
     "stage_append_only_runtime_service",
     "validate_client_snapshot_ref",
+    "validate_cshard",
     "write_h5ad",
     "__version__",
 ]

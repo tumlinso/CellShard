@@ -215,7 +215,7 @@ int finalize_preprocessed_blocked_ell_dataset_h5_to_output(const char *source_fi
     part_row_offsets.assign((std::size_t) matrix.num_partitions + 1u, 0u);
     part_dataset_ids.assign((std::size_t) matrix.num_partitions, 0u);
     part_codec_ids.assign((std::size_t) matrix.num_partitions, 0u);
-    part_formats.assign((std::size_t) matrix.num_partitions, dataset_execution_format_bucketed_blocked_ell);
+    part_formats.assign((std::size_t) matrix.num_partitions, matrix_traits<sparse::blocked_ell>::bucketed_execution_format);
     part_block_sizes.assign((std::size_t) matrix.num_partitions, 0u);
     part_bucket_counts.assign((std::size_t) matrix.num_partitions, 1u);
     part_fill_ratios.assign((std::size_t) matrix.num_partitions, 0.0f);
@@ -310,7 +310,7 @@ int finalize_preprocessed_blocked_ell_dataset_h5_to_output(const char *source_fi
     provenance_view.dataset_feature_to_global = filtered_dataset_feature_to_global.empty() ? nullptr : filtered_dataset_feature_to_global.data();
 
     codec.codec_id = 0u;
-    codec.family = dataset_codec_family_blocked_ell;
+    codec.family = matrix_traits<sparse::blocked_ell>::codec_family;
     codec.value_code = (std::uint32_t) ::real::code_of< ::real::storage_t>::code;
     codec.scale_value_code = 0u;
     codec.bits = (std::uint32_t) (sizeof(::real::storage_t) * 8u);
@@ -340,7 +340,7 @@ int finalize_preprocessed_blocked_ell_dataset_h5_to_output(const char *source_fi
     }
     if (!create_dataset_blocked_ell_h5(temp_path.c_str(), &layout, &dataset_view, &provenance_view)) goto done;
 
-    part_formats.assign(compact_part_ptrs.size(), dataset_execution_format_bucketed_blocked_ell);
+    part_formats.assign(compact_part_ptrs.size(), matrix_traits<sparse::blocked_ell>::bucketed_execution_format);
     part_block_sizes.assign(compact_part_ptrs.size(), 0u);
     part_bucket_counts.assign(compact_part_ptrs.size(), 1u);
     part_fill_ratios.assign(compact_part_ptrs.size(), 0.0f);
@@ -359,7 +359,7 @@ int finalize_preprocessed_blocked_ell_dataset_h5_to_output(const char *source_fi
             : 0u;
     }
 
-    shard_formats.assign(compact_shard_part_begin.size(), dataset_execution_format_bucketed_blocked_ell);
+    shard_formats.assign(compact_shard_part_begin.size(), matrix_traits<sparse::blocked_ell>::bucketed_execution_format);
     shard_block_sizes.assign(compact_shard_part_begin.size(), 0u);
     shard_bucketed_partition_counts.assign(compact_shard_part_begin.size(), 0u);
     shard_bucketed_segment_counts.assign(compact_shard_part_begin.size(), 0u);
@@ -432,7 +432,7 @@ int finalize_preprocessed_blocked_ell_dataset_h5_to_output(const char *source_fi
     execution_view.shard_preferred_pair_ids = shard_pair_ids.empty() ? nullptr : shard_pair_ids.data();
     execution_view.shard_owner_node_ids = shard_owner_node_ids.empty() ? nullptr : shard_owner_node_ids.data();
     execution_view.shard_owner_rank_ids = shard_owner_rank_ids.empty() ? nullptr : shard_owner_rank_ids.data();
-    execution_view.preferred_base_format = dataset_execution_format_bucketed_blocked_ell;
+    execution_view.preferred_base_format = matrix_traits<sparse::blocked_ell>::bucketed_execution_format;
     if (!append_dataset_execution_h5(temp_path.c_str(), &execution_view)) goto done;
     if (!append_dataset_runtime_service_h5(temp_path.c_str(), &runtime_service)) goto done;
     if (embedded_metadata != nullptr && !append_dataset_embedded_metadata_h5(temp_path.c_str(), embedded_metadata)) goto done;
@@ -725,7 +725,7 @@ int finalize_preprocessed_sliced_ell_dataset_h5_to_output(const char *source_fil
     part_row_offsets.assign((std::size_t) matrix.num_partitions + 1u, 0u);
     part_dataset_ids.assign((std::size_t) matrix.num_partitions, 0u);
     part_codec_ids.assign((std::size_t) matrix.num_partitions, 0u);
-    part_formats.assign((std::size_t) matrix.num_partitions, dataset_execution_format_bucketed_sliced_ell);
+    part_formats.assign((std::size_t) matrix.num_partitions, matrix_traits<sparse::sliced_ell>::bucketed_execution_format);
     part_block_sizes.assign((std::size_t) matrix.num_partitions, 0u);
     part_bucket_counts.assign((std::size_t) matrix.num_partitions, 0u);
     part_fill_ratios.assign((std::size_t) matrix.num_partitions, 0.0f);
@@ -842,7 +842,7 @@ int finalize_preprocessed_sliced_ell_dataset_h5_to_output(const char *source_fil
     provenance_view.dataset_feature_to_global = filtered_dataset_feature_to_global.empty() ? nullptr : filtered_dataset_feature_to_global.data();
 
     codec.codec_id = 0u;
-    codec.family = dataset_codec_family_sliced_ell;
+    codec.family = matrix_traits<sparse::sliced_ell>::codec_family;
     codec.value_code = (std::uint32_t) ::real::code_of< ::real::storage_t>::code;
     codec.scale_value_code = 0u;
     codec.bits = (std::uint32_t) (sizeof(::real::storage_t) * 8u);
@@ -873,7 +873,7 @@ int finalize_preprocessed_sliced_ell_dataset_h5_to_output(const char *source_fil
     if (!create_dataset_sliced_ell_h5(temp_path.c_str(), &layout, &dataset_view, &provenance_view)) goto done;
 
     {
-    std::vector<std::uint32_t> compact_part_formats(compact_part_ptrs.size(), dataset_execution_format_bucketed_sliced_ell);
+    std::vector<std::uint32_t> compact_part_formats(compact_part_ptrs.size(), matrix_traits<sparse::sliced_ell>::bucketed_execution_format);
     std::vector<std::uint32_t> compact_part_block_sizes(compact_part_ptrs.size(), 0u);
     std::vector<std::uint32_t> compact_part_bucket_counts(compact_part_ptrs.size(), 0u);
     std::vector<float> compact_part_fill_ratios(compact_part_ptrs.size(), 0.0f);
@@ -896,7 +896,7 @@ int finalize_preprocessed_sliced_ell_dataset_h5_to_output(const char *source_fil
         ++compact_part_id;
     }
 
-    std::vector<std::uint32_t> compact_shard_formats(compact_shard_part_begin.size(), dataset_execution_format_bucketed_sliced_ell);
+    std::vector<std::uint32_t> compact_shard_formats(compact_shard_part_begin.size(), matrix_traits<sparse::sliced_ell>::bucketed_execution_format);
     std::vector<std::uint32_t> compact_shard_block_sizes(compact_shard_part_begin.size(), 0u);
     std::vector<std::uint32_t> compact_shard_bucketed_partition_counts(compact_shard_part_begin.size(), 0u);
     std::vector<std::uint32_t> compact_shard_bucketed_segment_counts(compact_shard_part_begin.size(), 0u);
@@ -963,7 +963,7 @@ int finalize_preprocessed_sliced_ell_dataset_h5_to_output(const char *source_fil
     execution_view.shard_preferred_pair_ids = compact_shard_pair_ids.empty() ? nullptr : compact_shard_pair_ids.data();
     execution_view.shard_owner_node_ids = compact_shard_owner_node_ids.empty() ? nullptr : compact_shard_owner_node_ids.data();
     execution_view.shard_owner_rank_ids = compact_shard_owner_rank_ids.empty() ? nullptr : compact_shard_owner_rank_ids.data();
-    execution_view.preferred_base_format = dataset_execution_format_bucketed_sliced_ell;
+    execution_view.preferred_base_format = matrix_traits<sparse::sliced_ell>::bucketed_execution_format;
     if (!append_dataset_execution_h5(temp_path.c_str(), &execution_view)) goto done;
     if (!append_dataset_runtime_service_h5(temp_path.c_str(), &runtime_service)) goto done;
     if (embedded_metadata != nullptr && !append_dataset_embedded_metadata_h5(temp_path.c_str(), embedded_metadata)) goto done;
@@ -1067,7 +1067,7 @@ int finalize_preprocessed_dataset_h5_to_output(const char *source_filename,
     H5Fclose(file);
     file = (hid_t) -1;
 
-    if (std::strcmp(matrix_format, "sliced_ell") == 0) {
+    if (std::strcmp(matrix_format, matrix_traits<sparse::sliced_ell>::matrix_format_name()) == 0) {
         ok = finalize_preprocessed_sliced_ell_dataset_h5_to_output(source_filename,
                                                                    output_filename,
                                                                    cell_keep,
@@ -1081,7 +1081,7 @@ int finalize_preprocessed_dataset_h5_to_output(const char *source_filename,
                                                                    rows_out,
                                                                    cols_out,
                                                                    nnz_out);
-    } else if (std::strcmp(matrix_format, "blocked_ell") == 0) {
+    } else if (std::strcmp(matrix_format, matrix_traits<sparse::blocked_ell>::matrix_format_name()) == 0) {
         ok = finalize_preprocessed_blocked_ell_dataset_h5_to_output(source_filename,
                                                                     output_filename,
                                                                     cell_keep,

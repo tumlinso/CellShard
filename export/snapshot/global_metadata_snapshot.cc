@@ -77,19 +77,19 @@ bool validate_client_snapshot_ref(const global_metadata_snapshot &owner_snapshot
         set_error(error, "client snapshot_id does not match the owner snapshot");
         return false;
     }
-    if (request.canonical_generation != expected.canonical_generation) {
+    if (request.generation.canonical_generation != expected.generation.canonical_generation) {
         set_error(error, "client canonical_generation is stale");
         return false;
     }
-    if (request.execution_plan_generation != expected.execution_plan_generation) {
+    if (request.generation.execution_plan_generation != expected.generation.execution_plan_generation) {
         set_error(error, "client execution_plan_generation is stale");
         return false;
     }
-    if (request.pack_generation != expected.pack_generation) {
+    if (request.generation.pack_generation != expected.generation.pack_generation) {
         set_error(error, "client pack_generation is stale");
         return false;
     }
-    if (request.service_epoch != expected.service_epoch) {
+    if (request.generation.service_epoch != expected.generation.service_epoch) {
         set_error(error, "client service_epoch is stale");
         return false;
     }
@@ -109,18 +109,18 @@ bool stage_append_only_runtime_service(const runtime_service_metadata &current,
     }
 
     const std::uint64_t next_generation = std::max({
-        current.canonical_generation,
-        current.execution_plan_generation,
-        current.pack_generation,
-        current.active_read_generation,
-        current.staged_write_generation
+        current.runtime_generation.generation.canonical_generation,
+        current.runtime_generation.generation.execution_plan_generation,
+        current.runtime_generation.generation.pack_generation,
+        current.runtime_generation.active_read_generation,
+        current.runtime_generation.staged_write_generation
     }) + 1u;
 
     *staged = current;
-    staged->canonical_generation = next_generation;
-    staged->execution_plan_generation = next_generation;
-    staged->pack_generation = next_generation;
-    staged->staged_write_generation = next_generation;
+    staged->runtime_generation.generation.canonical_generation = next_generation;
+    staged->runtime_generation.generation.execution_plan_generation = next_generation;
+    staged->runtime_generation.generation.pack_generation = next_generation;
+    staged->runtime_generation.staged_write_generation = next_generation;
     return true;
 }
 
@@ -137,19 +137,20 @@ bool publish_runtime_service_cutover(const runtime_service_metadata &current,
         set_error(error, "runtime service cutover requires append-only mode");
         return false;
     }
-    if (staged.staged_write_generation == 0u) {
+    if (staged.runtime_generation.staged_write_generation == 0u) {
         set_error(error, "staged runtime service does not define a staged_write_generation");
         return false;
     }
-    if (staged.staged_write_generation < current.active_read_generation) {
+    if (staged.runtime_generation.staged_write_generation < current.runtime_generation.active_read_generation) {
         set_error(error, "staged runtime generation is older than the active read generation");
         return false;
     }
 
     *published = staged;
-    published->active_read_generation = staged.staged_write_generation;
-    published->staged_write_generation = published->active_read_generation;
-    published->service_epoch = std::max(current.service_epoch, staged.service_epoch) + 1u;
+    published->runtime_generation.active_read_generation = staged.runtime_generation.staged_write_generation;
+    published->runtime_generation.staged_write_generation = published->runtime_generation.active_read_generation;
+    published->runtime_generation.generation.service_epoch =
+        std::max(current.runtime_generation.generation.service_epoch, staged.runtime_generation.generation.service_epoch) + 1u;
     return true;
 }
 
@@ -170,11 +171,7 @@ bool describe_pack_delivery(const global_metadata_snapshot &owner_snapshot,
     *out = pack_delivery_descriptor{};
     out->snapshot_id = owner_snapshot.snapshot_id;
     out->shard_id = request.shard_id;
-    out->canonical_generation = owner_snapshot.runtime_service.canonical_generation;
-    out->execution_plan_generation = owner_snapshot.runtime_service.execution_plan_generation;
-    out->pack_generation = owner_snapshot.runtime_service.pack_generation;
-    out->service_epoch = owner_snapshot.runtime_service.service_epoch;
-    out->prefer_execution_pack = request.prefer_execution_pack != 0u ? 1u : 0u;
+    out->generation = generation_ref(owner_snapshot.runtime_service);
 
     if (request.shard_id < owner_snapshot.execution_shards.size()) {
         const execution_shard_metadata &shard = owner_snapshot.execution_shards[(std::size_t) request.shard_id];
@@ -183,13 +180,7 @@ bool describe_pack_delivery(const global_metadata_snapshot &owner_snapshot,
         out->execution_format = shard.execution_format;
     }
 
-    if (out->prefer_execution_pack != 0u) {
-        out->pack_kind = "execution";
-        out->relative_pack_path = build_execution_pack_relative_path(owner_snapshot.runtime_service, request.shard_id);
-    } else {
-        out->pack_kind = "canonical";
-        out->relative_pack_path = "packs/canonical/shard." + std::to_string(request.shard_id) + ".pack";
-    }
+    out->relative_pack_path = build_cspack_relative_path(owner_snapshot.runtime_service, request.shard_id);
     return true;
 }
 

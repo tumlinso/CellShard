@@ -206,10 +206,10 @@ int append_bucketed_blocked_ell_shard_h5(const char *filename,
     payload_root = H5Gopen2(file, payload_group, H5P_DEFAULT);
     if (payload_root < 0) payload_root = create_group(file, payload_group);
     if (payload_root < 0) goto done;
-    if (H5Lexists(payload_root, "blocked_ell", H5P_DEFAULT) > 0) {
-        payload = H5Gopen2(payload_root, "blocked_ell", H5P_DEFAULT);
+    if (H5Lexists(payload_root, matrix_traits<sparse::blocked_ell>::matrix_format_name(), H5P_DEFAULT) > 0) {
+        payload = H5Gopen2(payload_root, matrix_traits<sparse::blocked_ell>::matrix_format_name(), H5P_DEFAULT);
     } else {
-        payload = create_group(payload_root, "blocked_ell");
+        payload = create_group(payload_root, matrix_traits<sparse::blocked_ell>::matrix_format_name());
     }
     if (payload < 0) goto done;
     if (!build_optimized_shard_dataset_name(shard_id, dataset_name, sizeof(dataset_name))) goto done;

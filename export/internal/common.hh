@@ -51,17 +51,17 @@ inline hid_t open_optional_group(hid_t parent, const char *path) {
     return group;
 }
 
-inline std::string build_execution_pack_relative_path(const runtime_service_metadata &runtime,
-                                                      std::uint64_t shard_id) {
-    return "packs/execution/plan."
-        + std::to_string(runtime.execution_plan_generation)
+inline std::string build_cspack_relative_path(const runtime_service_metadata &runtime,
+                                              std::uint64_t shard_id) {
+    return "packs/plan."
+        + std::to_string(runtime.runtime_generation.generation.execution_plan_generation)
         + "-pack."
-        + std::to_string(runtime.pack_generation)
+        + std::to_string(runtime.runtime_generation.generation.pack_generation)
         + "-epoch."
-        + std::to_string(runtime.service_epoch)
+        + std::to_string(runtime.runtime_generation.generation.service_epoch)
         + "/shard."
         + std::to_string(shard_id)
-        + ".exec.pack";
+        + ".cspack";
 }
 
 inline bool read_attr_u64(hid_t obj, const char *name, std::uint64_t *value) {

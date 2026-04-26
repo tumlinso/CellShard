@@ -104,8 +104,8 @@ inline py::dict build_uns_dict(const anndata_export &input) {
         entry[py::str("barcode_path")] = py::str(dataset.barcode_path);
         entry[py::str("metadata_path")] = py::str(dataset.metadata_path);
         entry[py::str("format")] = py::int_(dataset.format);
-        entry[py::str("row_begin")] = py::int_(dataset.row_begin);
-        entry[py::str("row_end")] = py::int_(dataset.row_end);
+        entry[py::str("row_begin")] = py::int_(dataset.row_span.row_begin);
+        entry[py::str("row_end")] = py::int_(dataset.row_span.row_end);
         entry[py::str("rows")] = py::int_(dataset.rows);
         entry[py::str("cols")] = py::int_(dataset.cols);
         entry[py::str("nnz")] = py::int_(dataset.nnz);

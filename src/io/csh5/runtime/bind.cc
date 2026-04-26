@@ -64,7 +64,7 @@ int bind_dataset_h5_cache(shard_storage *s, const char *cache_root) {
         state->cache_manifest_path = 0;
     }
     if (cache_root == 0 || *cache_root == 0) return 1;
-    if (shard_storage_has_capability(s, shard_storage_cap_materialize_canonical_pack | shard_storage_cap_materialize_execution_pack)) {
+    if (shard_storage_has_capability(s, shard_storage_cap_materialize_pack)) {
         if (!ensure_directory_exists(cache_root)) return 0;
     } else if (!directory_exists(cache_root)) {
         return 0;
@@ -123,7 +123,7 @@ int set_dataset_h5_cache_budget_bytes(shard_storage *s, std::uint64_t bytes) {
     dataset_h5_cache_runtime *runtime = 0;
     if (state == 0) return 0;
     if (!require_storage_capability(s,
-                                    shard_storage_cap_materialize_canonical_pack,
+                                    shard_storage_cap_materialize_pack,
                                     "set dataset h5 cache budget")) {
         return 0;
     }
@@ -165,7 +165,7 @@ int unpin_dataset_h5_cache_shard(shard_storage *s, unsigned long shard_id) {
     dataset_h5_cache_runtime *runtime = 0;
     if (state == 0) return 0;
     if (!require_storage_capability(s,
-                                    shard_storage_cap_materialize_canonical_pack,
+                                    shard_storage_cap_materialize_pack,
                                     "unpin dataset h5 cache shard")) {
         return 0;
     }
@@ -185,7 +185,7 @@ int evict_dataset_h5_cache_shard(shard_storage *s, unsigned long shard_id) {
     dataset_h5_cache_runtime *runtime = 0;
     if (state == 0) return 0;
     if (!require_storage_capability(s,
-                                    shard_storage_cap_materialize_canonical_pack,
+                                    shard_storage_cap_materialize_pack,
                                     "evict dataset h5 cache shard")) {
         return 0;
     }
@@ -206,7 +206,7 @@ int invalidate_dataset_h5_cache(shard_storage *s) {
     char path[4096];
     if (state == 0) return 0;
     if (!require_storage_capability(s,
-                                    shard_storage_cap_materialize_canonical_pack,
+                                    shard_storage_cap_materialize_pack,
                                     "invalidate dataset h5 cache")) {
         return 0;
     }
@@ -217,8 +217,8 @@ int invalidate_dataset_h5_cache(shard_storage *s) {
         std::lock_guard<std::mutex> lock(runtime->state_mutex);
         for (shard_id = 0ul; shard_id < (unsigned long) state->num_shards; ++shard_id) {
             evict_cached_shard_locked(state, shard_id);
-            if (build_execution_pack_path(state, shard_id, path, sizeof(path))) ::unlink(path);
-            if (build_execution_pack_temp_path(state, shard_id, path, sizeof(path))) ::unlink(path);
+            if (build_cspack_path(state, shard_id, path, sizeof(path))) ::unlink(path);
+            if (build_cspack_temp_path(state, shard_id, path, sizeof(path))) ::unlink(path);
         }
         state->access_clock = 0u;
         state->last_requested_shard = std::numeric_limits<std::uint64_t>::max();

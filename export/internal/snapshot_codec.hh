@@ -135,6 +135,18 @@ inline std::uint64_t fnv1a64(const std::vector<std::uint8_t> &bytes) {
     return hash;
 }
 
+inline const cellshard::dataset_generation_ref &generation_ref(const runtime_service_metadata &runtime) {
+    return runtime.runtime_generation.generation;
+}
+
+inline bool same_generation(const cellshard::dataset_generation_ref &lhs,
+                            const cellshard::dataset_generation_ref &rhs) {
+    return lhs.canonical_generation == rhs.canonical_generation
+        && lhs.execution_plan_generation == rhs.execution_plan_generation
+        && lhs.pack_generation == rhs.pack_generation
+        && lhs.service_epoch == rhs.service_epoch;
+}
+
 inline void append_source_dataset_summary(std::vector<std::uint8_t> *out, const source_dataset_summary &value) {
     append_string(out, value.dataset_id);
     append_string(out, value.matrix_path);
@@ -142,8 +154,8 @@ inline void append_source_dataset_summary(std::vector<std::uint8_t> *out, const 
     append_string(out, value.barcode_path);
     append_string(out, value.metadata_path);
     append_pod(out, value.format);
-    append_pod(out, value.row_begin);
-    append_pod(out, value.row_end);
+    append_pod(out, value.row_span.row_begin);
+    append_pod(out, value.row_span.row_end);
     append_pod(out, value.rows);
     append_pod(out, value.cols);
     append_pod(out, value.nnz);
@@ -159,8 +171,8 @@ inline bool read_source_dataset_summary(byte_reader *reader,
         && read_string(reader, &out->barcode_path, error, "barcode_path")
         && read_string(reader, &out->metadata_path, error, "metadata_path")
         && read_pod(reader, &out->format, error, "dataset_format")
-        && read_pod(reader, &out->row_begin, error, "dataset_row_begin")
-        && read_pod(reader, &out->row_end, error, "dataset_row_end")
+        && read_pod(reader, &out->row_span.row_begin, error, "dataset_row_begin")
+        && read_pod(reader, &out->row_span.row_end, error, "dataset_row_end")
         && read_pod(reader, &out->rows, error, "dataset_rows")
         && read_pod(reader, &out->cols, error, "dataset_cols")
         && read_pod(reader, &out->nnz, error, "dataset_nnz");
@@ -189,8 +201,8 @@ inline bool read_dataset_codec_summary(byte_reader *reader,
 
 inline void append_dataset_partition_summary(std::vector<std::uint8_t> *out, const dataset_partition_summary &value) {
     append_pod(out, value.partition_id);
-    append_pod(out, value.row_begin);
-    append_pod(out, value.row_end);
+    append_pod(out, value.row_span.row_begin);
+    append_pod(out, value.row_span.row_end);
     append_pod(out, value.rows);
     append_pod(out, value.nnz);
     append_pod(out, value.aux);
@@ -204,8 +216,8 @@ inline bool read_dataset_partition_summary(byte_reader *reader,
                                            std::string *error) {
     return out != nullptr
         && read_pod(reader, &out->partition_id, error, "partition_id")
-        && read_pod(reader, &out->row_begin, error, "partition_row_begin")
-        && read_pod(reader, &out->row_end, error, "partition_row_end")
+        && read_pod(reader, &out->row_span.row_begin, error, "partition_row_begin")
+        && read_pod(reader, &out->row_span.row_end, error, "partition_row_end")
         && read_pod(reader, &out->rows, error, "partition_rows")
         && read_pod(reader, &out->nnz, error, "partition_nnz")
         && read_pod(reader, &out->aux, error, "partition_aux")
@@ -218,8 +230,8 @@ inline void append_dataset_shard_summary(std::vector<std::uint8_t> *out, const d
     append_pod(out, value.shard_id);
     append_pod(out, value.partition_begin);
     append_pod(out, value.partition_end);
-    append_pod(out, value.row_begin);
-    append_pod(out, value.row_end);
+    append_pod(out, value.row_span.row_begin);
+    append_pod(out, value.row_span.row_end);
 }
 
 inline bool read_dataset_shard_summary(byte_reader *reader,
@@ -229,8 +241,8 @@ inline bool read_dataset_shard_summary(byte_reader *reader,
         && read_pod(reader, &out->shard_id, error, "shard_id")
         && read_pod(reader, &out->partition_begin, error, "shard_partition_begin")
         && read_pod(reader, &out->partition_end, error, "shard_partition_end")
-        && read_pod(reader, &out->row_begin, error, "shard_row_begin")
-        && read_pod(reader, &out->row_end, error, "shard_row_end");
+        && read_pod(reader, &out->row_span.row_begin, error, "shard_row_begin")
+        && read_pod(reader, &out->row_span.row_end, error, "shard_row_end");
 }
 
 inline void append_dataset_summary(std::vector<std::uint8_t> *out,
@@ -346,8 +358,8 @@ inline bool read_dataset_summary(byte_reader *reader,
 inline void append_execution_partition_metadata(std::vector<std::uint8_t> *out,
                                                 const execution_partition_metadata &value) {
     append_pod(out, value.partition_id);
-    append_pod(out, value.row_begin);
-    append_pod(out, value.row_end);
+    append_pod(out, value.row_span.row_begin);
+    append_pod(out, value.row_span.row_end);
     append_pod(out, value.rows);
     append_pod(out, value.nnz);
     append_pod(out, value.aux);
@@ -368,8 +380,8 @@ inline bool read_execution_partition_metadata(byte_reader *reader,
                                               std::string *error) {
     return out != nullptr
         && read_pod(reader, &out->partition_id, error, "exec_partition_id")
-        && read_pod(reader, &out->row_begin, error, "exec_partition_row_begin")
-        && read_pod(reader, &out->row_end, error, "exec_partition_row_end")
+        && read_pod(reader, &out->row_span.row_begin, error, "exec_partition_row_begin")
+        && read_pod(reader, &out->row_span.row_end, error, "exec_partition_row_end")
         && read_pod(reader, &out->rows, error, "exec_partition_rows")
         && read_pod(reader, &out->nnz, error, "exec_partition_nnz")
         && read_pod(reader, &out->aux, error, "exec_partition_aux")
@@ -390,8 +402,8 @@ inline void append_execution_shard_metadata(std::vector<std::uint8_t> *out,
     append_pod(out, value.shard_id);
     append_pod(out, value.partition_begin);
     append_pod(out, value.partition_end);
-    append_pod(out, value.row_begin);
-    append_pod(out, value.row_end);
+    append_pod(out, value.row_span.row_begin);
+    append_pod(out, value.row_span.row_end);
     append_pod(out, value.execution_format);
     append_pod(out, value.blocked_ell_block_size);
     append_pod(out, value.bucketed_partition_count);
@@ -411,8 +423,8 @@ inline bool read_execution_shard_metadata(byte_reader *reader,
         && read_pod(reader, &out->shard_id, error, "exec_shard_id")
         && read_pod(reader, &out->partition_begin, error, "exec_shard_partition_begin")
         && read_pod(reader, &out->partition_end, error, "exec_shard_partition_end")
-        && read_pod(reader, &out->row_begin, error, "exec_shard_row_begin")
-        && read_pod(reader, &out->row_end, error, "exec_shard_row_end")
+        && read_pod(reader, &out->row_span.row_begin, error, "exec_shard_row_begin")
+        && read_pod(reader, &out->row_span.row_end, error, "exec_shard_row_end")
         && read_pod(reader, &out->execution_format, error, "exec_shard_format")
         && read_pod(reader, &out->blocked_ell_block_size, error, "exec_shard_block_size")
         && read_pod(reader, &out->bucketed_partition_count, error, "exec_shard_bucketed_partition_count")
@@ -433,12 +445,12 @@ inline void append_runtime_service_metadata(std::vector<std::uint8_t> *out,
     append_pod(out, value.remote_pack_delivery);
     append_pod(out, value.single_reader_coordinator);
     append_pod(out, value.maintenance_lock_blocks_overwrite);
-    append_pod(out, value.canonical_generation);
-    append_pod(out, value.execution_plan_generation);
-    append_pod(out, value.pack_generation);
-    append_pod(out, value.service_epoch);
-    append_pod(out, value.active_read_generation);
-    append_pod(out, value.staged_write_generation);
+    append_pod(out, value.runtime_generation.generation.canonical_generation);
+    append_pod(out, value.runtime_generation.generation.execution_plan_generation);
+    append_pod(out, value.runtime_generation.generation.pack_generation);
+    append_pod(out, value.runtime_generation.generation.service_epoch);
+    append_pod(out, value.runtime_generation.active_read_generation);
+    append_pod(out, value.runtime_generation.staged_write_generation);
 }
 
 inline bool read_runtime_service_metadata(byte_reader *reader,
@@ -451,12 +463,12 @@ inline bool read_runtime_service_metadata(byte_reader *reader,
         && read_pod(reader, &out->remote_pack_delivery, error, "runtime_remote_pack_delivery")
         && read_pod(reader, &out->single_reader_coordinator, error, "runtime_single_reader_coordinator")
         && read_pod(reader, &out->maintenance_lock_blocks_overwrite, error, "runtime_maintenance_lock_blocks_overwrite")
-        && read_pod(reader, &out->canonical_generation, error, "runtime_canonical_generation")
-        && read_pod(reader, &out->execution_plan_generation, error, "runtime_execution_plan_generation")
-        && read_pod(reader, &out->pack_generation, error, "runtime_pack_generation")
-        && read_pod(reader, &out->service_epoch, error, "runtime_service_epoch")
-        && read_pod(reader, &out->active_read_generation, error, "runtime_active_read_generation")
-        && read_pod(reader, &out->staged_write_generation, error, "runtime_staged_write_generation");
+        && read_pod(reader, &out->runtime_generation.generation.canonical_generation, error, "runtime_canonical_generation")
+        && read_pod(reader, &out->runtime_generation.generation.execution_plan_generation, error, "runtime_execution_plan_generation")
+        && read_pod(reader, &out->runtime_generation.generation.pack_generation, error, "runtime_pack_generation")
+        && read_pod(reader, &out->runtime_generation.generation.service_epoch, error, "runtime_service_epoch")
+        && read_pod(reader, &out->runtime_generation.active_read_generation, error, "runtime_active_read_generation")
+        && read_pod(reader, &out->runtime_generation.staged_write_generation, error, "runtime_staged_write_generation");
 }
 
 inline bool serialize_global_metadata_snapshot_payload(const global_metadata_snapshot &snapshot,
@@ -496,10 +508,7 @@ inline std::uint64_t compute_snapshot_id(const global_metadata_snapshot &snapsho
 inline client_snapshot_ref build_client_snapshot_ref(const global_metadata_snapshot &snapshot) {
     client_snapshot_ref ref;
     ref.snapshot_id = compute_snapshot_id(snapshot);
-    ref.canonical_generation = snapshot.runtime_service.canonical_generation;
-    ref.execution_plan_generation = snapshot.runtime_service.execution_plan_generation;
-    ref.pack_generation = snapshot.runtime_service.pack_generation;
-    ref.service_epoch = snapshot.runtime_service.service_epoch;
+    ref.generation = generation_ref(snapshot.runtime_service);
     return ref;
 }
 
@@ -512,8 +521,7 @@ inline void copy_execution_partition_metadata(const dataset_summary &summary,
     for (std::size_t i = 0; i < count; ++i) {
         (*out)[i] = execution_partition_metadata{
             summary.partitions[i].partition_id,
-            summary.partitions[i].row_begin,
-            summary.partitions[i].row_end,
+            summary.partitions[i].row_span,
             summary.partitions[i].rows,
             summary.partitions[i].nnz,
             summary.partitions[i].aux,
@@ -549,8 +557,7 @@ inline void copy_execution_shard_metadata(const dataset_summary &summary,
             summary.shards[i].shard_id,
             summary.shards[i].partition_begin,
             summary.shards[i].partition_end,
-            summary.shards[i].row_begin,
-            summary.shards[i].row_end,
+            summary.shards[i].row_span,
             i < execution.shard_count && execution.shard_execution_formats != nullptr
                 ? execution.shard_execution_formats[i] : 0u,
             i < execution.shard_count && execution.shard_blocked_ell_block_sizes != nullptr
@@ -585,12 +592,16 @@ inline void copy_runtime_service_metadata(const cellshard::dataset_runtime_servi
         view.remote_pack_delivery,
         view.single_reader_coordinator,
         view.maintenance_lock_blocks_overwrite,
-        view.canonical_generation,
-        view.execution_plan_generation,
-        view.pack_generation,
-        view.service_epoch,
-        view.active_read_generation,
-        view.staged_write_generation
+        {
+            {
+                view.canonical_generation,
+                view.execution_plan_generation,
+                view.pack_generation,
+                view.service_epoch
+            },
+            view.active_read_generation,
+            view.staged_write_generation
+        }
     };
 }
 

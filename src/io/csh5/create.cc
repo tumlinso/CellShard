@@ -240,12 +240,12 @@ inline int create_dataset_blocked_ell_h5_impl(const char *filename,
                                             filename,
                                             layout,
                                             datasets,
-                                            "blocked_ell",
+                                            matrix_traits<sparse::blocked_ell>::matrix_format_name(),
                                             optimized_payload_only ? payload_layout_optimized_blocked_ell
                                                                    : payload_layout_shard_packed)) {
         goto done;
     }
-    payload = payload_root >= 0 ? create_group(payload_root, "blocked_ell") : (hid_t) -1;
+    payload = payload_root >= 0 ? create_group(payload_root, matrix_traits<sparse::blocked_ell>::matrix_format_name()) : (hid_t) -1;
     if (payload < 0) goto done;
 
     if (!write_common_matrix_tables(matrix, layout, partition_aux.data(), partition_axes.data())
@@ -417,11 +417,11 @@ int create_dataset_quantized_blocked_ell_h5(const char *filename,
                                             filename,
                                             layout,
                                             datasets,
-                                            "quantized_blocked_ell",
+                                            matrix_traits<sparse::quantized_blocked_ell>::matrix_format_name(),
                                             payload_layout_shard_packed)) {
         goto done;
     }
-    payload = payload_root >= 0 ? create_group(payload_root, "quantized_blocked_ell") : (hid_t) -1;
+    payload = payload_root >= 0 ? create_group(payload_root, matrix_traits<sparse::quantized_blocked_ell>::matrix_format_name()) : (hid_t) -1;
     if (payload < 0) goto done;
 
     if (!write_common_matrix_tables(matrix, layout, partition_aux.data(), partition_axes.data())
@@ -493,11 +493,11 @@ int create_dataset_sliced_ell_h5(const char *filename,
                                             filename,
                                             layout,
                                             datasets,
-                                            "sliced_ell",
+                                            matrix_traits<sparse::sliced_ell>::matrix_format_name(),
                                             payload_layout_optimized_sliced_ell)) {
         goto done;
     }
-    payload = payload_root >= 0 ? create_group(payload_root, "sliced_ell") : (hid_t) -1;
+    payload = payload_root >= 0 ? create_group(payload_root, matrix_traits<sparse::sliced_ell>::matrix_format_name()) : (hid_t) -1;
     if (payload < 0) goto done;
 
     if (!write_common_matrix_tables(matrix, layout, partition_aux.data(), partition_axes.data())

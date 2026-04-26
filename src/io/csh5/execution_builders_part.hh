@@ -1816,7 +1816,6 @@ inline int build_graph_bucketed_optimized_shard_from_parts(sparse::blocked_ell *
                                                            float *shard_fill_ratio_out,
                                                            std::uint64_t *shard_execution_bytes_out,
                                                            std::uint64_t *shard_bucketed_blocked_ell_bytes_out) {
-    static constexpr unsigned int block_size_candidates[] = { 4u, 8u, 16u, 32u };
     static constexpr std::uint32_t sampled_row_budget = 16384u;
     std::uint32_t *exec_to_canonical_cols = 0;
     std::uint32_t *canonical_to_exec_cols = 0;
@@ -1907,8 +1906,8 @@ inline int build_graph_bucketed_optimized_shard_from_parts(sparse::blocked_ell *
         if (!bucket::blocked_ell_from_coo_cuda_auto_bridge(&permuted_coo,
                                                            cols,
                                                            nullptr,
-                                                           block_size_candidates,
-                                                           (unsigned int) (sizeof(block_size_candidates) / sizeof(block_size_candidates[0])),
+                                                           blocked_ell_block_size_candidates,
+                                                           blocked_ell_block_size_candidate_count,
                                                            &optimized_part,
                                                            device,
                                                            &picked)) {

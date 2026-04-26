@@ -7,6 +7,9 @@
 #include "../../core/real.cuh"
 #include "../../runtime/storage/shard_storage.cuh"
 #include "../../runtime/layout/sharded.cuh"
+#include "../common/codec.hh"
+#include "../common/layout.hh"
+#include "../common/matrix_traits.hh"
 
 #include <cstdint>
 #include <cstdlib>
@@ -15,44 +18,6 @@ namespace cellshard {
 
 enum {
     dataset_h5_schema_version = 3u
-};
-
-// Codec families describe how one stored partition payload should be
-// interpreted after the lightweight dataset metadata has already been loaded.
-// Values 1 and 2 are reserved for unsupported legacy compressed `.csh5`
-// datasets; new forward `.csh5` output is Blocked-ELL-first.
-enum {
-    dataset_codec_family_none = 0u,
-    dataset_codec_family_standard_csr = 1u,
-    dataset_codec_family_quantized_csr = 2u,
-    dataset_codec_family_blocked_ell = 3u,
-    dataset_codec_family_sliced_ell = 4u,
-    dataset_codec_family_quantized_blocked_ell = 5u
-};
-
-enum {
-    dataset_execution_format_unknown = 0u,
-    // Reserved legacy value for unsupported compressed `.csh5` datasets.
-    dataset_execution_format_compressed = 1u,
-    dataset_execution_format_blocked_ell = 2u,
-    dataset_execution_format_mixed = 3u,
-    dataset_execution_format_bucketed_blocked_ell = 4u,
-    dataset_execution_format_sliced_ell = 5u,
-    dataset_execution_format_bucketed_sliced_ell = 6u,
-    dataset_execution_format_quantized_blocked_ell = 7u
-};
-
-enum {
-    dataset_quantized_decode_policy_unknown = 0u,
-    dataset_quantized_decode_policy_per_gene_affine = 1u,
-    dataset_quantized_decode_policy_column_scale_row_offset = 2u
-};
-
-enum {
-    dataset_codec_flag_direct_device_delivery = 1u << 0,
-    dataset_codec_flag_live_fused_decode = 1u << 1,
-    dataset_codec_quantized_decode_policy_shift = 8u,
-    dataset_codec_quantized_decode_policy_mask = 0xffu << dataset_codec_quantized_decode_policy_shift
 };
 
 enum {
@@ -77,17 +42,6 @@ struct dataset_codec_descriptor {
     std::uint32_t bits;
     std::uint32_t flags;
 };
-
-__host__ __device__ __forceinline__ std::uint32_t dataset_codec_quantized_decode_policy(std::uint32_t flags) {
-    return (flags & dataset_codec_quantized_decode_policy_mask) >> dataset_codec_quantized_decode_policy_shift;
-}
-
-__host__ __device__ __forceinline__ std::uint32_t set_dataset_codec_quantized_decode_policy(
-    std::uint32_t flags,
-    std::uint32_t policy) {
-    return (flags & ~dataset_codec_quantized_decode_policy_mask)
-        | ((policy << dataset_codec_quantized_decode_policy_shift) & dataset_codec_quantized_decode_policy_mask);
-}
 
 struct dataset_text_column_view {
     std::uint32_t count;
@@ -680,16 +634,10 @@ int warm_dataset_sliced_ell_h5_cache_range(const char *filename,
                                            unsigned long shard_end);
 int warm_dataset_sliced_ell_h5_cache(const char *filename,
                                      const char *cache_root);
-int warm_dataset_blocked_ell_h5_execution_cache_range(const char *filename,
-                                                     const char *cache_root,
-                                                     unsigned long shard_begin,
-                                                     unsigned long shard_end);
-int warm_dataset_blocked_ell_h5_execution_cache(const char *filename,
-                                               const char *cache_root);
-int fetch_dataset_blocked_ell_h5_execution_partition(bucketed_blocked_ell_partition *out,
-                                                    const sharded<sparse::blocked_ell> *m,
-                                                    const shard_storage *s,
-                                                    unsigned long partition_id);
+int fetch_dataset_blocked_ell_h5_pack_partition(bucketed_blocked_ell_partition *out,
+                                                const sharded<sparse::blocked_ell> *m,
+                                                const shard_storage *s,
+                                                unsigned long partition_id);
 int fetch_dataset_sliced_ell_h5_bucketed_partition(bucketed_sliced_ell_partition *out,
                                                    const sharded<sparse::sliced_ell> *m,
                                                    const shard_storage *s,

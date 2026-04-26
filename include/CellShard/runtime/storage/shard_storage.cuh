@@ -24,9 +24,8 @@ enum {
     shard_storage_cap_none = 0u,
     shard_storage_cap_canonical_read = 1u << 0u,
     shard_storage_cap_canonical_write = 1u << 1u,
-    shard_storage_cap_materialize_canonical_pack = 1u << 2u,
-    shard_storage_cap_materialize_execution_pack = 1u << 3u,
-    shard_storage_cap_read_published_pack = 1u << 4u
+    shard_storage_cap_materialize_pack = 1u << 2u,
+    shard_storage_cap_read_published_pack = 1u << 3u
 };
 
 // shard_storage owns the durable source path plus backend-specific state for

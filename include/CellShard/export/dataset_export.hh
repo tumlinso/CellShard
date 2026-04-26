@@ -1,5 +1,8 @@
 #pragma once
 
+#include "../io/common/generation.hh"
+#include "../io/common/partition.hh"
+
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -14,8 +17,7 @@ struct source_dataset_summary {
     std::string barcode_path;
     std::string metadata_path;
     std::uint32_t format = 0u;
-    std::uint64_t row_begin = 0u;
-    std::uint64_t row_end = 0u;
+    dataset_row_span row_span = {0u, 0u};
     std::uint64_t rows = 0u;
     std::uint64_t cols = 0u;
     std::uint64_t nnz = 0u;
@@ -32,8 +34,7 @@ struct dataset_codec_summary {
 
 struct dataset_partition_summary {
     std::uint64_t partition_id = 0u;
-    std::uint64_t row_begin = 0u;
-    std::uint64_t row_end = 0u;
+    dataset_row_span row_span = {0u, 0u};
     std::uint64_t rows = 0u;
     std::uint64_t nnz = 0u;
     std::uint64_t aux = 0u;
@@ -46,8 +47,7 @@ struct dataset_shard_summary {
     std::uint64_t shard_id = 0u;
     std::uint64_t partition_begin = 0u;
     std::uint64_t partition_end = 0u;
-    std::uint64_t row_begin = 0u;
-    std::uint64_t row_end = 0u;
+    dataset_row_span row_span = {0u, 0u};
 };
 
 struct observation_metadata_column {
@@ -85,8 +85,7 @@ struct dataset_attribute_summary {
 
 struct embedded_metadata_table {
     std::uint32_t dataset_index = 0u;
-    std::uint64_t row_begin = 0u;
-    std::uint64_t row_end = 0u;
+    dataset_row_span row_span = {0u, 0u};
     std::uint32_t rows = 0u;
     std::uint32_t cols = 0u;
     std::vector<std::string> column_names;
@@ -96,8 +95,7 @@ struct embedded_metadata_table {
 
 struct execution_partition_metadata {
     std::uint64_t partition_id = 0u;
-    std::uint64_t row_begin = 0u;
-    std::uint64_t row_end = 0u;
+    dataset_row_span row_span = {0u, 0u};
     std::uint64_t rows = 0u;
     std::uint64_t nnz = 0u;
     std::uint64_t aux = 0u;
@@ -117,8 +115,7 @@ struct execution_shard_metadata {
     std::uint64_t shard_id = 0u;
     std::uint64_t partition_begin = 0u;
     std::uint64_t partition_end = 0u;
-    std::uint64_t row_begin = 0u;
-    std::uint64_t row_end = 0u;
+    dataset_row_span row_span = {0u, 0u};
     std::uint32_t execution_format = 0u;
     std::uint32_t blocked_ell_block_size = 0u;
     std::uint32_t bucketed_partition_count = 0u;
@@ -138,40 +135,26 @@ struct runtime_service_metadata {
     std::uint32_t remote_pack_delivery = 0u;
     std::uint32_t single_reader_coordinator = 0u;
     std::uint32_t maintenance_lock_blocks_overwrite = 0u;
-    std::uint64_t canonical_generation = 0u;
-    std::uint64_t execution_plan_generation = 0u;
-    std::uint64_t pack_generation = 0u;
-    std::uint64_t service_epoch = 0u;
-    std::uint64_t active_read_generation = 0u;
-    std::uint64_t staged_write_generation = 0u;
+    dataset_runtime_generation runtime_generation = {{0u, 0u, 0u, 0u}, 0u, 0u};
 };
 
 struct client_snapshot_ref {
     std::uint64_t snapshot_id = 0u;
-    std::uint64_t canonical_generation = 0u;
-    std::uint64_t execution_plan_generation = 0u;
-    std::uint64_t pack_generation = 0u;
-    std::uint64_t service_epoch = 0u;
+    dataset_generation_ref generation = {0u, 0u, 0u, 0u};
 };
 
 struct pack_delivery_request {
     client_snapshot_ref request;
     std::uint64_t shard_id = 0u;
-    std::uint32_t prefer_execution_pack = 1u;
 };
 
 struct pack_delivery_descriptor {
     std::uint64_t snapshot_id = 0u;
     std::uint64_t shard_id = 0u;
-    std::uint64_t canonical_generation = 0u;
-    std::uint64_t execution_plan_generation = 0u;
-    std::uint64_t pack_generation = 0u;
-    std::uint64_t service_epoch = 0u;
+    dataset_generation_ref generation = {0u, 0u, 0u, 0u};
     std::uint32_t owner_node_id = 0u;
     std::uint32_t owner_rank_id = 0u;
     std::uint32_t execution_format = 0u;
-    std::uint32_t prefer_execution_pack = 0u;
-    std::string pack_kind;
     std::string relative_pack_path;
 };
 
@@ -231,14 +214,14 @@ struct derived_materialization_request {
     std::vector<derivation_group_span> row_groups;
     std::vector<derivation_group_span> feature_groups;
     bool materialize_dataset = true;
-    bool materialize_execution_pack = false;
+    bool materialize_pack = false;
 };
 
 struct derived_materialization_result {
     bool materialized_dataset = false;
-    bool materialized_execution_pack = false;
+    bool materialized_pack = false;
     std::string materialized_dataset_path;
-    std::string execution_cache_root;
+    std::string pack_cache_root;
     std::string derived_pack_name;
     std::uint64_t rows = 0u;
     std::uint64_t cols = 0u;

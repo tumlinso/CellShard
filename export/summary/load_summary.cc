@@ -326,8 +326,10 @@ bool load_dataset_summary(const char *path, dataset_summary *out, std::string *e
             i < barcode_paths.size() ? barcode_paths[i] : std::string(),
             i < metadata_paths.size() ? metadata_paths[i] : std::string(),
             i < dataset_formats.size() ? dataset_formats[i] : 0u,
-            i < dataset_row_begin.size() ? dataset_row_begin[i] : 0u,
-            i < dataset_row_end.size() ? dataset_row_end[i] : 0u,
+            {
+                i < dataset_row_begin.size() ? dataset_row_begin[i] : 0u,
+                i < dataset_row_end.size() ? dataset_row_end[i] : 0u
+            },
             i < dataset_rows.size() ? dataset_rows[i] : 0u,
             i < dataset_cols.size() ? dataset_cols[i] : 0u,
             i < dataset_nnz.size() ? dataset_nnz[i] : 0u
@@ -338,8 +340,10 @@ bool load_dataset_summary(const char *path, dataset_summary *out, std::string *e
     for (std::size_t i = 0; i < partition_rows.size(); ++i) {
         out->partitions.push_back(dataset_partition_summary{
             (std::uint64_t) i,
-            i < partition_row_offsets.size() ? partition_row_offsets[i] : 0u,
-            i + 1u < partition_row_offsets.size() ? partition_row_offsets[i + 1u] : 0u,
+            {
+                i < partition_row_offsets.size() ? partition_row_offsets[i] : 0u,
+                i + 1u < partition_row_offsets.size() ? partition_row_offsets[i + 1u] : 0u
+            },
             i < partition_rows.size() ? partition_rows[i] : 0u,
             i < partition_nnz.size() ? partition_nnz[i] : 0u,
             i < partition_aux.size() ? partition_aux[i] : 0u,
@@ -361,8 +365,7 @@ bool load_dataset_summary(const char *path, dataset_summary *out, std::string *e
                 : std::max<unsigned long>(
                     find_partition_index_for_row(partition_row_offsets, row_begin),
                     find_partition_end_for_row(partition_row_offsets, row_end))),
-            row_begin,
-            row_end
+            {row_begin, row_end}
         });
     }
 

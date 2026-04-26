@@ -239,6 +239,7 @@ endif()
 
 if(CELLSHARD_BUILD_EXPORT)
     add_library(cellshard_export STATIC
+        src/io/cshard/cshard.cc
         export/summary/load_summary.cc
         export/materialize/csr_export.cc
         export/snapshot/global_metadata_snapshot.cc
@@ -373,6 +374,26 @@ if(CELLSHARD_ENABLE_PYTHON)
     endif()
 endif()
 
+if(CELLSHARD_BUILD_APPS AND CELLSHARD_BUILD_EXPORT)
+    add_executable(cellshard
+        src/apps/cellshard_main.cc
+    )
+    target_include_directories(cellshard PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/export
+    )
+    target_link_libraries(cellshard PRIVATE
+        cellshard_export
+    )
+    set_target_properties(cellshard PROPERTIES
+        CXX_STANDARD 17
+        CXX_STANDARD_REQUIRED YES
+    )
+    cellshard_assert_no_torch_dependency(cellshard)
+endif()
+
 if(CELLSHARD_BUILD_TESTS AND CELLSHARD_BUILD_EXPORT)
     if(CELLSHARD_ENABLE_CUDA)
         set(cellshard_export_runtime_test_source tests/cellshard_export_runtime_test.cu)
@@ -402,6 +423,24 @@ if(CELLSHARD_BUILD_TESTS AND CELLSHARD_BUILD_EXPORT)
             CUDA_STANDARD_REQUIRED YES
         )
     endif()
+
+    add_executable(cellShardCshardTest
+        tests/cshard_v1_test.cc
+    )
+    target_include_directories(cellShardCshardTest PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/export
+    )
+    target_link_libraries(cellShardCshardTest PRIVATE
+        cellshard_export
+        ${HDF5_LIBRARIES}
+    )
+    set_target_properties(cellShardCshardTest PROPERTIES
+        CXX_STANDARD 17
+        CXX_STANDARD_REQUIRED YES
+    )
 endif()
 
 if(CELLSHARD_BUILD_TESTS)
@@ -464,6 +503,12 @@ endif()
 
 if(TARGET cellshardH5adExport)
     install(TARGETS cellshardH5adExport
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    )
+endif()
+
+if(TARGET cellshard)
+    install(TARGETS cellshard
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     )
 endif()

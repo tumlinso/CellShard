@@ -7,7 +7,7 @@ It is generated during source ingest before final `.csh5` assembly and exists to
 avoid rereading an expensive source matrix while preserving `.csh5` as the
 durable source of truth.
 
-CSPOOL is not the archive format. It is not the execution-pack format. It is
+CSPOOL is not the archive format. It is not the CSPACK format. It is
 the local ingest staging artifact.
 
 ## Non-goals
@@ -37,6 +37,11 @@ bounded ingest cache, not as a durable published interface.
 CSPOOL files may be emitted in either layout during ingest. A blocked or sliced
 spool artifact is valid as long as the ingest pipeline reoptimizes as needed
 before converting the staged payload into the canonical artifact.
+
+CSPOOL reuses the shared raw matrix payload vocabulary from
+`include/CellShard/io/common/raw_format.hh`. CSPOOL owns the `.cspool` file
+convention; the raw `disk_header` and `disk_format_*` layout tags are common
+IO vocabulary shared with CSPACK payloads and future CSHARD staging paths.
 
 ## Filename Convention
 
@@ -86,7 +91,8 @@ There is no separate metadata table in v1.
 
 ## Header
 
-The fixed header matches the current CellShard raw disk codec:
+The fixed header is the shared `disk_header` from
+`include/CellShard/io/common/raw_format.hh`:
 
 - `format` : `uint8`
 - `rows` : `uint32`

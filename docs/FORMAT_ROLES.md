@@ -52,7 +52,7 @@ Current CellShard archive format.
 
 ### Purpose
 
-`.csh5` is the current durable CellShard container. It may store canonical sparse data, metadata, preprocessing state, shard information, and enough information to regenerate execution packs.
+`.csh5` is the current durable CellShard container. It may store canonical sparse data, metadata, preprocessing state, shard information, and enough information to regenerate CSPACK files.
 
 It is useful because HDF5 is accessible and inspectable, but it should not be treated as the long-term hot execution format.
 
@@ -166,7 +166,7 @@ Execution artifact.
 
 ### Purpose
 
-`.cspack` is the GGUF-like execution-pack format for CellShard and Cellerator.
+`.cspack` is the GGUF-like CSPACK format for CellShard and Cellerator.
 
 It is generated from an archive or interchange source and consumed directly by Cellerator for low-overhead sparse GPU execution.
 
@@ -230,42 +230,83 @@ Cellerator hot paths should consume `.cspack`, not `.csh5` or `.h5ad`.
 
 ### Role
 
-Future native archive format.
+Experimental standby native archive format.
 
 ### Purpose
 
-`.cshard` is the possible future HDF5-free native archive format for CellShard.
+`.cshard` is the HDF5-free native archive format under active standby
+development for CellShard.
 
-It should eventually replace `.csh5` if HDF5 overhead becomes too limiting or if a fully controlled binary layout becomes necessary for reproducibility, portability, and performance.
+It is implemented enough to inspect, validate, convert from `.csh5`, and read
+row batches directly. It is not the production durable format yet and it does
+not make existing `.csh5` runtimes prefer `.cshard`.
 
-It is not the current priority.
+The v1 layout is offset-based and ELL-family native. Blocked-ELL is the default
+stored layout because current CellShard/Cellerator execution policy is
+Blocked-ELL-first. Sliced-ELL remains a native ELL-family layout. CSR is
+allowed only as an explicit compatibility/export fallback.
 
 ### Use `.cshard` for
 
-- Future native durable archives.
+- Experimental native durable archives.
 - HDF5-free canonical storage.
 - Generation-aware biological datasets.
 - Columnar observation and feature metadata.
 - Pack manifests.
 - Preprocessing provenance.
 - Regeneration of `.cspack`.
+- Direct archive inspection and sparse row reads without `.cspack`.
 
 ### Do not use `.cshard` for
 
-- The first public execution milestone.
+- Replacing `.csh5` in production paths yet.
 - Replacing `.cspack`.
-- Hot GPU execution unless explicitly materialized into execution sections.
-- Avoiding the immediate need to freeze `.cspack`.
+- Owning model weights or training checkpoints.
+- Hiding execution behind CSR as the conceptual default.
 
 ### Policy
 
-`.cshard` should wait until `.cspack` is stable.
+`.cshard` is standby v1. Keep `.csh5` as the current compatibility and durable
+archive source until `.cshard` has broader mileage.
 
-The correct development order is:
+`.cshard` may record external references, including future references to model
+artifacts, but it must not own model weights.
+
+The current development order is:
 
 ```text
-.csh5 compatibility -> .cspack execution -> .cshard native archive
+.csh5 compatibility -> .cspack execution cache -> .cshard standby native archive
 ```
+
+---
+
+## `.cellerator`
+
+### Role
+
+Cellerator-owned future model/checkpoint artifact.
+
+### Policy
+
+`.cellerator` belongs to Cellerator, not CellShard.
+
+CellShard may record external references to future `.cellerator` artifacts, but
+it must not define, write, own, or validate that model/checkpoint format. Do
+not write model weights, optimizer state, or training checkpoints into
+`.cshard` to approximate it.
+
+---
+
+## `.csbundle`
+
+### Role
+
+Reserved future bundle/distribution artifact.
+
+### Policy
+
+`.csbundle` does not exist yet. It is reserved for a future packaging role and
+is not implemented in this milestone.
 
 ---
 
@@ -277,7 +318,9 @@ The correct development order is:
 | `.csh5` | Current CellShard archive | No | Current support |
 | `.cspool` | Local ingest spool | No | Narrow local support |
 | `.cspack` | Execution artifact | Yes | Immediate priority |
-| `.cshard` | Future native archive | Maybe later | Defer |
+| `.cshard` | Experimental standby native archive | No | Read/convert standby |
+| `.cellerator` | Cellerator-owned model artifact | No | Outside CellShard |
+| `.csbundle` | Reserved bundle artifact | No | Future only |
 
 ---
 

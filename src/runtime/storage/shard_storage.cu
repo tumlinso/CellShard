@@ -11,13 +11,11 @@ inline std::uint32_t default_capabilities_for_role(std::uint32_t role) {
         case shard_storage_role_builder:
             return shard_storage_cap_canonical_read
                 | shard_storage_cap_canonical_write
-                | shard_storage_cap_materialize_canonical_pack
-                | shard_storage_cap_materialize_execution_pack
+                | shard_storage_cap_materialize_pack
                 | shard_storage_cap_read_published_pack;
         case shard_storage_role_owner_runtime:
             return shard_storage_cap_canonical_read
-                | shard_storage_cap_materialize_canonical_pack
-                | shard_storage_cap_materialize_execution_pack
+                | shard_storage_cap_materialize_pack
                 | shard_storage_cap_read_published_pack;
         case shard_storage_role_executor:
             return shard_storage_cap_read_published_pack;

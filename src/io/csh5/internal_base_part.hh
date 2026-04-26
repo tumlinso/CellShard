@@ -137,17 +137,8 @@ static const char payload_optimized_sliced_ell_group[] = "/payload/optimized_sli
 static const char payload_layout_shard_packed[] = "shard_packed";
 static const char payload_layout_optimized_blocked_ell[] = "optimized_bucketed_blocked_ell";
 static const char payload_layout_optimized_sliced_ell[] = "optimized_bucketed_sliced_ell";
-static const unsigned char execution_pack_magic[8] = { 'C', 'S', 'E', 'P', 'A', 'C', 'K', '1' };
+static const unsigned char cspack_magic[8] = { 'C', 'S', 'P', 'A', 'C', 'K', '0', '1' };
 static const std::uint32_t dataset_cache_schema_version = 1u;
-static const std::uint64_t shard_pack_payload_alignment = 4096u;
-
-enum {
-    dataset_matrix_family_none = 0u,
-    dataset_matrix_family_blocked_ell = 1u,
-    dataset_matrix_family_optimized_blocked_ell = 2u,
-    dataset_matrix_family_sliced_ell = 3u,
-    dataset_matrix_family_quantized_blocked_ell = 4u
-};
 
 enum {
     dataset_cache_shard_missing = 0u,

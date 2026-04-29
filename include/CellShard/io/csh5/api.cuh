@@ -1,8 +1,14 @@
 #pragma once
 
+#ifndef CELLSHARD_ENABLE_CELLERATOR_QUANTIZED
+#define CELLSHARD_ENABLE_CELLERATOR_QUANTIZED 1
+#endif
+
 #include "../../formats/compressed.cuh"
 #include "../../formats/blocked_ell.cuh"
+#if CELLSHARD_ENABLE_CELLERATOR_QUANTIZED
 #include "../../formats/quantized_blocked_ell.cuh"
+#endif
 #include "../../formats/sliced_ell.cuh"
 #include "../../core/real.cuh"
 #include "../../runtime/storage/shard_storage.cuh"
@@ -10,6 +16,7 @@
 #include "../common/codec.hh"
 #include "../common/layout.hh"
 #include "../common/matrix_traits.hh"
+#include "../multi_assay.hh"
 
 #include <cstdint>
 #include <cstdlib>
@@ -172,6 +179,7 @@ struct dataset_preprocess_view {
     std::uint32_t normalized_log1p_metrics;
     std::uint32_t hvg_available;
     std::uint32_t mark_mito_from_feature_names;
+    std::uint32_t qc_group_count;
 
     std::uint64_t rows;
     std::uint32_t cols;
@@ -195,12 +203,16 @@ struct dataset_preprocess_view {
     const float *cell_max_counts;
     const std::uint32_t *cell_detected_genes;
     const std::uint8_t *cell_keep;
+    dataset_text_column_view qc_group_names;
+    const float *cell_group_counts;
+    const float *cell_group_pct;
 
     const float *gene_sum;
     const float *gene_sq_sum;
     const float *gene_detected_cells;
     const std::uint8_t *gene_keep;
     const std::uint8_t *gene_flags;
+    const std::uint32_t *feature_group_masks;
 };
 
 struct dataset_layout_view {
@@ -221,6 +233,21 @@ struct dataset_layout_view {
 
     const dataset_codec_descriptor *codecs;
     std::uint32_t num_codecs;
+};
+
+struct dataset_assay_archive_view {
+    const char *assay_id;
+    dataset_assay_semantics semantics;
+    dataset_assay_row_map_view row_map;
+    const dataset_layout_view *layout;
+    const dataset_feature_metadata_view *feature_metadata;
+};
+
+struct dataset_multi_assay_archive_view {
+    std::uint64_t global_observation_count;
+    std::uint32_t pairing;
+    std::uint32_t assay_count;
+    const dataset_assay_archive_view *assays;
 };
 
 struct dataset_execution_view {
@@ -473,10 +500,12 @@ int create_dataset_blocked_ell_h5(const char *filename,
                                  const dataset_layout_view *layout,
                                  const dataset_dataset_table_view *datasets,
                                  const dataset_provenance_view *provenance);
+#if CELLSHARD_ENABLE_CELLERATOR_QUANTIZED
 int create_dataset_quantized_blocked_ell_h5(const char *filename,
                                             const dataset_layout_view *layout,
                                             const dataset_dataset_table_view *datasets,
                                             const dataset_provenance_view *provenance);
+#endif
 int create_dataset_sliced_ell_h5(const char *filename,
                                  const dataset_layout_view *layout,
                                  const dataset_dataset_table_view *datasets,
@@ -564,15 +593,29 @@ int bind_dataset_h5_owner_runtime(shard_storage *s, const char *path);
 int append_blocked_ell_partition_h5(const char *filename,
                                unsigned long partition_id,
                                const sparse::blocked_ell *part);
+#if CELLSHARD_ENABLE_CELLERATOR_QUANTIZED
 int append_quantized_blocked_ell_partition_h5(const char *filename,
                                               unsigned long partition_id,
                                               const sparse::quantized_blocked_ell *part);
+#endif
 int append_sliced_ell_partition_h5(const char *filename,
                                    unsigned long partition_id,
                                    const bucketed_sliced_ell_partition *part);
 int append_bucketed_blocked_ell_shard_h5(const char *filename,
                                          unsigned long shard_id,
                                          const bucketed_blocked_ell_shard *shard);
+int serialize_bucketed_blocked_ell_shard_blob(const bucketed_blocked_ell_shard *shard,
+                                              unsigned char **data_out,
+                                              std::size_t *bytes_out);
+int deserialize_bucketed_blocked_ell_shard_blob(const unsigned char *data,
+                                                std::size_t bytes,
+                                                bucketed_blocked_ell_shard *shard);
+int serialize_bucketed_sliced_ell_shard_blob(const bucketed_sliced_ell_shard *shard,
+                                             unsigned char **data_out,
+                                             std::size_t *bytes_out);
+int deserialize_bucketed_sliced_ell_shard_blob(const unsigned char *data,
+                                               std::size_t bytes,
+                                               bucketed_sliced_ell_shard *shard);
 
 // Header load binds a lazy shard_storage backend; fetch/prefetch calls are the
 // points that actually materialize partition payloads or populate local caches.
@@ -592,9 +635,11 @@ int invalidate_dataset_h5_cache(shard_storage *s);
 int load_dataset_blocked_ell_h5_header(const char *filename,
                                       sharded<sparse::blocked_ell> *m,
                                       shard_storage *s);
+#if CELLSHARD_ENABLE_CELLERATOR_QUANTIZED
 int load_dataset_quantized_blocked_ell_h5_header(const char *filename,
                                                  sharded<sparse::quantized_blocked_ell> *m,
                                                  shard_storage *s);
+#endif
 int load_dataset_sliced_ell_h5_header(const char *filename,
                                       sharded<sparse::sliced_ell> *m,
                                       shard_storage *s);
@@ -604,12 +649,14 @@ int prefetch_dataset_blocked_ell_h5_partition_cache(const sharded<sparse::blocke
 int prefetch_dataset_blocked_ell_h5_shard_cache(const sharded<sparse::blocked_ell> *m,
                                                shard_storage *s,
                                                unsigned long shard_id);
+#if CELLSHARD_ENABLE_CELLERATOR_QUANTIZED
 int prefetch_dataset_quantized_blocked_ell_h5_partition_cache(const sharded<sparse::quantized_blocked_ell> *m,
                                                               shard_storage *s,
                                                               unsigned long partition_id);
 int prefetch_dataset_quantized_blocked_ell_h5_shard_cache(const sharded<sparse::quantized_blocked_ell> *m,
                                                           shard_storage *s,
                                                           unsigned long shard_id);
+#endif
 int prefetch_dataset_sliced_ell_h5_partition_cache(const sharded<sparse::sliced_ell> *m,
                                                    shard_storage *s,
                                                    unsigned long partition_id);
@@ -622,12 +669,14 @@ int warm_dataset_blocked_ell_h5_cache_range(const char *filename,
                                            unsigned long shard_end);
 int warm_dataset_blocked_ell_h5_cache(const char *filename,
                                      const char *cache_root);
+#if CELLSHARD_ENABLE_CELLERATOR_QUANTIZED
 int warm_dataset_quantized_blocked_ell_h5_cache_range(const char *filename,
                                                       const char *cache_root,
                                                       unsigned long shard_begin,
                                                       unsigned long shard_end);
 int warm_dataset_quantized_blocked_ell_h5_cache(const char *filename,
                                                 const char *cache_root);
+#endif
 int warm_dataset_sliced_ell_h5_cache_range(const char *filename,
                                            const char *cache_root,
                                            unsigned long shard_begin,
@@ -660,12 +709,14 @@ int fetch_dataset_blocked_ell_h5_partition(sharded<sparse::blocked_ell> *m,
 int fetch_dataset_blocked_ell_h5_shard(sharded<sparse::blocked_ell> *m,
                                       const shard_storage *s,
                                       unsigned long shard_id);
+#if CELLSHARD_ENABLE_CELLERATOR_QUANTIZED
 int fetch_dataset_quantized_blocked_ell_h5_partition(sharded<sparse::quantized_blocked_ell> *m,
                                                      const shard_storage *s,
                                                      unsigned long partition_id);
 int fetch_dataset_quantized_blocked_ell_h5_shard(sharded<sparse::quantized_blocked_ell> *m,
                                                  const shard_storage *s,
                                                  unsigned long shard_id);
+#endif
 int fetch_dataset_sliced_ell_h5_partition(sharded<sparse::sliced_ell> *m,
                                           const shard_storage *s,
                                           unsigned long partition_id);
@@ -699,6 +750,7 @@ inline int prefetch_dataset_blocked_ell_h5_shard_to_cache(const sharded<sparse::
     return prefetch_dataset_blocked_ell_h5_shard_cache(m, const_cast<shard_storage *>(s), shard_id);
 }
 
+#if CELLSHARD_ENABLE_CELLERATOR_QUANTIZED
 inline int prefetch_dataset_quantized_blocked_ell_h5_partition_to_cache(const sharded<sparse::quantized_blocked_ell> *m,
                                                                         const shard_storage *s,
                                                                         unsigned long partition_id) {
@@ -710,5 +762,6 @@ inline int prefetch_dataset_quantized_blocked_ell_h5_shard_to_cache(const sharde
                                                                     unsigned long shard_id) {
     return prefetch_dataset_quantized_blocked_ell_h5_shard_cache(m, const_cast<shard_storage *>(s), shard_id);
 }
+#endif
 
 } // namespace cellshard

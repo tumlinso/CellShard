@@ -41,13 +41,37 @@ include(CMakePackageConfigHelpers)
 set(CELLSHARD_VERSION 0.1.0)
 
 option(CELLSHARD_BUILD_EXPORT "Build the CellShard export helpers." ON)
+option(CELLSHARD_BUILD_INGEST "Build the optional CellShard dataset ingest headers and checks." OFF)
 option(CELLSHARD_ENABLE_PYTHON "Build the optional CellShard Python bindings and H5AD export app." OFF)
 option(CELLSHARD_BUILD_APPS "Build optional CellShard applications." ON)
 option(CELLSHARD_BUILD_TESTS "Build CellShard-local test targets." OFF)
 option(CELLSHARD_ENABLE_CUDA_LINEINFO "Emit CUDA line mapping for Nsight profiling." OFF)
+option(CELLSHARD_ENABLE_CELLERATOR_QUANTIZED "Build quantized storage plumbing against Cellerator's quantized format ABI." ON)
+option(CELLSHARD_INSTALL_PREPROCESS "Build and install CellShardPreprocess as a separate downstream package." OFF)
+set(CELLSHARD_CELLERATOR_REPOSITORY "git@github.com:tumlinso/Cellerator.git" CACHE STRING
+    "Cellerator repository used for standalone quantized format headers.")
+set(CELLSHARD_CELLERATOR_TAG "main" CACHE STRING
+    "Cellerator git tag or branch used for standalone quantized format headers.")
+set(CELLSHARD_CELLERATOR_SOURCE_DIR "" CACHE PATH
+    "Local Cellerator source checkout used for standalone quantized format headers.")
+set(CELLSHARD_PREPROCESS_REPOSITORY "git@github.com:tumlinso/CellShardPreprocess.git" CACHE STRING
+    "CellShardPreprocess repository used when CELLSHARD_INSTALL_PREPROCESS is enabled and no local source checkout is found.")
+set(CELLSHARD_PREPROCESS_TAG "main" CACHE STRING
+    "CellShardPreprocess git tag or branch used when CELLSHARD_INSTALL_PREPROCESS is enabled and no local source checkout is found.")
+set(CELLSHARD_PREPROCESS_SOURCE_DIR "" CACHE PATH
+    "Local CellShardPreprocess source checkout to build and install with CellShard.")
 set(CELLSHARD_CUDA_MODE "generic" CACHE STRING
     "CellShard CUDA optimization mode: generic, native, or native-extreme")
 set_property(CACHE CELLSHARD_CUDA_MODE PROPERTY STRINGS generic native native-extreme)
+
+if(CELLSHARD_ENABLE_PYTHON)
+    set(CELLSHARD_INSTALL_PREPROCESS ON CACHE BOOL
+        "Python CellShard builds include CellShardPreprocess as cellshard.preprocess." FORCE)
+endif()
+if(CELLSHARD_INSTALL_PREPROCESS)
+    set(CELLSHARD_BUILD_INGEST ON CACHE BOOL
+        "CellShardPreprocess installation requires CellShard-owned ingest support." FORCE)
+endif()
 
 if(NOT CELLSHARD_CUDA_MODE STREQUAL "generic"
    AND NOT CELLSHARD_CUDA_MODE STREQUAL "native"
@@ -91,6 +115,13 @@ if(CELLSHARD_ENABLE_CUDA AND NOT TARGET CUDA::cudart)
     find_package(CUDAToolkit REQUIRED)
 endif()
 
+if(CELLSHARD_INSTALL_PREPROCESS AND NOT CELLSHARD_ENABLE_CUDA)
+    message(FATAL_ERROR "CELLSHARD_INSTALL_PREPROCESS requires CELLSHARD_ENABLE_CUDA=ON")
+endif()
+if(CELLSHARD_BUILD_INGEST AND NOT CELLSHARD_ENABLE_CUDA)
+    message(FATAL_ERROR "CELLSHARD_BUILD_INGEST requires CELLSHARD_ENABLE_CUDA=ON")
+endif()
+
 if(CELLSHARD_ENABLE_CUDA)
     find_library(CELLSHARD_NCCL_LIBRARY
         NAMES nccl
@@ -101,6 +132,45 @@ endif()
 
 if(NOT HDF5_FOUND)
     find_package(HDF5 REQUIRED COMPONENTS C)
+endif()
+
+if(CELLSHARD_ENABLE_CELLERATOR_QUANTIZED)
+    if(NOT TARGET Cellerator::quantized_formats)
+        if(CELLSHARD_CELLERATOR_SOURCE_DIR)
+            if(NOT EXISTS "${CELLSHARD_CELLERATOR_SOURCE_DIR}/include/Cellerator/quantized/quantized_blocked_ell.cuh")
+                message(FATAL_ERROR
+                    "CELLSHARD_CELLERATOR_SOURCE_DIR must point at a Cellerator checkout with "
+                    "include/Cellerator/quantized/quantized_blocked_ell.cuh")
+            endif()
+            set(CELLSHARD_CELLERATOR_QUANTIZED_INCLUDE_ROOT "${CELLSHARD_CELLERATOR_SOURCE_DIR}/include")
+            add_library(cellshard_cellerator_quantized_formats INTERFACE)
+            target_include_directories(cellshard_cellerator_quantized_formats INTERFACE
+                "${CELLSHARD_CELLERATOR_SOURCE_DIR}/include")
+        else()
+            include(FetchContent)
+            FetchContent_Declare(
+                cellshard_cellerator_quantized_source
+                GIT_REPOSITORY ${CELLSHARD_CELLERATOR_REPOSITORY}
+                GIT_TAG ${CELLSHARD_CELLERATOR_TAG}
+                GIT_SHALLOW TRUE
+            )
+            FetchContent_GetProperties(cellshard_cellerator_quantized_source)
+            if(NOT cellshard_cellerator_quantized_source_POPULATED)
+                FetchContent_Populate(cellshard_cellerator_quantized_source)
+            endif()
+            set(CELLSHARD_CELLERATOR_QUANTIZED_INCLUDE_ROOT "${cellshard_cellerator_quantized_source_SOURCE_DIR}/include")
+            add_library(cellshard_cellerator_quantized_formats INTERFACE)
+            target_include_directories(cellshard_cellerator_quantized_formats INTERFACE
+                "${cellshard_cellerator_quantized_source_SOURCE_DIR}/include")
+        endif()
+        target_compile_features(cellshard_cellerator_quantized_formats INTERFACE cxx_std_17)
+        if(TARGET CUDA::cudart)
+            target_link_libraries(cellshard_cellerator_quantized_formats INTERFACE CUDA::cudart)
+        endif()
+        add_library(Cellerator::quantized_formats ALIAS cellshard_cellerator_quantized_formats)
+    elseif(EXISTS "${CMAKE_SOURCE_DIR}/include/Cellerator/quantized/quantized_blocked_ell.cuh")
+        set(CELLSHARD_CELLERATOR_QUANTIZED_INCLUDE_ROOT "${CMAKE_SOURCE_DIR}/include")
+    endif()
 endif()
 
 function(cellshard_enable_perf target)
@@ -155,6 +225,16 @@ if(CELLSHARD_ENABLE_CUDA)
     target_compile_definitions(cellshard_headers INTERFACE CELLSHARD_ENABLE_CUDA=1)
 else()
     target_compile_definitions(cellshard_headers INTERFACE CELLSHARD_ENABLE_CUDA=0)
+endif()
+if(CELLSHARD_ENABLE_CELLERATOR_QUANTIZED)
+    target_compile_definitions(cellshard_headers INTERFACE CELLSHARD_ENABLE_CELLERATOR_QUANTIZED=1)
+    if(CELLSHARD_CELLERATOR_QUANTIZED_INCLUDE_ROOT)
+        target_include_directories(cellshard_headers INTERFACE
+            $<BUILD_INTERFACE:${CELLSHARD_CELLERATOR_QUANTIZED_INCLUDE_ROOT}>
+        )
+    endif()
+else()
+    target_compile_definitions(cellshard_headers INTERFACE CELLSHARD_ENABLE_CELLERATOR_QUANTIZED=0)
 endif()
 target_compile_definitions(cellshard_headers INTERFACE
     CELLSHARD_CUDA_MODE_GENERIC=${CELLSHARD_CUDA_MODE_GENERIC}
@@ -221,20 +301,56 @@ set(CELLSHARD_PACKAGE_COMPONENTS
 )
 
 if(CELLSHARD_ENABLE_CUDA)
-    add_library(cellshard_runtime INTERFACE)
+    add_library(cellshard_runtime STATIC
+        src/runtime/mask_groups.cu
+    )
     add_library(CellShard::runtime ALIAS cellshard_runtime)
     set_target_properties(cellshard_runtime PROPERTIES EXPORT_NAME runtime)
-    target_link_libraries(cellshard_runtime INTERFACE
+    target_include_directories(cellshard_runtime
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}
+            ${CMAKE_CURRENT_SOURCE_DIR}/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+    target_link_libraries(cellshard_runtime PUBLIC
         cellshard_inspect
         CUDA::cudart
     )
     if(CELLSHARD_NCCL_LIBRARY)
-        target_link_libraries(cellshard_runtime INTERFACE ${CELLSHARD_NCCL_LIBRARY})
+        target_link_libraries(cellshard_runtime PUBLIC ${CELLSHARD_NCCL_LIBRARY})
     endif()
-    target_compile_features(cellshard_runtime INTERFACE cxx_std_17)
+    target_compile_features(cellshard_runtime PUBLIC cxx_std_17)
+    set_target_properties(cellshard_runtime PROPERTIES
+        CXX_STANDARD 17
+        CXX_STANDARD_REQUIRED YES
+        CUDA_STANDARD 17
+        CUDA_STANDARD_REQUIRED YES
+    )
+    cellshard_enable_perf(cellshard_runtime)
     cellshard_assert_no_torch_dependency(cellshard_runtime)
     list(APPEND CELLSHARD_EXPORT_TARGETS cellshard_runtime)
+    list(APPEND CELLSHARD_INSTALL_TARGETS cellshard_runtime)
     list(APPEND CELLSHARD_PACKAGE_COMPONENTS runtime)
+endif()
+
+if(CELLSHARD_BUILD_INGEST)
+    if(NOT TARGET CellShard::runtime)
+        message(FATAL_ERROR "CELLSHARD_BUILD_INGEST requires the CellShard CUDA runtime target")
+    endif()
+    add_library(cellshard_ingest INTERFACE)
+    add_library(CellShard::ingest ALIAS cellshard_ingest)
+    set_target_properties(cellshard_ingest PROPERTIES EXPORT_NAME ingest)
+    target_link_libraries(cellshard_ingest INTERFACE
+        cellshard_runtime
+        ${HDF5_LIBRARIES}
+    )
+    target_include_directories(cellshard_ingest INTERFACE
+        ${HDF5_INCLUDE_DIRS}
+    )
+    target_compile_features(cellshard_ingest INTERFACE cxx_std_17)
+    cellshard_assert_no_torch_dependency(cellshard_ingest)
+    list(APPEND CELLSHARD_EXPORT_TARGETS cellshard_ingest)
+    list(APPEND CELLSHARD_PACKAGE_COMPONENTS ingest)
 endif()
 
 if(CELLSHARD_BUILD_EXPORT)
@@ -374,6 +490,72 @@ if(CELLSHARD_ENABLE_PYTHON)
     endif()
 endif()
 
+set(CELLSHARD_PREPROCESS_INSTALL_TARGETS "")
+if(CELLSHARD_INSTALL_PREPROCESS)
+    if(NOT TARGET CellShard::runtime)
+        message(FATAL_ERROR "CELLSHARD_INSTALL_PREPROCESS requires the CellShard CUDA runtime target")
+    endif()
+
+    if(NOT DEFINED CELLSHARD_PREPROCESS_BUILD_WORKBENCH)
+        set(CELLSHARD_PREPROCESS_BUILD_WORKBENCH OFF CACHE BOOL
+            "Build the optional CellShardPreprocess ncurses workbench stub." FORCE)
+    endif()
+    set(CELLSHARD_PREPROCESS_BUILD_TESTS OFF CACHE BOOL
+        "Do not build nested CellShardPreprocess tests from CellShard." FORCE)
+    set(CELLSHARD_PREPROCESS_INSTALL_RULES OFF CACHE BOOL
+        "CellShard owns nested CellShardPreprocess install rules." FORCE)
+
+    if(NOT TARGET CellShardPreprocess::runtime)
+        if(CELLSHARD_PREPROCESS_SOURCE_DIR)
+            if(NOT EXISTS "${CELLSHARD_PREPROCESS_SOURCE_DIR}/CMakeLists.txt")
+                message(FATAL_ERROR
+                    "CELLSHARD_PREPROCESS_SOURCE_DIR must point at a CellShardPreprocess checkout with CMakeLists.txt")
+            endif()
+            set(cellshard_preprocess_source_dir "${CELLSHARD_PREPROCESS_SOURCE_DIR}")
+        elseif(EXISTS "${CMAKE_CURRENT_LIST_DIR}/../CellShardPreprocess/CMakeLists.txt")
+            set(cellshard_preprocess_source_dir "${CMAKE_CURRENT_LIST_DIR}/../CellShardPreprocess")
+        elseif(EXISTS "${CMAKE_CURRENT_LIST_DIR}/extern/CellShardPreprocess/CMakeLists.txt")
+            set(cellshard_preprocess_source_dir "${CMAKE_CURRENT_LIST_DIR}/extern/CellShardPreprocess")
+        else()
+            include(FetchContent)
+            FetchContent_Declare(
+                cellshard_preprocess_source
+                GIT_REPOSITORY ${CELLSHARD_PREPROCESS_REPOSITORY}
+                GIT_TAG ${CELLSHARD_PREPROCESS_TAG}
+                GIT_SHALLOW TRUE
+            )
+            FetchContent_GetProperties(cellshard_preprocess_source)
+            if(NOT cellshard_preprocess_source_POPULATED)
+                FetchContent_Populate(cellshard_preprocess_source)
+            endif()
+            set(cellshard_preprocess_source_dir "${cellshard_preprocess_source_SOURCE_DIR}")
+        endif()
+        add_subdirectory(
+            "${cellshard_preprocess_source_dir}"
+            "${CMAKE_CURRENT_BINARY_DIR}/CellShardPreprocess"
+            EXCLUDE_FROM_ALL)
+    endif()
+
+    if(TARGET cellshard_preprocess_runtime)
+        list(APPEND CELLSHARD_PREPROCESS_INSTALL_TARGETS cellshard_preprocess_runtime)
+    endif()
+    if(TARGET cellshard_preprocess_preprocess)
+        list(APPEND CELLSHARD_PREPROCESS_INSTALL_TARGETS cellshard_preprocess_preprocess)
+    endif()
+    if(CELLSHARD_ENABLE_PYTHON)
+        set(cellshard_preprocess_python_init
+            "${cellshard_preprocess_source_dir}/python/cellshard/preprocess/__init__.py")
+        if(NOT EXISTS "${cellshard_preprocess_python_init}")
+            set(cellshard_preprocess_python_init
+                "${cellshard_preprocess_source_dir}/python/cellshard_preprocess/__init__.py")
+        endif()
+        if(NOT EXISTS "${cellshard_preprocess_python_init}")
+            message(FATAL_ERROR
+                "CellShard Python builds require a CellShardPreprocess Python package marker")
+        endif()
+    endif()
+endif()
+
 if(CELLSHARD_BUILD_APPS AND CELLSHARD_BUILD_EXPORT)
     add_executable(cellshard
         src/apps/cellshard_main.cc
@@ -424,6 +606,27 @@ if(CELLSHARD_BUILD_TESTS AND CELLSHARD_BUILD_EXPORT)
         )
     endif()
 
+    if(CELLSHARD_ENABLE_CUDA)
+        add_executable(cellShardMaskGroupsRuntimeTest
+            tests/mask_groups_runtime_test.cu
+        )
+        target_include_directories(cellShardMaskGroupsRuntimeTest PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}
+            ${CMAKE_CURRENT_SOURCE_DIR}/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+        )
+        target_link_libraries(cellShardMaskGroupsRuntimeTest PRIVATE
+            CellShard::runtime
+        )
+        set_target_properties(cellShardMaskGroupsRuntimeTest PROPERTIES
+            CXX_STANDARD 17
+            CXX_STANDARD_REQUIRED YES
+            CUDA_STANDARD 17
+            CUDA_STANDARD_REQUIRED YES
+        )
+        cellshard_enable_perf(cellShardMaskGroupsRuntimeTest)
+    endif()
+
     add_executable(cellShardCshardTest
         tests/cshard_v1_test.cc
     )
@@ -441,22 +644,65 @@ if(CELLSHARD_BUILD_TESTS AND CELLSHARD_BUILD_EXPORT)
         CXX_STANDARD 17
         CXX_STANDARD_REQUIRED YES
     )
+
+    if(CELLSHARD_BUILD_INGEST)
+        add_library(cellShardDatasetIngestCompileTest OBJECT
+            tests/dataset_ingest_compile_test.cu
+        )
+        target_link_libraries(cellShardDatasetIngestCompileTest PRIVATE CellShard::ingest)
+        target_include_directories(cellShardDatasetIngestCompileTest PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}
+            ${CMAKE_CURRENT_SOURCE_DIR}/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+            ${HDF5_INCLUDE_DIRS}
+        )
+        set_target_properties(cellShardDatasetIngestCompileTest PROPERTIES
+            CXX_STANDARD 17
+            CXX_STANDARD_REQUIRED YES
+            CUDA_STANDARD 17
+            CUDA_STANDARD_REQUIRED YES
+        )
+        cellshard_enable_perf(cellShardDatasetIngestCompileTest)
+    endif()
 endif()
 
 if(CELLSHARD_BUILD_TESTS)
     set(cellshard_package_test_root ${CMAKE_CURRENT_BINARY_DIR}/tests/package_consumer)
     set(cellshard_package_test_stage ${cellshard_package_test_root}/install)
     set(cellshard_package_test_build ${cellshard_package_test_root}/build)
+    set(cellshard_package_test_dependencies
+        cellshard_headers
+        ${CELLSHARD_INSTALL_TARGETS}
+        ${CELLSHARD_PREPROCESS_INSTALL_TARGETS}
+    )
+    if(TARGET _cellshard)
+        list(APPEND cellshard_package_test_dependencies _cellshard)
+    endif()
+    if(TARGET cellshardH5adExport)
+        list(APPEND cellshard_package_test_dependencies cellshardH5adExport)
+    endif()
+    if(TARGET cellshard)
+        list(APPEND cellshard_package_test_dependencies cellshard)
+    endif()
     if(CELLSHARD_ENABLE_CUDA)
         set(cellshard_package_test_expect_runtime ON)
     else()
         set(cellshard_package_test_expect_runtime OFF)
     endif()
+    if(CELLSHARD_INSTALL_PREPROCESS)
+        set(cellshard_package_test_expect_preprocess ON)
+    else()
+        set(cellshard_package_test_expect_preprocess OFF)
+    endif()
+    if(CELLSHARD_BUILD_INGEST)
+        set(cellshard_package_test_expect_ingest ON)
+    else()
+        set(cellshard_package_test_expect_ingest OFF)
+    endif()
 
     add_custom_target(cellShardInspectPackageTest
         DEPENDS
-            cellshard_headers
-            ${CELLSHARD_INSTALL_TARGETS}
+            ${cellshard_package_test_dependencies}
         COMMAND ${CMAKE_COMMAND} -E rm -rf ${cellshard_package_test_root}
         COMMAND ${CMAKE_COMMAND} -E make_directory ${cellshard_package_test_root}
         COMMAND ${CMAKE_COMMAND} --install ${CMAKE_BINARY_DIR} --prefix ${cellshard_package_test_stage}
@@ -465,6 +711,8 @@ if(CELLSHARD_BUILD_TESTS)
             -B ${cellshard_package_test_build}
             -DCMAKE_PREFIX_PATH=${cellshard_package_test_stage}
             -DCELLSHARD_EXPECT_RUNTIME=${cellshard_package_test_expect_runtime}
+            -DCELLSHARD_EXPECT_INGEST=${cellshard_package_test_expect_ingest}
+            -DCELLSHARD_EXPECT_PREPROCESS=${cellshard_package_test_expect_preprocess}
             -DCMAKE_CUDA_COMPILER=${CMAKE_CUDA_COMPILER}
             -DCMAKE_CUDA_HOST_COMPILER=${CMAKE_CUDA_HOST_COMPILER}
             -DCMAKE_CUDA_ARCHITECTURES=${CMAKE_CUDA_ARCHITECTURES}
@@ -484,9 +732,51 @@ install(TARGETS cellshard_headers
     EXPORT CellShardTargets
 )
 
-if(TARGET cellshard_runtime)
-    install(TARGETS cellshard_runtime
+if(TARGET cellshard_ingest)
+    install(TARGETS cellshard_ingest
         EXPORT CellShardTargets
+    )
+endif()
+
+if(CELLSHARD_INSTALL_PREPROCESS)
+    install(TARGETS
+        cellshard_preprocess_preprocess
+        cellshard_preprocess_runtime
+        EXPORT CellShardPreprocessTargets
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    )
+
+    install(DIRECTORY "${cellshard_preprocess_source_dir}/include/"
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+        FILES_MATCHING
+            PATTERN "*.hh"
+            PATTERN "*.cuh"
+    )
+
+    install(EXPORT CellShardPreprocessTargets
+        FILE CellShardPreprocessTargets.cmake
+        NAMESPACE CellShardPreprocess::
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/CellShardPreprocess
+    )
+
+    write_basic_package_version_file(
+        ${CMAKE_CURRENT_BINARY_DIR}/CellShardPreprocessConfigVersion.cmake
+        VERSION 0.1.0
+        COMPATIBILITY SameMajorVersion
+    )
+
+    configure_package_config_file(
+        ${cellshard_preprocess_source_dir}/cmake/CellShardPreprocessConfig.cmake.in
+        ${CMAKE_CURRENT_BINARY_DIR}/CellShardPreprocessConfig.cmake
+        INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/CellShardPreprocess
+    )
+
+    install(FILES
+        ${CMAKE_CURRENT_BINARY_DIR}/CellShardPreprocessConfig.cmake
+        ${CMAKE_CURRENT_BINARY_DIR}/CellShardPreprocessConfigVersion.cmake
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/CellShardPreprocess
     )
 endif()
 
@@ -499,6 +789,12 @@ if(TARGET _cellshard)
         python/cellshard/__init__.py
         DESTINATION cellshard
     )
+    if(CELLSHARD_INSTALL_PREPROCESS)
+        install(FILES
+            "${cellshard_preprocess_python_init}"
+            DESTINATION cellshard/preprocess
+        )
+    endif()
 endif()
 
 if(TARGET cellshardH5adExport)
@@ -516,9 +812,36 @@ endif()
 install(DIRECTORY include/
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     FILES_MATCHING
+        PATTERN "CellShard/ingest" EXCLUDE
         PATTERN "*.hh"
         PATTERN "*.cuh"
 )
+
+if(CELLSHARD_BUILD_INGEST)
+    install(DIRECTORY include/CellShard/ingest
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/CellShard
+        FILES_MATCHING
+            PATTERN "*.hh"
+            PATTERN "*.cuh"
+    )
+
+    install(DIRECTORY src/
+        DESTINATION src
+        FILES_MATCHING
+            PATTERN "*.hh"
+            PATTERN "*.cuh"
+    )
+endif()
+
+if(CELLSHARD_ENABLE_CELLERATOR_QUANTIZED)
+    if(NOT CELLSHARD_CELLERATOR_QUANTIZED_INCLUDE_ROOT)
+        message(FATAL_ERROR "Unable to locate Cellerator quantized format headers for install")
+    endif()
+    install(FILES
+        "${CELLSHARD_CELLERATOR_QUANTIZED_INCLUDE_ROOT}/Cellerator/quantized/quantized_blocked_ell.cuh"
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/Cellerator/quantized
+    )
+endif()
 
 install(EXPORT CellShardTargets
     FILE CellShardTargets.cmake

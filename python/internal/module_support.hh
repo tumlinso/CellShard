@@ -17,9 +17,11 @@
 
 #include <cstdio>
 #include <cstring>
+#include <cstdint>
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace py = pybind11;
@@ -52,6 +54,14 @@ inline py::array_t<float> copy_half_values(const __half *values, std::size_t cou
     py::array_t<float> out((py::ssize_t) count);
     float *dst = out.mutable_data();
     for (std::size_t i = 0; i < count; ++i) dst[i] = __half2float(values[i]);
+    return out;
+}
+
+inline std::vector<std::uint16_t> copy_storage_bits(const real::storage_t *values, std::size_t count) {
+    static_assert(sizeof(real::storage_t) == sizeof(std::uint16_t),
+                  "Python native CellShard storage export currently expects 16-bit storage_t");
+    std::vector<std::uint16_t> out(count);
+    if (count != 0u && values != nullptr) std::memcpy(out.data(), values, count * sizeof(std::uint16_t));
     return out;
 }
 
@@ -133,6 +143,278 @@ inline std::vector<std::uint64_t> normalize_row_indices(py::handle handle) {
     throw py::type_error("row indices must be a Python sequence, NumPy array, or torch tensor");
 }
 
+template<typename MatrixT>
+struct scoped_sharded_load {
+    cellshard::sharded<MatrixT> view;
+    cellshard::shard_storage storage;
+
+    scoped_sharded_load() {
+        cellshard::init(&view);
+        cellshard::init(&storage);
+    }
+
+    ~scoped_sharded_load() {
+        cellshard::clear(&storage);
+        cellshard::clear(&view);
+    }
+
+    scoped_sharded_load(const scoped_sharded_load &) = delete;
+    scoped_sharded_load &operator=(const scoped_sharded_load &) = delete;
+};
+
+struct blocked_ell_partition_export {
+    std::uint32_t rows = 0u;
+    std::uint32_t cols = 0u;
+    std::uint32_t nnz = 0u;
+    std::uint32_t block_size = 0u;
+    std::uint32_t ell_cols = 0u;
+    std::uint32_t row_block_count = 0u;
+    std::uint32_t ell_width_blocks = 0u;
+    std::vector<std::uint32_t> block_col_idx;
+    std::vector<std::uint16_t> values_storage;
+
+    py::array_t<std::uint32_t> block_col_idx_array() const {
+        py::array_t<std::uint32_t> out({(py::ssize_t) row_block_count, (py::ssize_t) ell_width_blocks});
+        if (!block_col_idx.empty()) std::memcpy(out.mutable_data(), block_col_idx.data(), block_col_idx.size() * sizeof(std::uint32_t));
+        return out;
+    }
+
+    py::array_t<std::uint16_t> values_storage_array() const {
+        py::array_t<std::uint16_t> out({(py::ssize_t) rows, (py::ssize_t) ell_cols});
+        if (!values_storage.empty()) std::memcpy(out.mutable_data(), values_storage.data(), values_storage.size() * sizeof(std::uint16_t));
+        return out;
+    }
+
+    py::array_t<float> values_float32() const {
+        py::array_t<float> out({(py::ssize_t) rows, (py::ssize_t) ell_cols});
+        float *dst = out.mutable_data();
+        for (std::size_t i = 0; i < values_storage.size(); ++i) {
+            real::storage_t stored;
+            std::memcpy(&stored, values_storage.data() + i, sizeof(stored));
+            dst[i] = __half2float(stored);
+        }
+        return out;
+    }
+
+    py::dict as_dict() const {
+        py::dict out;
+        out[py::str("format")] = py::str("blocked_ell");
+        out[py::str("rows")] = py::int_(rows);
+        out[py::str("cols")] = py::int_(cols);
+        out[py::str("nnz")] = py::int_(nnz);
+        out[py::str("block_size")] = py::int_(block_size);
+        out[py::str("ell_cols")] = py::int_(ell_cols);
+        out[py::str("row_block_count")] = py::int_(row_block_count);
+        out[py::str("ell_width_blocks")] = py::int_(ell_width_blocks);
+        out[py::str("block_col_idx")] = block_col_idx_array();
+        out[py::str("values_storage")] = values_storage_array();
+        return out;
+    }
+};
+
+struct sliced_ell_partition_export {
+    std::uint32_t rows = 0u;
+    std::uint32_t cols = 0u;
+    std::uint32_t nnz = 0u;
+    std::uint32_t slice_count = 0u;
+    std::uint32_t total_slots = 0u;
+    std::vector<std::uint32_t> slice_row_offsets;
+    std::vector<std::uint32_t> slice_widths;
+    std::vector<std::uint32_t> col_idx;
+    std::vector<std::uint16_t> values_storage;
+
+    py::array_t<std::uint32_t> slice_row_offsets_array() const { return copy_1d_array(slice_row_offsets); }
+    py::array_t<std::uint32_t> slice_widths_array() const { return copy_1d_array(slice_widths); }
+    py::array_t<std::uint32_t> col_idx_array() const { return copy_1d_array(col_idx); }
+    py::array_t<std::uint16_t> values_storage_array() const { return copy_1d_array(values_storage); }
+
+    py::array_t<float> values_float32() const {
+        py::array_t<float> out((py::ssize_t) values_storage.size());
+        float *dst = out.mutable_data();
+        for (std::size_t i = 0; i < values_storage.size(); ++i) {
+            real::storage_t stored;
+            std::memcpy(&stored, values_storage.data() + i, sizeof(stored));
+            dst[i] = __half2float(stored);
+        }
+        return out;
+    }
+
+    py::dict as_dict() const {
+        py::dict out;
+        out[py::str("format")] = py::str("sliced_ell");
+        out[py::str("rows")] = py::int_(rows);
+        out[py::str("cols")] = py::int_(cols);
+        out[py::str("nnz")] = py::int_(nnz);
+        out[py::str("slice_count")] = py::int_(slice_count);
+        out[py::str("total_slots")] = py::int_(total_slots);
+        out[py::str("slice_row_offsets")] = slice_row_offsets_array();
+        out[py::str("slice_widths")] = slice_widths_array();
+        out[py::str("col_idx")] = col_idx_array();
+        out[py::str("values_storage")] = values_storage_array();
+        return out;
+    }
+};
+
+inline blocked_ell_partition_export make_blocked_ell_partition_export(const cellshard::sparse::blocked_ell *partition) {
+    if (partition == nullptr) throw std::runtime_error("fetched blocked-ELL partition is null");
+    blocked_ell_partition_export out;
+    out.rows = partition->rows;
+    out.cols = partition->cols;
+    out.nnz = partition->nnz;
+    out.block_size = partition->block_size;
+    out.ell_cols = partition->ell_cols;
+    out.row_block_count = cellshard::sparse::row_block_count(partition);
+    out.ell_width_blocks = cellshard::sparse::ell_width_blocks(partition);
+    const std::size_t idx_count = (std::size_t) out.row_block_count * (std::size_t) out.ell_width_blocks;
+    const std::size_t value_count = (std::size_t) out.rows * (std::size_t) out.ell_cols;
+    out.block_col_idx.resize(idx_count);
+    if (idx_count != 0u && partition->blockColIdx != nullptr) {
+        std::memcpy(out.block_col_idx.data(), partition->blockColIdx, idx_count * sizeof(std::uint32_t));
+    }
+    out.values_storage = copy_storage_bits(partition->val, value_count);
+    return out;
+}
+
+inline sliced_ell_partition_export make_sliced_ell_partition_export(const cellshard::sparse::sliced_ell *partition) {
+    if (partition == nullptr) throw std::runtime_error("fetched sliced-ELL partition is null");
+    sliced_ell_partition_export out;
+    out.rows = partition->rows;
+    out.cols = partition->cols;
+    out.nnz = partition->nnz;
+    out.slice_count = partition->slice_count;
+    out.total_slots = cellshard::sparse::total_slots(partition);
+    out.slice_row_offsets.resize((std::size_t) out.slice_count + 1u);
+    out.slice_widths.resize(out.slice_count);
+    out.col_idx.resize(out.total_slots);
+    if (!out.slice_row_offsets.empty() && partition->slice_row_offsets != nullptr) {
+        std::memcpy(out.slice_row_offsets.data(), partition->slice_row_offsets, out.slice_row_offsets.size() * sizeof(std::uint32_t));
+    }
+    if (!out.slice_widths.empty() && partition->slice_widths != nullptr) {
+        std::memcpy(out.slice_widths.data(), partition->slice_widths, out.slice_widths.size() * sizeof(std::uint32_t));
+    }
+    if (!out.col_idx.empty() && partition->col_idx != nullptr) {
+        std::memcpy(out.col_idx.data(), partition->col_idx, out.col_idx.size() * sizeof(std::uint32_t));
+    }
+    out.values_storage = copy_storage_bits(partition->val, out.total_slots);
+    return out;
+}
+
+inline blocked_ell_partition_export fetch_blocked_ell_partition_export(const std::string &path,
+                                                                       unsigned long partition_id) {
+    scoped_sharded_load<cellshard::sparse::blocked_ell> loaded;
+    if (!cellshard::load_header(path.c_str(), &loaded.view, &loaded.storage)) {
+        throw std::runtime_error("failed to load blocked-ELL dataset header");
+    }
+    if (partition_id >= loaded.view.num_partitions) throw std::out_of_range("partition_id is out of range");
+    if (!cellshard::fetch_dataset_blocked_ell_h5_partition(&loaded.view, &loaded.storage, partition_id)) {
+        throw std::runtime_error("failed to fetch blocked-ELL partition");
+    }
+    return make_blocked_ell_partition_export(loaded.view.parts[partition_id]);
+}
+
+inline sliced_ell_partition_export fetch_sliced_ell_partition_export(const std::string &path,
+                                                                     unsigned long partition_id) {
+    scoped_sharded_load<cellshard::sparse::sliced_ell> loaded;
+    if (!cellshard::load_header(path.c_str(), &loaded.view, &loaded.storage)) {
+        throw std::runtime_error("failed to load sliced-ELL dataset header");
+    }
+    if (partition_id >= loaded.view.num_partitions) throw std::out_of_range("partition_id is out of range");
+    if (!cellshard::fetch_dataset_sliced_ell_h5_partition(&loaded.view, &loaded.storage, partition_id)) {
+        throw std::runtime_error("failed to fetch sliced-ELL partition");
+    }
+    return make_sliced_ell_partition_export(loaded.view.parts[partition_id]);
+}
+
+inline py::object fetch_native_partition_object(const std::string &path,
+                                                const cse::dataset_summary &info,
+                                                unsigned long partition_id) {
+    if (partition_id >= info.partitions.size()) throw std::out_of_range("partition_id is out of range");
+    warn_cpu_materialize_once("native partition fetch");
+    if (info.matrix_format == "blocked_ell") return py::cast(fetch_blocked_ell_partition_export(path, partition_id));
+    if (info.matrix_format == "sliced_ell") return py::cast(fetch_sliced_ell_partition_export(path, partition_id));
+    throw std::runtime_error(
+        "unsupported native matrix layout '" + info.matrix_format
+        + "' for partition fetch; use format=\"csr\" only if this dataset supports CSR export");
+}
+
+struct native_matrix_view {
+    std::string path;
+    cse::dataset_summary summary;
+
+    explicit native_matrix_view(std::string path_in)
+        : path(std::move(path_in)) {
+        std::string error;
+        if (!cse::load_dataset_summary(path.c_str(), &summary, &error)) throw std::runtime_error(error);
+    }
+
+    py::tuple shape() const {
+        return py::make_tuple((py::ssize_t) summary.rows, (py::ssize_t) summary.cols);
+    }
+
+    py::object partition(unsigned long partition_id) const {
+        return fetch_native_partition_object(path, summary, partition_id);
+    }
+
+    py::list shard(unsigned long shard_id) const {
+        if (shard_id >= summary.shards.size()) throw std::out_of_range("shard_id is out of range");
+        py::list out;
+        const cse::dataset_shard_summary &shard_info = summary.shards[shard_id];
+        for (std::uint64_t part = shard_info.partition_begin; part < shard_info.partition_end; ++part) {
+            out.append(partition((unsigned long) part));
+        }
+        return out;
+    }
+
+    cse::csr_matrix_export to_csr() const {
+        cse::csr_matrix_export out;
+        std::string error;
+        if (!cse::load_dataset_as_csr(path.c_str(), &out, &error)) throw std::runtime_error(error);
+        return out;
+    }
+
+    py::object to_scipy_csr() const {
+        return build_scipy_csr(to_csr());
+    }
+
+    py::object to_torch_sparse_csr() const {
+        return build_torch_sparse_csr(to_csr());
+    }
+};
+
+struct native_row_selection {
+    std::string path;
+    std::vector<std::uint64_t> row_indices;
+    cse::dataset_summary summary;
+
+    native_row_selection(std::string path_in, std::vector<std::uint64_t> rows_in)
+        : path(std::move(path_in)),
+          row_indices(std::move(rows_in)) {
+        std::string error;
+        if (!cse::load_dataset_summary(path.c_str(), &summary, &error)) throw std::runtime_error(error);
+    }
+
+    py::tuple shape() const {
+        return py::make_tuple((py::ssize_t) row_indices.size(), (py::ssize_t) summary.cols);
+    }
+
+    cse::csr_matrix_export to_csr() const {
+        cse::csr_matrix_export out;
+        std::string error;
+        if (!cse::load_dataset_rows_as_csr(path.c_str(), row_indices.data(), row_indices.size(), &out, &error)) {
+            throw std::runtime_error(error);
+        }
+        return out;
+    }
+
+    py::object to_scipy_csr() const {
+        return build_scipy_csr(to_csr());
+    }
+
+    py::object to_torch_sparse_csr() const {
+        return build_torch_sparse_csr(to_csr());
+    }
+};
+
 struct dataset_file_handle {
     std::string path;
 
@@ -188,50 +470,11 @@ struct dataset_file_handle {
         return out;
     }
 
-    py::dict materialize_partition(unsigned long partition_id) const {
+    py::object materialize_partition(unsigned long partition_id) const {
         cse::dataset_summary info;
         std::string error;
         if (!cse::load_dataset_summary(path.c_str(), &info, &error)) throw std::runtime_error(error);
-        if (partition_id >= info.partitions.size()) throw std::out_of_range("partition_id is out of range");
-        warn_cpu_materialize_once("partition materialization");
-
-        if (info.matrix_format == "blocked_ell") {
-            cellshard::sharded<cellshard::sparse::blocked_ell> view;
-            cellshard::shard_storage storage;
-            py::dict out;
-            cellshard::init(&view);
-            cellshard::init(&storage);
-            if (!cellshard::load_header(path.c_str(), &view, &storage)) throw std::runtime_error("failed to load blocked-ELL dataset header");
-            if (!cellshard::fetch_partition(&view, &storage, partition_id)) {
-                cellshard::clear(&storage);
-                cellshard::clear(&view);
-                throw std::runtime_error("failed to fetch blocked-ELL partition");
-            }
-            const cellshard::sparse::blocked_ell *partition = view.parts[partition_id];
-            const std::size_t row_blocks = cellshard::sparse::row_block_count(partition);
-            const std::size_t width = cellshard::sparse::ell_width_blocks(partition);
-            py::array_t<std::uint32_t> block_idx({(py::ssize_t) row_blocks, (py::ssize_t) width});
-            py::array_t<float> values({(py::ssize_t) partition->rows, (py::ssize_t) partition->ell_cols});
-            auto *block_dst = block_idx.mutable_data();
-            auto *value_dst = values.mutable_data();
-            for (std::size_t i = 0; i < row_blocks * width; ++i) block_dst[i] = partition->blockColIdx[i];
-            for (std::size_t i = 0; i < (std::size_t) partition->rows * (std::size_t) partition->ell_cols; ++i) {
-                value_dst[i] = __half2float(partition->val[i]);
-            }
-            out[py::str("format")] = py::str("blocked_ell");
-            out[py::str("rows")] = py::int_(partition->rows);
-            out[py::str("cols")] = py::int_(partition->cols);
-            out[py::str("nnz")] = py::int_(partition->nnz);
-            out[py::str("block_size")] = py::int_(partition->block_size);
-            out[py::str("ell_cols")] = py::int_(partition->ell_cols);
-            out[py::str("block_col_idx")] = block_idx;
-            out[py::str("values")] = values;
-            cellshard::clear(&storage);
-            cellshard::clear(&view);
-            return out;
-        }
-
-        throw std::runtime_error("unsupported matrix_format for partition materialization; supported native format is blocked_ell");
+        return fetch_native_partition_object(path, info, partition_id);
     }
 
     void write_h5ad(const std::string &output_path) const {

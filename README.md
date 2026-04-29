@@ -11,6 +11,7 @@ Its scope is narrow:
 - stage partitions and shards to GPU
 - build and serve CSPACK generations from the canonical container
 - provide the sparse conversion and layout helpers needed for that runtime
+- optionally stream source matrices and metadata into canonical CellShard containers
 
 CellShard is the storage, pack-delivery, and distributed execution base layer. It is not the analysis toolkit, model layer, or Torch integration layer. Those live on the Cellerator side.
 
@@ -22,12 +23,15 @@ CellShard is the storage, pack-delivery, and distributed execution base layer. I
 - CSPACK generation and delivery from canonical dataset containers
 - host fetch and drop operations
 - device upload and staging helpers
+- sparse row/feature masking and grouped row reductions for runtime-ready
+  Blocked-ELL, Sliced-ELL, and compressed fallback views
 - owner-hosted runtime metadata and distributed shard/CSPACK delivery
+- optional bounded source ingest when configured with `CELLSHARD_BUILD_INGEST=ON`
 - optional export helpers and optional Python bindings
 
 CellShard does not own:
 
-- preprocessing, filtering, normalization, and row/column selection workflows
+- biological preprocessing, normalization, and analytical row/column selection workflows
 - clustering, embedding, or neighbor analysis APIs
 - model training or inference
 - Torch or libtorch integration
@@ -52,6 +56,7 @@ Main source areas:
 - `include/CellShard/formats/`: concrete matrix layouts such as `compressed`, `blocked_ell`, `dense`, `triplet`, and `diagonal`
 - `include/CellShard/runtime/`: public sharded layout, host fetch/drop, device staging, storage dispatch, and local multi-GPU headers
 - `include/CellShard/io/`: public `.cspack`, `.csh5`, and standby `.cshard` entry headers
+- `include/CellShard/ingest/`: optional source ingest headers, enabled with `CELLSHARD_BUILD_INGEST=ON`
 - `include/CellShard/export/`: public dataset export and metadata snapshot APIs
 - `src/io/pack/`: the per-partition packed payload codec used inside shard `.cspack` cache files
 - `src/io/csh5/`: the `.csh5` container backend plus runtime cache materialization and fetch
@@ -70,6 +75,9 @@ Useful public/runtime waypoints:
 - `include/CellShard/runtime/host/sharded_host.cuh`: host-side fetch/drop and shard regrouping
 - `include/CellShard/runtime/device/sharded_device.cuh`: single-GPU upload and staging
 - `include/CellShard/runtime/distributed/distributed.cuh`: local multi-GPU shard placement and owner staging
+- `include/CellShard/runtime/mask_groups.cuh`: generic sparse row/feature
+  masks, grouped row reductions, fleet dispatch, and the explicit masked-layout
+  reoptimization hook
 - `include/CellShard/runtime/storage/disk.cuh`: `load_header()` dispatch for CellShard dataset files
 - `include/CellShard/io/csh5/api.cuh`, `src/io/csh5/create.cc`, `src/io/csh5/metadata.cc`, `src/io/csh5/finalize_preprocess.cc`, `src/io/csh5/write.cc`, and `src/io/csh5/runtime/`: the `.csh5` container backend plus shard `.cspack` runtime caches
 - `include/CellShard/io/cshard.hh` and `include/CellShard/io/cshard/spec.hh`: the standby `.cshard` archive API and fixed v1 POD records
@@ -88,11 +96,49 @@ Useful public/runtime waypoints:
 - `.cspool`: the local ingest-spool part format used before final `.csh5` assembly
 - `.cspack`: the generated execution artifact used for fast multithreaded fetch and delivery
 
+CellShard runtime masking is a generic sparse compute primitive, not a
+biology-specific QC policy. Biological group definitions such as mitochondrial,
+ribosomal, or hemoglobin feature rules are compiled by CellShardPreprocess and
+passed in as ordinary `uint32_t` feature-group masks. Runtime row masks and
+feature masks are independent: a feature can belong to one or more groups and
+still be excluded from a particular masked reduction or explicit rebuild.
+
+The explicit `manual_reoptimize_masked_sparse()` hook rebuilds a masked sparse
+view only when the caller asks for it and reports compact kept-row,
+kept-feature, live-nnz, layout, and byte metadata. Automatic reoptimization is
+intentionally not enabled yet; the public prediction placeholder records the
+future inputs: density change, row/feature drop ratios, layout padding change,
+estimated rebuild cost, and expected repeated-use count.
+
+## Python Binding Posture
+
+The Python package is native-first for `.csh5` datasets. `cellshard.open(path).matrix()`,
+`matrix(format="native")`, `rows(...)`, slicing, and `head(...)` return lazy
+native view objects by default. Those objects expose metadata and only fetch
+payloads when a partition, shard, or explicit conversion method is requested.
+
+Expensive interop is opt-in:
+
+- `format="csr"` returns `CsrMatrixExport`
+- `format="scipy"` builds a SciPy CSR matrix
+- `format="torch"` imports Torch and builds a `torch.sparse_csr_tensor`
+- `NativeMatrixView.to_csr()`, `.to_scipy_csr()`, and `.to_torch_sparse_csr()`
+  make full-matrix conversion explicit
+- `NativeRowSelection.to_csr()`, `.to_scipy_csr()`, and
+  `.to_torch_sparse_csr()` make selected-row conversion explicit
+
+Native partition fetch returns typed objects such as `BlockedEllPartition` and
+`SlicedEllPartition`. Stored values are exposed as raw 16-bit storage
+(`values_storage`) by default; call `values_float32()` when inspection really
+needs expanded floats.
+
 ## Ownership Boundary
 
-- Cellerator owns source ingest, QC, filtering, feature/cell selection, metadata alignment, and one-pass emission of an immutable canonical sparse matrix.
+- CellShard owns optional bounded source ingest, metadata capture, local `.cspool` staging, and one-pass emission of an immutable canonical sparse matrix when `CELLSHARD_BUILD_INGEST=ON`.
+- Cellerator owns ML compute, model workflows, Torch interop, trajectory logic, and reusable analysis kernels above CellShard storage/runtime surfaces.
+- CellShardPreprocess owns accelerated standard-biology preprocessing and requires CellShard ingest when installed through CellShard.
 - CellShard owns partitioning, sharding, blocking, bucketing, rebucketing, CSPACK generation, CSPACK delivery, and append-only canonical/runtime generation management.
-- Once Cellerator hands a canonical matrix to CellShard, row and column membership is immutable for that canonical generation.
+- Once ingest emits a canonical matrix to CellShard storage, row and column membership is immutable for that canonical generation.
 
 ## Storage Model
 
@@ -102,9 +148,13 @@ CellShard has two different storage roles, and the distinction matters:
 - `.cspack` is the execution-facing runtime format. CellShard builds versioned CSPACK generations from `.csh5` and serves those CSPACK artifacts to executor clients for low-latency multithreaded access.
 - `.cshard` is an experimental standby archive. It can be inspected,
   validated, converted from `.csh5`, and read directly by row range without
-  HDF5, but it does not replace `.csh5` in production paths yet.
+  HDF5, but it does not replace `.csh5` in production paths yet. Its
+  multi-assay path writes one global observation table, per-assay feature
+  tables, exact or partial observation-level row maps, and either CSR fallback
+  payloads or already optimized bucketed Blocked-ELL/Sliced-ELL assay-shard
+  blobs. CSPACK remains a coordinated single-assay execution artifact.
 
-In the current Cellerator ingest path there is also a bounded local ingest spool:
+When optional CellShard ingest is enabled, there is also a bounded local ingest spool:
 
 - ingest can spill intermediate `.cspool` partition artifacts to a machine-local SSD spool before the final `.csh5` is assembled
 - that spool is not an archive format and is not part of the steady-state runtime contract
@@ -172,7 +222,7 @@ Note on naming:
 For large or remote MTX ingest, the practical write-side workflow is:
 
 1. stream the source matrix once through bounded conversion windows
-2. finish all filtering and shape-changing decisions before CellShard emission
+2. finish all filtering and shape-changing decisions before canonical CellShard emission
 3. spill bounded `.cspool` part artifacts to machine-local spool storage
 4. assemble or append the final `.csh5` from that local spool
 5. build or refresh the active CSPACK generation on the machine that owns the `.csh5` source
@@ -186,8 +236,8 @@ The important rule is:
 
 - `.csh5` stays on the owner host as the durable canonical source
 - `.cspack` is the execution artifact that readers and executors consume
-- Cellerator does filtering and immutable canonical emission before CellShard
-  takes over
+- optional CellShard ingest finishes filtering and immutable canonical emission
+  before the runtime side takes over
 - CellShard owns pack preparation, delivery, append staging, and generation
   cutover
 

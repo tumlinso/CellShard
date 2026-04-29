@@ -1,4 +1,5 @@
 from ._cellshard import (
+    BlockedEllPartition,
     ClientSnapshotRef,
     CsrMatrixExport,
     CshardDescription,
@@ -17,10 +18,13 @@ from ._cellshard import (
     ExecutionPartitionMetadata,
     ExecutionShardMetadata,
     GlobalMetadataSnapshot,
+    NativeMatrixView,
+    NativeRowSelection,
     ObservationMetadataColumn,
     PackDeliveryDescriptor,
     PackDeliveryRequest,
     RuntimeServiceMetadata,
+    SlicedEllPartition,
     bootstrap_dataset_client,
     deserialize_global_metadata_snapshot,
     describe_pack_delivery,
@@ -57,6 +61,7 @@ def _is_stale_client_error(exc: Exception) -> bool:
 def _normalize_format(fmt: str) -> str:
     normalized = fmt.strip().lower().replace("-", "_")
     aliases = {
+        "native": "native",
         "torch": "torch",
         "torch_csr": "torch",
         "torch_sparse_csr": "torch",
@@ -67,7 +72,7 @@ def _normalize_format(fmt: str) -> str:
         "numpy_csr": "csr",
     }
     if normalized not in aliases:
-        raise ValueError("format must be one of: 'torch', 'scipy', or 'csr'")
+        raise ValueError("format must be one of: 'native', 'torch', 'scipy', or 'csr'")
     return aliases[normalized]
 
 
@@ -151,6 +156,8 @@ class Dataset:
 
     def _materialize(self, fmt: str):
         normalized = _normalize_format(fmt)
+        if normalized == "native":
+            return NativeMatrixView(self.path)
         if normalized == "torch":
             return self._with_refresh(lambda: self._client.materialize_torch_sparse_csr())
         if normalized == "scipy":
@@ -159,19 +166,23 @@ class Dataset:
 
     def _materialize_rows(self, row_indices, fmt: str):
         normalized = _normalize_format(fmt)
+        if normalized == "native":
+            return NativeRowSelection(self.path, row_indices)
         if normalized == "torch":
             return self._with_refresh(lambda: self._client.materialize_rows_torch_sparse_csr(row_indices))
         if normalized == "scipy":
             return self._with_refresh(lambda: self._client.materialize_rows_scipy_csr(row_indices))
         return self._with_refresh(lambda: self._client.materialize_rows_csr(row_indices))
 
-    def matrix(self, format: str = "torch"):
+    def matrix(self, format: str = "native"):
         return self._materialize(format)
 
-    def rows(self, row_indices, format: str = "torch"):
+    def rows(self, row_indices, format: str = "native"):
+        if isinstance(row_indices, int):
+            row_indices = [row_indices]
         return self._materialize_rows(row_indices, format)
 
-    def head(self, count: int, format: str = "torch"):
+    def head(self, count: int, format: str = "native"):
         if count < 0:
             raise ValueError("count must be non-negative")
         return self.rows(range(min(count, self.rows_count)), format=format)
@@ -185,8 +196,8 @@ class Dataset:
     def __getitem__(self, item):
         if isinstance(item, slice):
             start, stop, step = item.indices(self.rows_count)
-            return self.rows(range(start, stop, step), format="torch")
-        return self.rows(item, format="torch")
+            return self.rows(range(start, stop, step), format="native")
+        return self.rows(item, format="native")
 
 
 class CshardDataset:
@@ -230,6 +241,8 @@ class CshardDataset:
             return csr.to_torch_sparse_csr()
         if normalized == "scipy":
             return csr.to_scipy_csr()
+        if normalized == "native":
+            raise ValueError(".cshard row reads expose CSR interop only; use format='csr', 'scipy', or 'torch'")
         return csr
 
 
@@ -241,6 +254,7 @@ def open(path: str) -> Dataset:
 __all__ = [
     "CsrMatrixExport",
     "ClientSnapshotRef",
+    "BlockedEllPartition",
     "DatasetClient",
     "DatasetCodecSummary",
     "SourceDatasetSummary",
@@ -259,10 +273,13 @@ __all__ = [
     "ExecutionPartitionMetadata",
     "ExecutionShardMetadata",
     "GlobalMetadataSnapshot",
+    "NativeMatrixView",
+    "NativeRowSelection",
     "ObservationMetadataColumn",
     "PackDeliveryDescriptor",
     "PackDeliveryRequest",
     "RuntimeServiceMetadata",
+    "SlicedEllPartition",
     "bootstrap_dataset_client",
     "deserialize_global_metadata_snapshot",
     "describe_pack_delivery",

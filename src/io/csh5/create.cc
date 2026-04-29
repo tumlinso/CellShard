@@ -357,6 +357,7 @@ int create_dataset_optimized_blocked_ell_h5(const char *filename,
     return create_dataset_blocked_ell_h5_impl(filename, layout, datasets, provenance, 1);
 }
 
+#if CELLSHARD_ENABLE_CELLERATOR_QUANTIZED
 int create_dataset_quantized_blocked_ell_h5(const char *filename,
                                             const dataset_layout_view *layout,
                                             const dataset_dataset_table_view *datasets,
@@ -443,6 +444,7 @@ done:
     if (file >= 0) H5Fclose(file);
     return ok;
 }
+#endif
 
 int create_dataset_sliced_ell_h5(const char *filename,
                                  const dataset_layout_view *layout,

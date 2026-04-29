@@ -31,4 +31,5 @@ cmake.source-dir = "."
 wheel.packages = ["python/cellshard"]
 cmake.define.CELLSHARD_BUILD_EXPORT = "ON"
 cmake.define.CELLSHARD_ENABLE_PYTHON = "ON"
+cmake.define.CELLSHARD_INSTALL_PREPROCESS = "ON"
 cmake.define.CELLSHARD_BUILD_APPS = "OFF"

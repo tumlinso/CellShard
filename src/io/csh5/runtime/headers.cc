@@ -152,6 +152,7 @@ int load_dataset_blocked_ell_h5_header(const char *filename,
         });
 }
 
+#if CELLSHARD_ENABLE_CELLERATOR_QUANTIZED
 int load_dataset_quantized_blocked_ell_h5_header(const char *filename,
                                                  sharded<sparse::quantized_blocked_ell> *m,
                                                  shard_storage *s) {
@@ -168,6 +169,7 @@ int load_dataset_quantized_blocked_ell_h5_header(const char *filename,
     if (!ok) clear(m);
     return ok;
 }
+#endif
 
 int load_dataset_sliced_ell_h5_header(const char *filename,
                                       sharded<sparse::sliced_ell> *m,

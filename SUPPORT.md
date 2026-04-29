@@ -19,6 +19,10 @@ CellShard `0.1.x` is intentionally narrow.
   - `DatasetOwner`
   - `bootstrap_dataset_client`
   - `DatasetClient`
+  - `NativeMatrixView`
+  - `NativeRowSelection`
+  - `BlockedEllPartition`
+  - `SlicedEllPartition`
   - `load_dataset_summary`
   - `load_dataset_as_csr`
   - `load_dataset_rows_as_csr`
@@ -47,9 +51,14 @@ CellShard `0.1.x` is intentionally narrow.
 - CUDA-enabled release validation should use the same host/toolchain class as the main CellShard development environment.
 - Binary wheels are Linux-only.
 - The standalone `cellshardH5adExport` app is part of CMake builds, but wheel builds package the Python extension only.
+- Python `.csh5` access is native-first: `Dataset.matrix()`, `Dataset.rows(...)`,
+  slicing, and `head(...)` return lazy native views by default. CSR, SciPy, and
+  Torch are explicit conversion formats or explicit `to_*` calls.
+- Torch is optional interop, not the default representation and not a CellShard
+  build dependency.
 - `.csh5` is the canonical archive/container format. High-throughput repeated fetch is expected to run through generated shard `.cspack` cache files built from that container.
 - The normal runtime path is therefore `bind .csh5` -> `materialize cspack` -> `fetch from .cspack` -> `stage to GPU`, not repeated direct HDF5 payload reads as the final execution substrate.
-- Cellerator-side ingest may use bounded local `.cspool` part files, generally sliced-ELL but also blocked-ELL when appropriate, to avoid rereading an expensive source MTX before `.csh5` assembly. That spool is an implementation detail, not a supported archival surface.
+- Optional CellShard ingest may use bounded local `.cspool` part files, generally sliced-ELL but also blocked-ELL when appropriate, to avoid rereading an expensive source MTX before `.csh5` assembly. That spool is an implementation detail, not a supported archival surface.
 - Persisted parts and shards remain row-aligned. One cell is not split across parts or shards.
 
 ## Not Promised In `0.1.x`

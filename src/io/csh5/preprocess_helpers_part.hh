@@ -880,6 +880,7 @@ inline std::uint64_t estimate_cspack_bytes(const dataset_h5_state *state, unsign
             bytes += state->partition_bucketed_blocked_ell_bytes[i];
         } else if (state->matrix_family == dataset_matrix_family_sliced_ell && state->partition_bucketed_sliced_ell_bytes != 0) {
             bytes += state->partition_bucketed_sliced_ell_bytes[i];
+#if CELLSHARD_ENABLE_CELLERATOR_QUANTIZED
         } else if (state->matrix_family == dataset_matrix_family_quantized_blocked_ell) {
             bytes += (std::uint64_t) packed_bytes((const sparse::quantized_blocked_ell *) 0,
                                                   (types::dim_t) state->partition_rows[i],
@@ -887,6 +888,7 @@ inline std::uint64_t estimate_cspack_bytes(const dataset_h5_state *state, unsign
                                                   (types::nnz_t) state->partition_nnz[i],
                                                   (unsigned long) state->partition_aux[i],
                                                   sizeof(real::storage_t));
+#endif
         }
     }
     return bytes;

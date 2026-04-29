@@ -56,6 +56,10 @@ Current CellShard archive format.
 
 It is useful because HDF5 is accessible and inspectable, but it should not be treated as the long-term hot execution format.
 
+For multiome datasets, `.csh5` owns archive-level assay semantics: one global
+observation table, per-assay sparse matrices and feature tables, and row maps
+that connect global observations to assay-local rows.
+
 ### Use `.csh5` for
 
 - Current CellShard datasets.
@@ -172,6 +176,10 @@ It is generated from an archive or interchange source and consumed directly by C
 
 This is the current priority.
 
+CSPACK remains a single-assay execution artifact. Multiome execution uses
+multiple coordinated CSPACK files plus manifest metadata, not one mixed-modality
+CSPACK payload.
+
 ### Use `.cspack` for
 
 - GPU-native runtime execution.
@@ -181,6 +189,7 @@ This is the current priority.
 - Low-overhead device staging.
 - Reproducible execution layouts.
 - Benchmarkable runtime artifacts.
+- Per-assay sparse payloads that can be co-sharded by global observation range.
 
 ### Do not use `.cspack` for
 
@@ -217,6 +226,7 @@ Not supported in v1:
 - Dynamic graph updates.
 - Training checkpoints.
 - Rich observation metadata.
+- Multi-assay biological semantics inside the matrix payload.
 
 ### Policy
 
@@ -245,6 +255,17 @@ The v1 layout is offset-based and ELL-family native. Blocked-ELL is the default
 stored layout because current CellShard/Cellerator execution policy is
 Blocked-ELL-first. Sliced-ELL remains a native ELL-family layout. CSR is
 allowed only as an explicit compatibility/export fallback.
+
+Its assay directory records measurement semantics using the same numeric
+vocabulary as `cudaBioTypes`, while keeping matrix payload sections in the
+existing optimized sparse layouts.
+
+The public multi-assay `.cshard` path is archive-oriented: it writes one global
+observation table, per-assay feature-table ranges, exact or partial
+observation-level row maps, and either CSR fallback payloads or assay-local
+optimized bucketed Blocked-ELL/Sliced-ELL shard blobs. CSPACK remains
+single-assay; coordinated multiome execution still uses separate CSPACK
+artifacts plus manifest metadata.
 
 ### Use `.cshard` for
 

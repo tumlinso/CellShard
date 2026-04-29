@@ -47,6 +47,7 @@ int fetch_dataset_blocked_ell_h5_shard(sharded<sparse::blocked_ell> *m,
     return 1;
 }
 
+#if CELLSHARD_ENABLE_CELLERATOR_QUANTIZED
 int fetch_dataset_quantized_blocked_ell_h5_partition(sharded<sparse::quantized_blocked_ell> *m,
                                                      const shard_storage *s,
                                                      unsigned long partition_id) {
@@ -58,6 +59,7 @@ int fetch_dataset_quantized_blocked_ell_h5_shard(sharded<sparse::quantized_block
                                                  unsigned long shard_id) {
     return fetch_cached_shard_common(m, s, shard_id, load_quantized_blocked_ell_part_from_cspack);
 }
+#endif
 
 int fetch_dataset_sliced_ell_h5_partition(sharded<sparse::sliced_ell> *m,
                                           const shard_storage *s,
@@ -247,6 +249,7 @@ int prefetch_dataset_blocked_ell_h5_shard_cache(const sharded<sparse::blocked_el
     return ensure_cspack_ready(s, state, shard_id);
 }
 
+#if CELLSHARD_ENABLE_CELLERATOR_QUANTIZED
 int prefetch_dataset_quantized_blocked_ell_h5_partition_cache(const sharded<sparse::quantized_blocked_ell> *m,
                                                               shard_storage *s,
                                                               unsigned long partition_id) {
@@ -258,6 +261,7 @@ int prefetch_dataset_quantized_blocked_ell_h5_shard_cache(const sharded<sparse::
                                                           unsigned long shard_id) {
     return prefetch_shard_cache_common(m, s, shard_id);
 }
+#endif
 
 int prefetch_dataset_sliced_ell_h5_partition_cache(const sharded<sparse::sliced_ell> *m,
                                                    shard_storage *s,

@@ -26,6 +26,11 @@ The current repository implements one shard-pack encoding:
 CSPACK files are per-shard files. The cache directory, generation metadata, and owner
 metadata live outside the file payloads.
 
+CSPACK payloads are intentionally single-assay. Multiome datasets publish one
+coordinated CSPACK set per assay, while archive or manifest metadata supplies
+the `assay_id`, global observation row range, local assay row range, and pairing
+row maps.
+
 ## Current Path Conventions
 
 CSPACK files are currently published at paths such as:
@@ -72,6 +77,7 @@ In particular, fields such as:
 - `generation.pack`
 - `service_epoch`
 - owner-node delivery metadata
+- assay id and multi-assay pairing metadata
 
 are currently external to the shard-pack bytes.
 

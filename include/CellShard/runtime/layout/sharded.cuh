@@ -1,10 +1,16 @@
 #pragma once
 
+#ifndef CELLSHARD_ENABLE_CELLERATOR_QUANTIZED
+#define CELLSHARD_ENABLE_CELLERATOR_QUANTIZED 1
+#endif
+
 #include "../../core/offset_span.cuh"
 #include "../../core/real.cuh"
 #include "../../formats/compressed.cuh"
 #include "../../formats/blocked_ell.cuh"
+#if CELLSHARD_ENABLE_CELLERATOR_QUANTIZED
 #include "../../formats/quantized_blocked_ell.cuh"
+#endif
 #include "../../formats/sliced_ell.cuh"
 #include "../../formats/dense.cuh"
 #include "../../formats/diagonal.cuh"
@@ -93,9 +99,11 @@ __host__ __device__ __forceinline__ unsigned long partition_aux(const sparse::bl
     return sparse::pack_blocked_ell_aux(m->block_size, sparse::ell_width_blocks(m));
 }
 
+#if CELLSHARD_ENABLE_CELLERATOR_QUANTIZED
 __host__ __device__ __forceinline__ unsigned long partition_aux(const sparse::quantized_blocked_ell *m) {
     return sparse::pack_quantized_blocked_ell_aux(m->bits, m->block_size, sparse::ell_width_blocks(m));
 }
+#endif
 
 __host__ __device__ __forceinline__ unsigned long partition_aux(const sparse::sliced_ell *m) {
     return sparse::pack_sliced_ell_aux(m->slice_count, sparse::total_slots(m));
@@ -272,6 +280,7 @@ __host__ __device__ __forceinline__ std::size_t partition_bytes(const sharded<sp
         + (std::size_t) m->partition_rows[partId] * (std::size_t) (ell_width * block_size) * sizeof(real::storage_t);
 }
 
+#if CELLSHARD_ENABLE_CELLERATOR_QUANTIZED
 __host__ __device__ __forceinline__ std::size_t partition_bytes(const sharded<sparse::quantized_blocked_ell> *m, unsigned long partId) {
     const unsigned long aux = m->partition_aux[partId];
     const unsigned long bits = sparse::unpack_quantized_blocked_ell_bits(aux);
@@ -289,6 +298,7 @@ __host__ __device__ __forceinline__ std::size_t partition_bytes(const sharded<sp
         + (std::size_t) m->cols * sizeof(float)
         + (std::size_t) m->partition_rows[partId] * sizeof(float);
 }
+#endif
 
 __host__ __device__ __forceinline__ std::size_t partition_bytes(const sharded<sparse::sliced_ell> *m, unsigned long partId) {
     const unsigned long aux = m->partition_aux[partId];

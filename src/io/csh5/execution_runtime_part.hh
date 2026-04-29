@@ -408,6 +408,7 @@ inline void close_cached_shard_file(dataset_h5_state *state, unsigned long shard
     }
 }
 
+#if CELLSHARD_ENABLE_CELLERATOR_QUANTIZED
 inline int load_quantized_blocked_ell_part_from_cspack(sharded<sparse::quantized_blocked_ell> *m,
                                                        dataset_h5_state *state,
                                                        unsigned long partition_id) {
@@ -458,6 +459,7 @@ done:
     }
     return ok;
 }
+#endif
 
 inline int load_sliced_ell_part_from_cspack(sharded<sparse::sliced_ell> *m,
                                                  dataset_h5_state *state,
@@ -792,6 +794,7 @@ done:
     return ok;
 }
 
+#if CELLSHARD_ENABLE_CELLERATOR_QUANTIZED
 inline int materialize_quantized_blocked_ell_cspack(shard_storage *s, dataset_h5_state *state, unsigned long shard_id) {
     const std::uint64_t begin = state != 0 && state->shard_part_begin != 0 ? state->shard_part_begin[shard_id] : 0u;
     const std::uint64_t end = state != 0 && state->shard_part_end != 0 ? state->shard_part_end[shard_id] : 0u;
@@ -849,11 +852,14 @@ done:
     std::free(partition_offsets);
     return ok;
 }
+#endif
 
 inline int materialize_cspack(shard_storage *s, dataset_h5_state *state, unsigned long shard_id) {
     if (state == 0) return 0;
     if (state->matrix_family == dataset_matrix_family_blocked_ell) return materialize_blocked_ell_cspack(s, state, shard_id);
+#if CELLSHARD_ENABLE_CELLERATOR_QUANTIZED
     if (state->matrix_family == dataset_matrix_family_quantized_blocked_ell) return materialize_quantized_blocked_ell_cspack(s, state, shard_id);
+#endif
     if (state->matrix_family == dataset_matrix_family_sliced_ell) return materialize_sliced_ell_cspack(s, state, shard_id);
     return 0;
 }

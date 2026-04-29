@@ -1,12 +1,18 @@
 #pragma once
 
+#ifndef CELLSHARD_ENABLE_CELLERATOR_QUANTIZED
+#define CELLSHARD_ENABLE_CELLERATOR_QUANTIZED 1
+#endif
+
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
 
 #include "../../formats/compressed.cuh"
 #include "../../formats/blocked_ell.cuh"
+#if CELLSHARD_ENABLE_CELLERATOR_QUANTIZED
 #include "../../formats/quantized_blocked_ell.cuh"
+#endif
 #include "../../formats/sliced_ell.cuh"
 #include "../layout/sharded.cuh"
 #include "shard_storage.cuh"
@@ -72,6 +78,7 @@ inline int load_header(const char *filename, sharded<sparse::blocked_ell> *m) {
     return load_header(filename, m, 0);
 }
 
+#if CELLSHARD_ENABLE_CELLERATOR_QUANTIZED
 inline int load_header(const char *filename, sharded<sparse::quantized_blocked_ell> *m, shard_storage *s) {
     const char *ext = std::strrchr(filename != 0 ? filename : "", '.');
     if (ext != 0) {
@@ -88,6 +95,7 @@ inline int load_header(const char *filename, sharded<sparse::quantized_blocked_e
 inline int load_header(const char *filename, sharded<sparse::quantized_blocked_ell> *m) {
     return load_header(filename, m, 0);
 }
+#endif
 
 inline int load_header(const char *filename, sharded<sparse::sliced_ell> *m, shard_storage *s) {
     const char *ext = std::strrchr(filename != 0 ? filename : "", '.');

@@ -213,6 +213,63 @@ void bind_dataset_export_types(py::module_ &m) {
         .def("to_scipy_csr", [](const cse::csr_matrix_export &self) { return build_scipy_csr(self); })
         .def("to_torch_sparse_csr", [](const cse::csr_matrix_export &self) { return build_torch_sparse_csr(self); });
 
+    py::class_<blocked_ell_partition_export>(m, "BlockedEllPartition")
+        .def_readonly("rows", &blocked_ell_partition_export::rows)
+        .def_readonly("cols", &blocked_ell_partition_export::cols)
+        .def_readonly("nnz", &blocked_ell_partition_export::nnz)
+        .def_readonly("block_size", &blocked_ell_partition_export::block_size)
+        .def_readonly("ell_cols", &blocked_ell_partition_export::ell_cols)
+        .def_readonly("row_block_count", &blocked_ell_partition_export::row_block_count)
+        .def_readonly("ell_width_blocks", &blocked_ell_partition_export::ell_width_blocks)
+        .def_property_readonly("block_col_idx", &blocked_ell_partition_export::block_col_idx_array)
+        .def_property_readonly("values_storage", &blocked_ell_partition_export::values_storage_array)
+        .def("values_float32", &blocked_ell_partition_export::values_float32)
+        .def("as_dict", &blocked_ell_partition_export::as_dict);
+
+    py::class_<sliced_ell_partition_export>(m, "SlicedEllPartition")
+        .def_readonly("rows", &sliced_ell_partition_export::rows)
+        .def_readonly("cols", &sliced_ell_partition_export::cols)
+        .def_readonly("nnz", &sliced_ell_partition_export::nnz)
+        .def_readonly("slice_count", &sliced_ell_partition_export::slice_count)
+        .def_readonly("total_slots", &sliced_ell_partition_export::total_slots)
+        .def_property_readonly("slice_row_offsets", &sliced_ell_partition_export::slice_row_offsets_array)
+        .def_property_readonly("slice_widths", &sliced_ell_partition_export::slice_widths_array)
+        .def_property_readonly("col_idx", &sliced_ell_partition_export::col_idx_array)
+        .def_property_readonly("values_storage", &sliced_ell_partition_export::values_storage_array)
+        .def("values_float32", &sliced_ell_partition_export::values_float32)
+        .def("as_dict", &sliced_ell_partition_export::as_dict);
+
+    py::class_<native_matrix_view>(m, "NativeMatrixView")
+        .def(py::init<std::string>())
+        .def_readonly("path", &native_matrix_view::path)
+        .def_readonly("summary", &native_matrix_view::summary)
+        .def_property_readonly("shape", &native_matrix_view::shape)
+        .def_property_readonly("layout", [](const native_matrix_view &self) { return self.summary.matrix_format; })
+        .def_property_readonly("payload_layout", [](const native_matrix_view &self) { return self.summary.payload_layout; })
+        .def_property_readonly("num_partitions", [](const native_matrix_view &self) { return self.summary.num_partitions; })
+        .def_property_readonly("num_shards", [](const native_matrix_view &self) { return self.summary.num_shards; })
+        .def_property_readonly("partitions", [](const native_matrix_view &self) { return self.summary.partitions; })
+        .def_property_readonly("shards", [](const native_matrix_view &self) { return self.summary.shards; })
+        .def("partition", &native_matrix_view::partition)
+        .def("shard", &native_matrix_view::shard)
+        .def("to_csr", &native_matrix_view::to_csr)
+        .def("to_scipy_csr", &native_matrix_view::to_scipy_csr)
+        .def("to_torch_sparse_csr", &native_matrix_view::to_torch_sparse_csr);
+
+    py::class_<native_row_selection>(m, "NativeRowSelection")
+        .def(py::init([](const std::string &path, py::handle row_indices) {
+            return native_row_selection(path, normalize_row_indices(row_indices));
+        }))
+        .def_readonly("path", &native_row_selection::path)
+        .def_readonly("summary", &native_row_selection::summary)
+        .def_property_readonly("shape", &native_row_selection::shape)
+        .def_property_readonly("layout", [](const native_row_selection &self) { return self.summary.matrix_format; })
+        .def_property_readonly("row_indices", [](const native_row_selection &self) { return copy_1d_array(self.row_indices); })
+        .def("__len__", [](const native_row_selection &self) { return self.row_indices.size(); })
+        .def("to_csr", &native_row_selection::to_csr)
+        .def("to_scipy_csr", &native_row_selection::to_scipy_csr)
+        .def("to_torch_sparse_csr", &native_row_selection::to_torch_sparse_csr);
+
     py::class_<cellshard::cshard::table_view::column>(m, "CshardTableColumn")
         .def_readonly("name", &cellshard::cshard::table_view::column::name)
         .def_readonly("type", &cellshard::cshard::table_view::column::type)

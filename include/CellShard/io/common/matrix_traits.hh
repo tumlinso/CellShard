@@ -1,8 +1,14 @@
 #pragma once
 
+#ifndef CELLSHARD_ENABLE_CELLERATOR_QUANTIZED
+#define CELLSHARD_ENABLE_CELLERATOR_QUANTIZED 1
+#endif
+
 #include "../../formats/compressed.cuh"
 #include "../../formats/blocked_ell.cuh"
+#if CELLSHARD_ENABLE_CELLERATOR_QUANTIZED
 #include "../../formats/quantized_blocked_ell.cuh"
+#endif
 #include "../../formats/sliced_ell.cuh"
 #include "../../formats/dense.cuh"
 #include "../../formats/diagonal.cuh"
@@ -47,6 +53,7 @@ struct matrix_traits<sparse::blocked_ell> {
     static inline const char *name() { return "blocked ell matrix"; }
 };
 
+#if CELLSHARD_ENABLE_CELLERATOR_QUANTIZED
 template<>
 struct matrix_traits<sparse::quantized_blocked_ell> {
     static constexpr disk_format raw_disk_format = disk_format_quantized_blocked_ell;
@@ -57,6 +64,7 @@ struct matrix_traits<sparse::quantized_blocked_ell> {
     static inline const char *matrix_format_name() { return "quantized_blocked_ell"; }
     static inline const char *name() { return "quantized blocked ell matrix"; }
 };
+#endif
 
 template<>
 struct matrix_traits<sparse::sliced_ell> {
@@ -95,7 +103,9 @@ inline std::uint32_t default_execution_format_for_matrix_family(std::uint32_t ma
             ? dataset_execution_format_bucketed_blocked_ell
             : dataset_execution_format_blocked_ell;
     }
+#if CELLSHARD_ENABLE_CELLERATOR_QUANTIZED
     if (matrix_family == dataset_matrix_family_quantized_blocked_ell) return dataset_execution_format_quantized_blocked_ell;
+#endif
     if (matrix_family == dataset_matrix_family_sliced_ell) return dataset_execution_format_bucketed_sliced_ell;
     return dataset_execution_format_unknown;
 }

@@ -58,11 +58,13 @@ int finalize_preprocessed_blocked_ell_dataset_h5_to_output(const char *source_fi
     std::vector<std::uint32_t> zero_shard_sliced_u32;
     std::vector<std::uint64_t> zero_shard_sliced_u64;
     std::vector<std::uint32_t> shard_pair_ids, shard_owner_node_ids, shard_owner_rank_ids;
-    std::vector<float> filtered_pre_cell_total_counts, filtered_pre_cell_mito_counts, filtered_pre_cell_max_counts;
+    std::vector<float> filtered_pre_cell_total_counts, filtered_pre_cell_mito_counts, filtered_pre_cell_max_counts,
+        filtered_pre_cell_group_counts, filtered_pre_cell_group_pct;
     std::vector<std::uint32_t> filtered_pre_cell_detected_genes;
     std::vector<std::uint8_t> filtered_pre_cell_keep;
     std::vector<float> filtered_pre_gene_sum, filtered_pre_gene_sq_sum, filtered_pre_gene_detected_cells;
     std::vector<std::uint8_t> filtered_pre_gene_keep, filtered_pre_gene_flags;
+    std::vector<std::uint32_t> filtered_pre_feature_group_masks;
     dataset_layout_view layout{};
     dataset_dataset_table_view dataset_view{};
     dataset_provenance_view provenance_view{};
@@ -450,6 +452,10 @@ int finalize_preprocessed_blocked_ell_dataset_h5_to_output(const char *source_fi
         filtered_pre_cell_max_counts.reserve((std::size_t) final_rows);
         filtered_pre_cell_detected_genes.reserve((std::size_t) final_rows);
         filtered_pre_cell_keep.reserve((std::size_t) final_rows);
+        if (preprocess->qc_group_count != 0u) {
+            filtered_pre_cell_group_counts.reserve((std::size_t) final_rows * preprocess->qc_group_count);
+            filtered_pre_cell_group_pct.reserve((std::size_t) final_rows * preprocess->qc_group_count);
+        }
         for (std::uint64_t row = 0u; row < matrix.rows; ++row) {
             if (cell_keep[row] == 0u) continue;
             if (preprocess->cell_total_counts != nullptr) filtered_pre_cell_total_counts.push_back(preprocess->cell_total_counts[row]);
@@ -457,12 +463,20 @@ int finalize_preprocessed_blocked_ell_dataset_h5_to_output(const char *source_fi
             if (preprocess->cell_max_counts != nullptr) filtered_pre_cell_max_counts.push_back(preprocess->cell_max_counts[row]);
             if (preprocess->cell_detected_genes != nullptr) filtered_pre_cell_detected_genes.push_back(preprocess->cell_detected_genes[row]);
             if (preprocess->cell_keep != nullptr) filtered_pre_cell_keep.push_back(1u);
+            if (preprocess->cell_group_counts != nullptr && preprocess->cell_group_pct != nullptr) {
+                const std::size_t base = (std::size_t) row * preprocess->qc_group_count;
+                for (std::uint32_t group = 0u; group < preprocess->qc_group_count; ++group) {
+                    filtered_pre_cell_group_counts.push_back(preprocess->cell_group_counts[base + group]);
+                    filtered_pre_cell_group_pct.push_back(preprocess->cell_group_pct[base + group]);
+                }
+            }
         }
         filtered_pre_gene_sum.reserve((std::size_t) final_cols);
         filtered_pre_gene_sq_sum.reserve((std::size_t) final_cols);
         filtered_pre_gene_detected_cells.reserve((std::size_t) final_cols);
         filtered_pre_gene_keep.reserve((std::size_t) final_cols);
         filtered_pre_gene_flags.reserve((std::size_t) final_cols);
+        filtered_pre_feature_group_masks.reserve((std::size_t) final_cols);
         for (std::uint32_t gene = 0u; gene < matrix.cols; ++gene) {
             if (gene_keep[gene] == 0u) continue;
             if (preprocess->gene_sum != nullptr) filtered_pre_gene_sum.push_back(preprocess->gene_sum[gene]);
@@ -470,17 +484,21 @@ int finalize_preprocessed_blocked_ell_dataset_h5_to_output(const char *source_fi
             if (preprocess->gene_detected_cells != nullptr) filtered_pre_gene_detected_cells.push_back(preprocess->gene_detected_cells[gene]);
             if (preprocess->gene_keep != nullptr) filtered_pre_gene_keep.push_back(1u);
             if (preprocess->gene_flags != nullptr) filtered_pre_gene_flags.push_back(preprocess->gene_flags[gene]);
+            if (preprocess->feature_group_masks != nullptr) filtered_pre_feature_group_masks.push_back(preprocess->feature_group_masks[gene]);
         }
         finalized_preprocess.cell_total_counts = filtered_pre_cell_total_counts.empty() ? nullptr : filtered_pre_cell_total_counts.data();
         finalized_preprocess.cell_mito_counts = filtered_pre_cell_mito_counts.empty() ? nullptr : filtered_pre_cell_mito_counts.data();
         finalized_preprocess.cell_max_counts = filtered_pre_cell_max_counts.empty() ? nullptr : filtered_pre_cell_max_counts.data();
         finalized_preprocess.cell_detected_genes = filtered_pre_cell_detected_genes.empty() ? nullptr : filtered_pre_cell_detected_genes.data();
         finalized_preprocess.cell_keep = filtered_pre_cell_keep.empty() ? nullptr : filtered_pre_cell_keep.data();
+        finalized_preprocess.cell_group_counts = filtered_pre_cell_group_counts.empty() ? nullptr : filtered_pre_cell_group_counts.data();
+        finalized_preprocess.cell_group_pct = filtered_pre_cell_group_pct.empty() ? nullptr : filtered_pre_cell_group_pct.data();
         finalized_preprocess.gene_sum = filtered_pre_gene_sum.empty() ? nullptr : filtered_pre_gene_sum.data();
         finalized_preprocess.gene_sq_sum = filtered_pre_gene_sq_sum.empty() ? nullptr : filtered_pre_gene_sq_sum.data();
         finalized_preprocess.gene_detected_cells = filtered_pre_gene_detected_cells.empty() ? nullptr : filtered_pre_gene_detected_cells.data();
         finalized_preprocess.gene_keep = filtered_pre_gene_keep.empty() ? nullptr : filtered_pre_gene_keep.data();
         finalized_preprocess.gene_flags = filtered_pre_gene_flags.empty() ? nullptr : filtered_pre_gene_flags.data();
+        finalized_preprocess.feature_group_masks = filtered_pre_feature_group_masks.empty() ? nullptr : filtered_pre_feature_group_masks.data();
         if (!append_dataset_preprocess_h5(temp_path.c_str(), &finalized_preprocess)) goto done;
     }
 
@@ -567,11 +585,13 @@ int finalize_preprocessed_sliced_ell_dataset_h5_to_output(const char *source_fil
     std::vector<std::uint32_t> shard_sliced_ell_slice_counts, shard_sliced_ell_slice_rows;
     std::vector<std::uint64_t> shard_bucketed_sliced_ell_bytes;
     std::vector<std::uint32_t> shard_pair_ids, shard_owner_node_ids, shard_owner_rank_ids;
-    std::vector<float> filtered_pre_cell_total_counts, filtered_pre_cell_mito_counts, filtered_pre_cell_max_counts;
+    std::vector<float> filtered_pre_cell_total_counts, filtered_pre_cell_mito_counts, filtered_pre_cell_max_counts,
+        filtered_pre_cell_group_counts, filtered_pre_cell_group_pct;
     std::vector<std::uint32_t> filtered_pre_cell_detected_genes;
     std::vector<std::uint8_t> filtered_pre_cell_keep;
     std::vector<float> filtered_pre_gene_sum, filtered_pre_gene_sq_sum, filtered_pre_gene_detected_cells;
     std::vector<std::uint8_t> filtered_pre_gene_keep, filtered_pre_gene_flags;
+    std::vector<std::uint32_t> filtered_pre_feature_group_masks;
     dataset_layout_view layout{};
     dataset_dataset_table_view dataset_view{};
     dataset_provenance_view provenance_view{};
@@ -981,6 +1001,10 @@ int finalize_preprocessed_sliced_ell_dataset_h5_to_output(const char *source_fil
         filtered_pre_cell_max_counts.reserve((std::size_t) final_rows);
         filtered_pre_cell_detected_genes.reserve((std::size_t) final_rows);
         filtered_pre_cell_keep.reserve((std::size_t) final_rows);
+        if (preprocess->qc_group_count != 0u) {
+            filtered_pre_cell_group_counts.reserve((std::size_t) final_rows * preprocess->qc_group_count);
+            filtered_pre_cell_group_pct.reserve((std::size_t) final_rows * preprocess->qc_group_count);
+        }
         for (std::uint64_t row = 0u; row < matrix.rows; ++row) {
             if (cell_keep[row] == 0u) continue;
             if (preprocess->cell_total_counts != nullptr) filtered_pre_cell_total_counts.push_back(preprocess->cell_total_counts[row]);
@@ -988,12 +1012,20 @@ int finalize_preprocessed_sliced_ell_dataset_h5_to_output(const char *source_fil
             if (preprocess->cell_max_counts != nullptr) filtered_pre_cell_max_counts.push_back(preprocess->cell_max_counts[row]);
             if (preprocess->cell_detected_genes != nullptr) filtered_pre_cell_detected_genes.push_back(preprocess->cell_detected_genes[row]);
             if (preprocess->cell_keep != nullptr) filtered_pre_cell_keep.push_back(1u);
+            if (preprocess->cell_group_counts != nullptr && preprocess->cell_group_pct != nullptr) {
+                const std::size_t base = (std::size_t) row * preprocess->qc_group_count;
+                for (std::uint32_t group = 0u; group < preprocess->qc_group_count; ++group) {
+                    filtered_pre_cell_group_counts.push_back(preprocess->cell_group_counts[base + group]);
+                    filtered_pre_cell_group_pct.push_back(preprocess->cell_group_pct[base + group]);
+                }
+            }
         }
         filtered_pre_gene_sum.reserve((std::size_t) final_cols);
         filtered_pre_gene_sq_sum.reserve((std::size_t) final_cols);
         filtered_pre_gene_detected_cells.reserve((std::size_t) final_cols);
         filtered_pre_gene_keep.reserve((std::size_t) final_cols);
         filtered_pre_gene_flags.reserve((std::size_t) final_cols);
+        filtered_pre_feature_group_masks.reserve((std::size_t) final_cols);
         for (std::uint32_t gene = 0u; gene < matrix.cols; ++gene) {
             if (gene_keep[gene] == 0u) continue;
             if (preprocess->gene_sum != nullptr) filtered_pre_gene_sum.push_back(preprocess->gene_sum[gene]);
@@ -1001,17 +1033,21 @@ int finalize_preprocessed_sliced_ell_dataset_h5_to_output(const char *source_fil
             if (preprocess->gene_detected_cells != nullptr) filtered_pre_gene_detected_cells.push_back(preprocess->gene_detected_cells[gene]);
             if (preprocess->gene_keep != nullptr) filtered_pre_gene_keep.push_back(1u);
             if (preprocess->gene_flags != nullptr) filtered_pre_gene_flags.push_back(preprocess->gene_flags[gene]);
+            if (preprocess->feature_group_masks != nullptr) filtered_pre_feature_group_masks.push_back(preprocess->feature_group_masks[gene]);
         }
         finalized_preprocess.cell_total_counts = filtered_pre_cell_total_counts.empty() ? nullptr : filtered_pre_cell_total_counts.data();
         finalized_preprocess.cell_mito_counts = filtered_pre_cell_mito_counts.empty() ? nullptr : filtered_pre_cell_mito_counts.data();
         finalized_preprocess.cell_max_counts = filtered_pre_cell_max_counts.empty() ? nullptr : filtered_pre_cell_max_counts.data();
         finalized_preprocess.cell_detected_genes = filtered_pre_cell_detected_genes.empty() ? nullptr : filtered_pre_cell_detected_genes.data();
         finalized_preprocess.cell_keep = filtered_pre_cell_keep.empty() ? nullptr : filtered_pre_cell_keep.data();
+        finalized_preprocess.cell_group_counts = filtered_pre_cell_group_counts.empty() ? nullptr : filtered_pre_cell_group_counts.data();
+        finalized_preprocess.cell_group_pct = filtered_pre_cell_group_pct.empty() ? nullptr : filtered_pre_cell_group_pct.data();
         finalized_preprocess.gene_sum = filtered_pre_gene_sum.empty() ? nullptr : filtered_pre_gene_sum.data();
         finalized_preprocess.gene_sq_sum = filtered_pre_gene_sq_sum.empty() ? nullptr : filtered_pre_gene_sq_sum.data();
         finalized_preprocess.gene_detected_cells = filtered_pre_gene_detected_cells.empty() ? nullptr : filtered_pre_gene_detected_cells.data();
         finalized_preprocess.gene_keep = filtered_pre_gene_keep.empty() ? nullptr : filtered_pre_gene_keep.data();
         finalized_preprocess.gene_flags = filtered_pre_gene_flags.empty() ? nullptr : filtered_pre_gene_flags.data();
+        finalized_preprocess.feature_group_masks = filtered_pre_feature_group_masks.empty() ? nullptr : filtered_pre_feature_group_masks.data();
         if (!append_dataset_preprocess_h5(temp_path.c_str(), &finalized_preprocess)) goto done;
     }
 

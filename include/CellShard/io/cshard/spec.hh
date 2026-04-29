@@ -25,6 +25,8 @@ enum section_kind : std::uint32_t {
     section_kind_provenance_directory = 6u,
     section_kind_pack_manifest_directory = 7u,
     section_kind_payload = 8u,
+    section_kind_assay_directory = 9u,
+    section_kind_pairing_directory = 10u,
     section_kind_blocked_ell_block_col_idx = 16u,
     section_kind_blocked_ell_values = 17u,
     section_kind_sliced_ell_slice_row_offsets = 18u,
@@ -34,6 +36,10 @@ enum section_kind : std::uint32_t {
     section_kind_csr_row_ptr = 22u,
     section_kind_csr_col_idx = 23u,
     section_kind_csr_values = 24u,
+    section_kind_assay_global_to_local_rows = 25u,
+    section_kind_assay_local_to_global_rows = 26u,
+    section_kind_optimized_blocked_ell_shard_blob = 27u,
+    section_kind_optimized_sliced_ell_shard_blob = 28u,
     section_kind_table_string_offsets = 32u,
     section_kind_table_string_bytes = 33u,
     section_kind_table_float32_values = 34u,
@@ -55,7 +61,9 @@ enum matrix_layout : std::uint32_t {
     matrix_layout_unknown = 0u,
     matrix_layout_blocked_ell = 1u,
     matrix_layout_sliced_ell = 2u,
-    matrix_layout_csr = 3u
+    matrix_layout_csr = 3u,
+    matrix_layout_bucketed_blocked_ell = 4u,
+    matrix_layout_bucketed_sliced_ell = 5u
 };
 
 enum table_column_type : std::uint32_t {
@@ -101,10 +109,15 @@ struct header {
     std::uint64_t cols;
     std::uint64_t nnz;
     std::uint64_t feature_order_hash;
+    std::uint64_t global_observation_count;
+    std::uint64_t assay_directory_offset;
+    std::uint64_t pairing_directory_offset;
+    std::uint32_t assay_directory_count;
+    std::uint32_t pairing_kind;
     std::uint32_t canonical_layout;
     std::uint32_t flags;
     std::uint32_t reserved32;
-    std::uint64_t reserved[10];
+    std::uint64_t reserved[6];
 };
 
 struct metadata_record {
@@ -156,6 +169,52 @@ struct table_column_descriptor {
     std::uint32_t reserved0;
     std::uint32_t offsets_section_id;
     std::uint32_t data_section_id;
+    std::uint64_t reserved[4];
+};
+
+struct assay_descriptor {
+    char assay_id[32];
+    std::uint32_t modality;
+    std::uint32_t observation_unit;
+    std::uint32_t feature_type;
+    std::uint32_t value_semantics;
+    std::uint32_t processing_state;
+    std::uint32_t row_axis;
+    std::uint32_t col_axis;
+    std::uint32_t feature_namespace;
+    std::uint64_t global_observation_count;
+    std::uint64_t assay_row_count;
+    std::uint64_t feature_count;
+    std::uint64_t nnz;
+    std::uint64_t feature_order_hash;
+    std::uint32_t matrix_descriptor_begin;
+    std::uint32_t matrix_descriptor_count;
+    std::uint32_t feature_table_column_begin;
+    std::uint32_t feature_table_column_count;
+    std::uint32_t global_to_assay_rows_section_id;
+    std::uint32_t assay_to_global_rows_section_id;
+    std::uint64_t reserved[4];
+};
+
+struct pairing_descriptor {
+    std::uint32_t pairing_kind;
+    std::uint32_t assay_count;
+    std::uint64_t global_observation_count;
+    std::uint32_t assay_directory_begin;
+    std::uint32_t assay_directory_count;
+    std::uint64_t reserved[4];
+};
+
+struct assay_pack_manifest_descriptor {
+    dataset_generation_ref generation;
+    char assay_id[32];
+    std::uint64_t shard_id;
+    std::uint64_t global_row_begin;
+    std::uint64_t global_row_end;
+    std::uint64_t local_row_begin;
+    std::uint64_t local_row_end;
+    std::uint32_t path_offsets_section_id;
+    std::uint32_t path_bytes_section_id;
     std::uint64_t reserved[4];
 };
 

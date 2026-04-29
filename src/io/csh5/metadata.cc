@@ -308,6 +308,7 @@ int append_dataset_preprocess_h5(const char *filename,
         || !write_attr_u32(root, "normalized_log1p_metrics", preprocess != 0 ? preprocess->normalized_log1p_metrics : 0u)
         || !write_attr_u32(root, "hvg_available", preprocess != 0 ? preprocess->hvg_available : 0u)
         || !write_attr_u32(root, "mark_mito_from_feature_names", preprocess != 0 ? preprocess->mark_mito_from_feature_names : 0u)
+        || !write_attr_u32(root, "qc_group_count", preprocess != 0 ? preprocess->qc_group_count : 0u)
         || !write_attr_u64(root, "rows", preprocess != 0 ? preprocess->rows : 0u)
         || !write_attr_u32(root, "cols", preprocess != 0 ? preprocess->cols : 0u)
         || !write_attr_u64(root, "nnz", preprocess != 0 ? preprocess->nnz : 0u)
@@ -331,8 +332,22 @@ int append_dataset_preprocess_h5(const char *filename,
     if (cell_qc < 0 || gene_qc < 0) goto done;
 
     if (!write_attr_u64(cell_qc, "rows", preprocess != 0 ? preprocess->rows : 0u)
+        || !write_attr_u32(cell_qc, "qc_group_count", preprocess != 0 ? preprocess->qc_group_count : 0u)
         || !write_attr_u32(gene_qc, "cols", preprocess != 0 ? preprocess->cols : 0u)) {
         goto done;
+    }
+
+    if (preprocess != 0 && preprocess->qc_group_count != 0u) {
+        const hsize_t group_values = rows * (hsize_t) preprocess->qc_group_count;
+        if (preprocess->qc_group_names.count == preprocess->qc_group_count
+            && !write_text_column(cell_qc, "group_names", &preprocess->qc_group_names)) {
+            goto done;
+        }
+        if ((group_values != 0u && (preprocess->cell_group_counts == 0 || preprocess->cell_group_pct == 0))
+            || !write_dataset_1d(cell_qc, "group_counts", H5T_NATIVE_FLOAT, group_values, preprocess->cell_group_counts)
+            || !write_dataset_1d(cell_qc, "group_pct", H5T_NATIVE_FLOAT, group_values, preprocess->cell_group_pct)) {
+            goto done;
+        }
     }
 
     if (rows != 0u) {
@@ -352,7 +367,9 @@ int append_dataset_preprocess_h5(const char *filename,
             || !write_dataset_1d(gene_qc, "sq_sum", H5T_NATIVE_FLOAT, cols, preprocess->gene_sq_sum)
             || !write_dataset_1d(gene_qc, "detected_cells", H5T_NATIVE_FLOAT, cols, preprocess->gene_detected_cells)
             || !write_dataset_1d(gene_qc, "keep", H5T_NATIVE_UINT8, cols, preprocess->gene_keep)
-            || !write_dataset_1d(gene_qc, "flags", H5T_NATIVE_UINT8, cols, preprocess->gene_flags)) {
+            || !write_dataset_1d(gene_qc, "flags", H5T_NATIVE_UINT8, cols, preprocess->gene_flags)
+            || (preprocess->feature_group_masks != 0
+                && !write_dataset_1d(gene_qc, "feature_group_mask", H5T_NATIVE_UINT32, cols, preprocess->feature_group_masks))) {
             goto done;
         }
     }

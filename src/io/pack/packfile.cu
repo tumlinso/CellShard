@@ -82,6 +82,7 @@ inline void free_blocked_ell_result(blocked_ell_load_result *out) {
     out->ell_cols = 0u;
 }
 
+#if CELLSHARD_ENABLE_CELLERATOR_QUANTIZED
 inline void free_quantized_blocked_ell_result(quantized_blocked_ell_load_result *out) {
     if (out->storage != 0) std::free(out->storage);
     else {
@@ -103,6 +104,7 @@ inline void free_quantized_blocked_ell_result(quantized_blocked_ell_load_result 
     out->row_stride_bytes = 0u;
     out->decode_policy = 0u;
 }
+#endif
 
 inline void free_sliced_ell_result(sliced_ell_load_result *out) {
     if (out->storage != 0) std::free(out->storage);
@@ -422,6 +424,7 @@ done:
     return ok;
 }
 
+#if CELLSHARD_ENABLE_CELLERATOR_QUANTIZED
 int store_quantized_blocked_ell_raw(const char *filename,
                                     types::dim_t rows,
                                     types::dim_t cols,
@@ -566,6 +569,7 @@ done:
     if (!ok) free_quantized_blocked_ell_result(out);
     return ok;
 }
+#endif
 
 int store_sliced_ell_raw(const char *filename,
                          types::dim_t rows,
@@ -896,6 +900,7 @@ int load(std::FILE *fp, sparse::blocked_ell *m) {
     return 1;
 }
 
+#if CELLSHARD_ENABLE_CELLERATOR_QUANTIZED
 int store(std::FILE *fp, const sparse::quantized_blocked_ell *m) {
     return store_quantized_blocked_ell_raw(fp,
                                            m->rows,
@@ -941,6 +946,7 @@ int load(std::FILE *fp, sparse::quantized_blocked_ell *m) {
     m->row_offsets = tmp.row_offsets;
     return 1;
 }
+#endif
 
 int store(std::FILE *fp, const sparse::sliced_ell *m) {
     return store_sliced_ell_raw(fp,

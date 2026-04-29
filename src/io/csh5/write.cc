@@ -110,6 +110,7 @@ done:
     return ok;
 }
 
+#if CELLSHARD_ENABLE_CELLERATOR_QUANTIZED
 int append_quantized_blocked_ell_partition_h5(const char *filename,
                                               unsigned long partition_id,
                                               const sparse::quantized_blocked_ell *part) {
@@ -147,6 +148,7 @@ done:
     if (file >= 0) H5Fclose(file);
     return ok;
 }
+#endif
 
 int append_sliced_ell_partition_h5(const char *filename,
                                    unsigned long partition_id,
@@ -225,6 +227,30 @@ done:
     if (payload_root >= 0) H5Gclose(payload_root);
     if (file >= 0) H5Fclose(file);
     return ok;
+}
+
+int serialize_bucketed_blocked_ell_shard_blob(const bucketed_blocked_ell_shard *shard,
+                                              unsigned char **data_out,
+                                              std::size_t *bytes_out) {
+    return serialize_optimized_shard(shard, data_out, bytes_out);
+}
+
+int deserialize_bucketed_blocked_ell_shard_blob(const unsigned char *data,
+                                                std::size_t bytes,
+                                                bucketed_blocked_ell_shard *shard) {
+    return deserialize_optimized_shard(data, bytes, shard);
+}
+
+int serialize_bucketed_sliced_ell_shard_blob(const bucketed_sliced_ell_shard *shard,
+                                             unsigned char **data_out,
+                                             std::size_t *bytes_out) {
+    return serialize_optimized_sliced_shard(shard, data_out, bytes_out);
+}
+
+int deserialize_bucketed_sliced_ell_shard_blob(const unsigned char *data,
+                                               std::size_t bytes,
+                                               bucketed_sliced_ell_shard *shard) {
+    return deserialize_optimized_sliced_shard(data, bytes, shard);
 }
 
 } // namespace cellshard

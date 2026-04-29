@@ -129,6 +129,7 @@ inline int load_bucketed_sliced_ell_partition_payload(dataset_h5_state *state,
     return ok;
 }
 
+#if CELLSHARD_ENABLE_CELLERATOR_QUANTIZED
 inline int load_quantized_blocked_ell_partition_payload(dataset_h5_state *state,
                                                         unsigned long partition_id,
                                                         sparse::quantized_blocked_ell *part) {
@@ -149,6 +150,7 @@ inline int load_quantized_blocked_ell_partition_payload(dataset_h5_state *state,
     std::fclose(fp);
     return ok;
 }
+#endif
 
 inline int prepare_blocked_ell_parts_from_state(const dataset_h5_state *state,
                                                 unsigned long begin,

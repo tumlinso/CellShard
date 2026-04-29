@@ -1,9 +1,12 @@
 #include <CellShard/export/dataset_export.hh>
 #include <CellShard/CellShard.hh>
+#include <CellShard/io/cshard.hh>
 
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
+#include <fstream>
 #include <filesystem>
 #include <stdexcept>
 #include <string>
@@ -12,6 +15,7 @@
 #include <unistd.h>
 
 namespace cs = ::cellshard;
+namespace csc = ::cellshard::cshard;
 namespace cse = ::cellshard::exporting;
 
 namespace {
@@ -69,16 +73,628 @@ void fill_blocked_ell_part(cs::sparse::blocked_ell *part) {
     part->val[7] = __float2half(4.0f);
 }
 
+std::string temp_cshard_path() {
+    char path[] = "/tmp/cshard_multi_runtimeXXXXXX";
+    const int fd = ::mkstemp(path);
+    require(fd >= 0, "mkstemp failed");
+    ::close(fd);
+    std::remove(path);
+    return std::string(path) + ".cshard";
+}
+
+csc::table_view make_cshard_table(std::uint64_t rows, const char *prefix) {
+    csc::table_view table;
+    csc::table_view::column index;
+    table.rows = rows;
+    index.name = "_index";
+    index.type = csc::spec::table_column_text;
+    for (std::uint64_t row = 0u; row < rows; ++row) index.text_values.push_back(std::string(prefix) + std::to_string(row));
+    table.columns.push_back(std::move(index));
+    return table;
+}
+
+cse::csr_matrix_export make_rna_csr(std::uint64_t rows) {
+    cse::csr_matrix_export csr;
+    csr.rows = rows;
+    csr.cols = 4u;
+    if (rows == 3u) {
+        csr.indptr = {0, 2, 3, 5};
+        csr.indices = {0, 2, 1, 0, 3};
+        csr.data = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
+    } else {
+        csr.indptr = {0};
+    }
+    return csr;
+}
+
+cse::csr_matrix_export make_atac_csr(std::uint64_t rows) {
+    cse::csr_matrix_export csr;
+    csr.rows = rows;
+    csr.cols = 5u;
+    if (rows == 3u) {
+        csr.indptr = {0, 1, 3, 4};
+        csr.indices = {1, 0, 4, 3};
+        csr.data = {6.0f, 7.0f, 8.0f, 9.0f};
+    } else if (rows == 2u) {
+        csr.indptr = {0, 1, 2};
+        csr.indices = {1, 3};
+        csr.data = {6.0f, 9.0f};
+    } else {
+        csr.indptr = {0};
+    }
+    return csr;
+}
+
+cs::dataset_assay_semantics make_semantics(std::uint32_t modality, std::uint32_t feature_type) {
+    cs::dataset_assay_semantics semantics{};
+    semantics.modality = modality;
+    semantics.observation_unit = cs::dataset_observation_cell;
+    semantics.feature_type = feature_type;
+    semantics.value_semantics = modality == cs::dataset_modality_scatac
+        ? cs::dataset_values_binary_accessibility
+        : cs::dataset_values_raw_counts;
+    semantics.processing_state = cs::dataset_processing_raw;
+    semantics.row_axis = cs::dataset_axis_observations;
+    semantics.col_axis = cs::dataset_axis_features;
+    semantics.feature_namespace = feature_type;
+    return semantics;
+}
+
+csc::csr_assay_input make_assay(const std::string &id,
+                                cs::dataset_assay_semantics semantics,
+                                cse::csr_matrix_export matrix,
+                                csc::table_view features,
+                                std::vector<std::uint32_t> global_to_assay,
+                                std::vector<std::uint32_t> assay_to_global) {
+    csc::csr_assay_input assay;
+    assay.assay_id = id;
+    assay.semantics = semantics;
+    assay.matrix = std::move(matrix);
+    assay.features = std::move(features);
+    assay.global_to_assay_row = std::move(global_to_assay);
+    assay.assay_row_to_global = std::move(assay_to_global);
+    return assay;
+}
+
+void fill_blocked_from_csr(cs::sparse::blocked_ell *part, const cse::csr_matrix_export &csr) {
+    std::uint32_t width = 1u;
+    for (std::uint64_t row = 0u; row < csr.rows; ++row) {
+        const std::uint32_t row_width = (std::uint32_t) (csr.indptr[(std::size_t) row + 1u] - csr.indptr[(std::size_t) row]);
+        if (row_width > width) width = row_width;
+    }
+    cs::sparse::init(part, (cs::types::dim_t) csr.rows, (cs::types::dim_t) csr.cols, (cs::types::nnz_t) csr.data.size(), 1u, width);
+    require(cs::sparse::allocate(part) != 0, "test blocked-ELL allocate failed");
+    for (std::uint64_t i = 0u; i < csr.rows * width; ++i) {
+        part->blockColIdx[(std::size_t) i] = cs::sparse::blocked_ell_invalid_col;
+        part->val[(std::size_t) i] = __float2half(0.0f);
+    }
+    for (std::uint64_t row = 0u; row < csr.rows; ++row) {
+        const std::int64_t begin = csr.indptr[(std::size_t) row];
+        const std::int64_t end = csr.indptr[(std::size_t) row + 1u];
+        for (std::int64_t ptr = begin; ptr < end; ++ptr) {
+            const std::size_t slot = (std::size_t) row * width + (std::size_t) (ptr - begin);
+            part->blockColIdx[slot] = (std::uint32_t) csr.indices[(std::size_t) ptr];
+            part->val[slot] = __float2half(csr.data[(std::size_t) ptr]);
+        }
+    }
+}
+
+void fill_sliced_from_csr(cs::sparse::sliced_ell *part, const cse::csr_matrix_export &csr) {
+    std::uint32_t width = 1u;
+    for (std::uint64_t row = 0u; row < csr.rows; ++row) {
+        const std::uint32_t row_width = (std::uint32_t) (csr.indptr[(std::size_t) row + 1u] - csr.indptr[(std::size_t) row]);
+        if (row_width > width) width = row_width;
+    }
+    const std::uint32_t offsets[] = {0u, (std::uint32_t) csr.rows};
+    const std::uint32_t widths[] = {width};
+    cs::sparse::init(part, (cs::types::dim_t) csr.rows, (cs::types::dim_t) csr.cols, (cs::types::nnz_t) csr.data.size());
+    require(cs::sparse::allocate(part, 1u, offsets, widths) != 0, "test sliced-ELL allocate failed");
+    for (std::uint64_t i = 0u; i < csr.rows * width; ++i) {
+        part->col_idx[(std::size_t) i] = cs::sparse::sliced_ell_invalid_col;
+        part->val[(std::size_t) i] = __float2half(0.0f);
+    }
+    for (std::uint64_t row = 0u; row < csr.rows; ++row) {
+        const std::int64_t begin = csr.indptr[(std::size_t) row];
+        const std::int64_t end = csr.indptr[(std::size_t) row + 1u];
+        for (std::int64_t ptr = begin; ptr < end; ++ptr) {
+            const std::size_t slot = (std::size_t) row * width + (std::size_t) (ptr - begin);
+            part->col_idx[slot] = (std::uint32_t) csr.indices[(std::size_t) ptr];
+            part->val[slot] = __float2half(csr.data[(std::size_t) ptr]);
+        }
+    }
+}
+
+void make_blocked_shard_from_csr(const cse::csr_matrix_export &csr, cs::bucketed_blocked_ell_shard *out) {
+    cs::sparse::blocked_ell part;
+    cs::bucketed_blocked_ell_partition bucket;
+    cs::sparse::init(&part);
+    cs::init(&bucket);
+    cs::init(out);
+    fill_blocked_from_csr(&part, csr);
+    require(cs::build_bucketed_blocked_ell_partition(&bucket, &part, 1u, nullptr) != 0,
+            "build test bucketed Blocked-ELL partition failed");
+    out->rows = (std::uint32_t) csr.rows;
+    out->cols = (std::uint32_t) csr.cols;
+    out->nnz = (std::uint32_t) csr.data.size();
+    out->partition_count = 1u;
+    out->partitions = (cs::bucketed_blocked_ell_partition *) std::calloc(1u, sizeof(cs::bucketed_blocked_ell_partition));
+    out->partition_row_offsets = (std::uint32_t *) std::calloc(2u, sizeof(std::uint32_t));
+    out->exec_to_canonical_cols = (std::uint32_t *) std::calloc((std::size_t) out->cols, sizeof(std::uint32_t));
+    out->canonical_to_exec_cols = (std::uint32_t *) std::calloc((std::size_t) out->cols, sizeof(std::uint32_t));
+    require(out->partitions != nullptr && out->partition_row_offsets != nullptr
+                && out->exec_to_canonical_cols != nullptr && out->canonical_to_exec_cols != nullptr,
+            "test optimized blocked shard allocation failed");
+    out->partitions[0] = bucket;
+    std::memset(&bucket, 0, sizeof(bucket));
+    out->partition_row_offsets[0] = 0u;
+    out->partition_row_offsets[1] = out->rows;
+    for (std::uint32_t col = 0u; col < out->cols; ++col) {
+        out->exec_to_canonical_cols[col] = col;
+        out->canonical_to_exec_cols[col] = col;
+    }
+    cs::sparse::clear(&part);
+}
+
+void make_sliced_shard_from_csr(const cse::csr_matrix_export &csr, cs::bucketed_sliced_ell_shard *out) {
+    cs::sparse::sliced_ell part;
+    cs::bucketed_sliced_ell_partition bucket;
+    cs::sparse::init(&part);
+    cs::init(&bucket);
+    cs::init(out);
+    fill_sliced_from_csr(&part, csr);
+    require(cs::build_bucketed_sliced_ell_partition(&bucket, &part, 1u, nullptr) != 0,
+            "build test bucketed Sliced-ELL partition failed");
+    out->rows = (std::uint32_t) csr.rows;
+    out->cols = (std::uint32_t) csr.cols;
+    out->nnz = (std::uint32_t) csr.data.size();
+    out->partition_count = 1u;
+    out->partitions = (cs::bucketed_sliced_ell_partition *) std::calloc(1u, sizeof(cs::bucketed_sliced_ell_partition));
+    out->partition_row_offsets = (std::uint32_t *) std::calloc(2u, sizeof(std::uint32_t));
+    require(out->partitions != nullptr && out->partition_row_offsets != nullptr,
+            "test optimized sliced shard allocation failed");
+    out->partitions[0] = bucket;
+    std::memset(&bucket, 0, sizeof(bucket));
+    out->partition_row_offsets[0] = 0u;
+    out->partition_row_offsets[1] = out->rows;
+    cs::sparse::clear(&part);
+}
+
+csc::optimized_blocked_ell_shard_input make_blocked_shard_input(const std::string &assay_id,
+                                                                std::uint64_t global_begin,
+                                                                std::uint64_t global_end,
+                                                                std::uint64_t local_begin,
+                                                                std::uint64_t local_end,
+                                                                const cs::bucketed_blocked_ell_shard *shard) {
+    csc::optimized_blocked_ell_shard_input input;
+    input.assay_id = assay_id;
+    input.global_row_begin = global_begin;
+    input.global_row_end = global_end;
+    input.local_row_begin = local_begin;
+    input.local_row_end = local_end;
+    input.shard = shard;
+    return input;
+}
+
+csc::optimized_sliced_ell_shard_input make_sliced_shard_input(const std::string &assay_id,
+                                                              std::uint64_t global_begin,
+                                                              std::uint64_t global_end,
+                                                              std::uint64_t local_begin,
+                                                              std::uint64_t local_end,
+                                                              const cs::bucketed_sliced_ell_shard *shard) {
+    csc::optimized_sliced_ell_shard_input input;
+    input.assay_id = assay_id;
+    input.global_row_begin = global_begin;
+    input.global_row_end = global_end;
+    input.local_row_begin = local_begin;
+    input.local_row_end = local_end;
+    input.shard = shard;
+    return input;
+}
+
+void test_exact_multi_assay_cshard() {
+    const std::string path = temp_cshard_path();
+    std::string error;
+    const std::vector<std::uint32_t> exact = {0u, 1u, 2u};
+    std::vector<csc::csr_assay_input> assays;
+    assays.push_back(make_assay("rna",
+                                make_semantics(cs::dataset_modality_scrna, cs::dataset_feature_gene),
+                                make_rna_csr(3u),
+                                make_cshard_table(4u, "gene"),
+                                exact,
+                                exact));
+    assays.push_back(make_assay("atac",
+                                make_semantics(cs::dataset_modality_scatac, cs::dataset_feature_peak),
+                                make_atac_csr(3u),
+                                make_cshard_table(5u, "peak"),
+                                exact,
+                                exact));
+    require(csc::write_multi_assay_csr(path, make_cshard_table(3u, "cell"), assays,
+                                       cs::dataset_pairing_exact_observation, {}, &error),
+            error.c_str());
+    csc::cshard_file file = csc::cshard_file::open(path);
+    require(file.is_multi_assay(), "exact multi-assay archive did not reopen as multi-assay");
+    require(file.assay_count() == 2u, "exact multi-assay assay count mismatch");
+    require(file.assay(0u).assay_id == "rna" && file.assay(1u).assay_id == "atac", "assay ids mismatch");
+    const csc::paired_rows rows = file.resolve_paired_rows(2u);
+    require(rows.assay_rows == std::vector<std::uint32_t>({2u, 2u}), "exact paired row resolution mismatch");
+    const cse::csr_matrix_export rna = file.read_assay_rows("rna", 1u, 2u);
+    require(rna.indptr == std::vector<std::int64_t>({0, 1, 3}), "exact RNA assay read indptr mismatch");
+    require(rna.indices == std::vector<std::int64_t>({1, 0, 3}), "exact RNA assay read indices mismatch");
+    const cse::csr_matrix_export atac = file.read_assay_rows("atac", 0u, 2u);
+    require(atac.indptr == std::vector<std::int64_t>({0, 1, 3}), "exact ATAC assay read indptr mismatch");
+    require(atac.indices == std::vector<std::int64_t>({1, 0, 4}), "exact ATAC assay read indices mismatch");
+    std::remove(path.c_str());
+}
+
+void test_partial_multi_assay_cshard() {
+    const std::string path = temp_cshard_path();
+    std::string error;
+    const std::vector<std::uint32_t> exact = {0u, 1u, 2u};
+    const std::vector<std::uint32_t> atac_global = {0u, cs::dataset_assay_invalid_row, 1u};
+    const std::vector<std::uint32_t> atac_local = {0u, 2u};
+    std::vector<csc::csr_assay_input> assays;
+    assays.push_back(make_assay("rna",
+                                make_semantics(cs::dataset_modality_scrna, cs::dataset_feature_gene),
+                                make_rna_csr(3u),
+                                make_cshard_table(4u, "gene"),
+                                exact,
+                                exact));
+    assays.push_back(make_assay("atac",
+                                make_semantics(cs::dataset_modality_scatac, cs::dataset_feature_peak),
+                                make_atac_csr(2u),
+                                make_cshard_table(5u, "peak"),
+                                atac_global,
+                                atac_local));
+    require(csc::write_multi_assay_csr(path, make_cshard_table(3u, "cell"), assays,
+                                       cs::dataset_pairing_partial_observation, {}, &error),
+            error.c_str());
+    csc::cshard_file file = csc::cshard_file::open(path);
+    const csc::paired_rows missing = file.resolve_paired_rows(1u);
+    require(missing.assay_rows == std::vector<std::uint32_t>({1u, cs::dataset_assay_invalid_row}),
+            "partial paired row resolution mismatch");
+    const cse::csr_matrix_export atac = file.read_assay_rows("atac", 1u, 1u);
+    require(atac.indptr == std::vector<std::int64_t>({0, 1}), "partial ATAC assay read indptr mismatch");
+    require(atac.indices == std::vector<std::int64_t>({3}), "partial ATAC assay read indices mismatch");
+    std::remove(path.c_str());
+}
+
+void test_exact_optimized_blocked_multi_assay_cshard() {
+    const std::string path = temp_cshard_path();
+    std::string error;
+    const std::vector<std::uint32_t> exact = {0u, 1u, 2u};
+    cs::bucketed_blocked_ell_shard rna_shard, atac_shard;
+    make_blocked_shard_from_csr(make_rna_csr(3u), &rna_shard);
+    make_blocked_shard_from_csr(make_atac_csr(3u), &atac_shard);
+
+    std::vector<csc::optimized_blocked_ell_assay_input> assays(2u);
+    assays[0].assay_id = "rna";
+    assays[0].semantics = make_semantics(cs::dataset_modality_scrna, cs::dataset_feature_gene);
+    assays[0].features = make_cshard_table(4u, "gene");
+    assays[0].global_to_assay_row = exact;
+    assays[0].assay_row_to_global = exact;
+    assays[0].shards.push_back(make_blocked_shard_input("rna", 0u, 3u, 0u, 3u, &rna_shard));
+    assays[1].assay_id = "atac";
+    assays[1].semantics = make_semantics(cs::dataset_modality_scatac, cs::dataset_feature_peak);
+    assays[1].features = make_cshard_table(5u, "peak");
+    assays[1].global_to_assay_row = exact;
+    assays[1].assay_row_to_global = exact;
+    assays[1].shards.push_back(make_blocked_shard_input("atac", 0u, 3u, 0u, 3u, &atac_shard));
+
+    require(csc::write_multi_assay_optimized_blocked_ell(path, make_cshard_table(3u, "cell"), assays,
+                                                         cs::dataset_pairing_exact_observation, {}, &error),
+            error.c_str());
+    csc::cshard_file file = csc::cshard_file::open(path);
+    require(file.describe().canonical_layout == "bucketed_blocked_ell", "optimized blocked layout mismatch");
+    require(file.resolve_paired_rows(2u).assay_rows == std::vector<std::uint32_t>({2u, 2u}),
+            "optimized blocked paired row resolution mismatch");
+    const cse::csr_matrix_export rna = file.read_assay_rows("rna", 1u, 2u);
+    require(rna.indptr == std::vector<std::int64_t>({0, 1, 3}), "optimized blocked RNA indptr mismatch");
+    require(rna.indices == std::vector<std::int64_t>({1, 0, 3}), "optimized blocked RNA indices mismatch");
+    const cse::csr_matrix_export atac = file.read_assay_rows("atac", 0u, 2u);
+    require(atac.indptr == std::vector<std::int64_t>({0, 1, 3}), "optimized blocked ATAC indptr mismatch");
+    require(atac.indices == std::vector<std::int64_t>({1, 0, 4}), "optimized blocked ATAC indices mismatch");
+    cs::clear(&rna_shard);
+    cs::clear(&atac_shard);
+    std::remove(path.c_str());
+}
+
+void test_partial_optimized_blocked_multi_assay_cshard() {
+    const std::string path = temp_cshard_path();
+    std::string error;
+    const std::vector<std::uint32_t> exact = {0u, 1u, 2u};
+    const std::vector<std::uint32_t> atac_global = {0u, cs::dataset_assay_invalid_row, 1u};
+    const std::vector<std::uint32_t> atac_local = {0u, 2u};
+    cs::bucketed_blocked_ell_shard rna_shard, atac_shard;
+    make_blocked_shard_from_csr(make_rna_csr(3u), &rna_shard);
+    make_blocked_shard_from_csr(make_atac_csr(2u), &atac_shard);
+
+    std::vector<csc::optimized_blocked_ell_assay_input> assays(2u);
+    assays[0].assay_id = "rna";
+    assays[0].semantics = make_semantics(cs::dataset_modality_scrna, cs::dataset_feature_gene);
+    assays[0].features = make_cshard_table(4u, "gene");
+    assays[0].global_to_assay_row = exact;
+    assays[0].assay_row_to_global = exact;
+    assays[0].shards.push_back(make_blocked_shard_input("rna", 0u, 3u, 0u, 3u, &rna_shard));
+    assays[1].assay_id = "atac";
+    assays[1].semantics = make_semantics(cs::dataset_modality_scatac, cs::dataset_feature_peak);
+    assays[1].features = make_cshard_table(5u, "peak");
+    assays[1].global_to_assay_row = atac_global;
+    assays[1].assay_row_to_global = atac_local;
+    assays[1].shards.push_back(make_blocked_shard_input("atac", 0u, 3u, 0u, 2u, &atac_shard));
+
+    require(csc::write_multi_assay_optimized_blocked_ell(path, make_cshard_table(3u, "cell"), assays,
+                                                         cs::dataset_pairing_partial_observation, {}, &error),
+            error.c_str());
+    csc::cshard_file file = csc::cshard_file::open(path);
+    require(file.resolve_paired_rows(1u).assay_rows == std::vector<std::uint32_t>({1u, cs::dataset_assay_invalid_row}),
+            "partial optimized blocked paired row resolution mismatch");
+    const cse::csr_matrix_export atac = file.read_assay_rows("atac", 1u, 1u);
+    require(atac.indptr == std::vector<std::int64_t>({0, 1}), "partial optimized blocked ATAC indptr mismatch");
+    require(atac.indices == std::vector<std::int64_t>({3}), "partial optimized blocked ATAC indices mismatch");
+    cs::clear(&rna_shard);
+    cs::clear(&atac_shard);
+    std::remove(path.c_str());
+}
+
+void test_exact_optimized_sliced_multi_assay_cshard() {
+    const std::string path = temp_cshard_path();
+    std::string error;
+    const std::vector<std::uint32_t> exact = {0u, 1u, 2u};
+    cs::bucketed_sliced_ell_shard rna_shard, atac_shard;
+    make_sliced_shard_from_csr(make_rna_csr(3u), &rna_shard);
+    make_sliced_shard_from_csr(make_atac_csr(3u), &atac_shard);
+
+    std::vector<csc::optimized_sliced_ell_assay_input> assays(2u);
+    assays[0].assay_id = "rna";
+    assays[0].semantics = make_semantics(cs::dataset_modality_scrna, cs::dataset_feature_gene);
+    assays[0].features = make_cshard_table(4u, "gene");
+    assays[0].global_to_assay_row = exact;
+    assays[0].assay_row_to_global = exact;
+    assays[0].shards.push_back(make_sliced_shard_input("rna", 0u, 3u, 0u, 3u, &rna_shard));
+    assays[1].assay_id = "atac";
+    assays[1].semantics = make_semantics(cs::dataset_modality_scatac, cs::dataset_feature_peak);
+    assays[1].features = make_cshard_table(5u, "peak");
+    assays[1].global_to_assay_row = exact;
+    assays[1].assay_row_to_global = exact;
+    assays[1].shards.push_back(make_sliced_shard_input("atac", 0u, 3u, 0u, 3u, &atac_shard));
+
+    require(csc::write_multi_assay_optimized_sliced_ell(path, make_cshard_table(3u, "cell"), assays,
+                                                        cs::dataset_pairing_exact_observation, {}, &error),
+            error.c_str());
+    csc::cshard_file file = csc::cshard_file::open(path);
+    require(file.describe().canonical_layout == "bucketed_sliced_ell", "optimized sliced layout mismatch");
+    const cse::csr_matrix_export rna = file.read_assay_rows("rna", 1u, 2u);
+    require(rna.indptr == std::vector<std::int64_t>({0, 1, 3}), "optimized sliced RNA indptr mismatch");
+    require(rna.indices == std::vector<std::int64_t>({1, 0, 3}), "optimized sliced RNA indices mismatch");
+    cs::clear(&rna_shard);
+    cs::clear(&atac_shard);
+    std::remove(path.c_str());
+}
+
+void test_partial_optimized_sliced_multi_assay_cshard() {
+    const std::string path = temp_cshard_path();
+    std::string error;
+    const std::vector<std::uint32_t> exact = {0u, 1u, 2u};
+    const std::vector<std::uint32_t> atac_global = {0u, cs::dataset_assay_invalid_row, 1u};
+    const std::vector<std::uint32_t> atac_local = {0u, 2u};
+    cs::bucketed_sliced_ell_shard rna_shard, atac_shard;
+    make_sliced_shard_from_csr(make_rna_csr(3u), &rna_shard);
+    make_sliced_shard_from_csr(make_atac_csr(2u), &atac_shard);
+
+    std::vector<csc::optimized_sliced_ell_assay_input> assays(2u);
+    assays[0].assay_id = "rna";
+    assays[0].semantics = make_semantics(cs::dataset_modality_scrna, cs::dataset_feature_gene);
+    assays[0].features = make_cshard_table(4u, "gene");
+    assays[0].global_to_assay_row = exact;
+    assays[0].assay_row_to_global = exact;
+    assays[0].shards.push_back(make_sliced_shard_input("rna", 0u, 3u, 0u, 3u, &rna_shard));
+    assays[1].assay_id = "atac";
+    assays[1].semantics = make_semantics(cs::dataset_modality_scatac, cs::dataset_feature_peak);
+    assays[1].features = make_cshard_table(5u, "peak");
+    assays[1].global_to_assay_row = atac_global;
+    assays[1].assay_row_to_global = atac_local;
+    assays[1].shards.push_back(make_sliced_shard_input("atac", 0u, 3u, 0u, 2u, &atac_shard));
+
+    require(csc::write_multi_assay_optimized_sliced_ell(path, make_cshard_table(3u, "cell"), assays,
+                                                        cs::dataset_pairing_partial_observation, {}, &error),
+            error.c_str());
+    csc::cshard_file file = csc::cshard_file::open(path);
+    require(file.resolve_paired_rows(1u).assay_rows == std::vector<std::uint32_t>({1u, cs::dataset_assay_invalid_row}),
+            "partial optimized sliced paired row resolution mismatch");
+    const cse::csr_matrix_export atac = file.read_assay_rows("atac", 1u, 1u);
+    require(atac.indptr == std::vector<std::int64_t>({0, 1}), "partial optimized sliced ATAC indptr mismatch");
+    require(atac.indices == std::vector<std::int64_t>({3}), "partial optimized sliced ATAC indices mismatch");
+    cs::clear(&rna_shard);
+    cs::clear(&atac_shard);
+    std::remove(path.c_str());
+}
+
+void test_multi_assay_rejections() {
+    std::string error;
+    const std::vector<std::uint32_t> exact = {0u, 1u, 2u};
+    std::vector<csc::csr_assay_input> bad_map;
+    bad_map.push_back(make_assay("rna",
+                                 make_semantics(cs::dataset_modality_scrna, cs::dataset_feature_gene),
+                                 make_rna_csr(3u),
+                                 make_cshard_table(4u, "gene"),
+                                 std::vector<std::uint32_t>{0u, 1u, 2u},
+                                 std::vector<std::uint32_t>{0u, 0u, 2u}));
+    require(!csc::write_multi_assay_csr(temp_cshard_path(), make_cshard_table(3u, "cell"), bad_map,
+                                        cs::dataset_pairing_partial_observation, {}, &error),
+            "malformed row map should be rejected");
+
+    std::vector<csc::csr_assay_input> bad_features;
+    bad_features.push_back(make_assay("rna",
+                                      make_semantics(cs::dataset_modality_scrna, cs::dataset_feature_gene),
+                                      make_rna_csr(3u),
+                                      make_cshard_table(3u, "gene"),
+                                      exact,
+                                      exact));
+    error.clear();
+    require(!csc::write_multi_assay_csr(temp_cshard_path(), make_cshard_table(3u, "cell"), bad_features,
+                                        cs::dataset_pairing_exact_observation, {}, &error),
+            "mismatched feature table size should be rejected");
+}
+
+void test_multi_assay_corruption_rejections() {
+    const std::vector<std::uint32_t> exact = {0u, 1u, 2u};
+    std::vector<csc::csr_assay_input> assays;
+    assays.push_back(make_assay("rna",
+                                make_semantics(cs::dataset_modality_scrna, cs::dataset_feature_gene),
+                                make_rna_csr(3u),
+                                make_cshard_table(4u, "gene"),
+                                exact,
+                                exact));
+    assays.push_back(make_assay("atac",
+                                make_semantics(cs::dataset_modality_scatac, cs::dataset_feature_peak),
+                                make_atac_csr(3u),
+                                make_cshard_table(5u, "peak"),
+                                exact,
+                                exact));
+
+    std::string error;
+    const std::string missing_row_map_path = temp_cshard_path();
+    require(csc::write_multi_assay_csr(missing_row_map_path, make_cshard_table(3u, "cell"), assays,
+                                       cs::dataset_pairing_exact_observation, {}, &error),
+            error.c_str());
+    {
+        std::fstream out(missing_row_map_path, std::ios::binary | std::ios::in | std::ios::out);
+        require((bool) out, "failed to reopen cshard for row-map corruption");
+        csc::spec::header header{};
+        csc::spec::assay_descriptor assay{};
+        out.read(reinterpret_cast<char *>(&header), sizeof(header));
+        out.seekg((std::streamoff) header.assay_directory_offset);
+        out.read(reinterpret_cast<char *>(&assay), sizeof(assay));
+        assay.global_to_assay_rows_section_id = 0u;
+        out.seekp((std::streamoff) header.assay_directory_offset);
+        out.write(reinterpret_cast<const char *>(&assay), sizeof(assay));
+    }
+    error.clear();
+    require(!csc::cshard_file::validate(missing_row_map_path, &error), "missing row-map section should be rejected");
+    std::remove(missing_row_map_path.c_str());
+
+    const std::string bad_matrix_path = temp_cshard_path();
+    require(csc::write_multi_assay_csr(bad_matrix_path, make_cshard_table(3u, "cell"), assays,
+                                       cs::dataset_pairing_exact_observation, {}, &error),
+            error.c_str());
+    {
+        std::fstream out(bad_matrix_path, std::ios::binary | std::ios::in | std::ios::out);
+        require((bool) out, "failed to reopen cshard for matrix-range corruption");
+        csc::spec::header header{};
+        csc::spec::assay_descriptor assay{};
+        out.read(reinterpret_cast<char *>(&header), sizeof(header));
+        out.seekg((std::streamoff) header.assay_directory_offset);
+        out.read(reinterpret_cast<char *>(&assay), sizeof(assay));
+        assay.matrix_descriptor_begin = header.matrix_directory_count + 1u;
+        out.seekp((std::streamoff) header.assay_directory_offset);
+        out.write(reinterpret_cast<const char *>(&assay), sizeof(assay));
+    }
+    error.clear();
+    require(!csc::cshard_file::validate(bad_matrix_path, &error), "invalid assay matrix descriptor range should be rejected");
+    std::remove(bad_matrix_path.c_str());
+}
+
+void test_optimized_multi_assay_rejections() {
+    std::string error;
+    const std::vector<std::uint32_t> exact = {0u, 1u, 2u};
+    cs::bucketed_blocked_ell_shard rna_shard, atac_shard;
+    make_blocked_shard_from_csr(make_rna_csr(3u), &rna_shard);
+    make_blocked_shard_from_csr(make_atac_csr(3u), &atac_shard);
+
+    std::vector<csc::optimized_blocked_ell_assay_input> assays(2u);
+    assays[0].assay_id = "rna";
+    assays[0].semantics = make_semantics(cs::dataset_modality_scrna, cs::dataset_feature_gene);
+    assays[0].features = make_cshard_table(4u, "gene");
+    assays[0].global_to_assay_row = exact;
+    assays[0].assay_row_to_global = exact;
+    assays[0].shards.push_back(make_blocked_shard_input("rna", 0u, 3u, 0u, 3u, &rna_shard));
+    assays[1].assay_id = "atac";
+    assays[1].semantics = make_semantics(cs::dataset_modality_scatac, cs::dataset_feature_peak);
+    assays[1].features = make_cshard_table(5u, "peak");
+    assays[1].global_to_assay_row = exact;
+    assays[1].assay_row_to_global = exact;
+    assays[1].shards.push_back(make_blocked_shard_input("atac", 0u, 2u, 0u, 2u, &atac_shard));
+    require(!csc::write_multi_assay_optimized_blocked_ell(temp_cshard_path(), make_cshard_table(3u, "cell"), assays,
+                                                          cs::dataset_pairing_exact_observation, {}, &error),
+            "mixed optimized global shard windows should be rejected");
+
+    assays[1].shards.clear();
+    assays[1].shards.push_back(make_blocked_shard_input("atac", 0u, 3u, 0u, 3u, &atac_shard));
+    assays[1].global_to_assay_row = {1u, 0u, 2u};
+    assays[1].assay_row_to_global = {1u, 0u, 2u};
+    error.clear();
+    require(!csc::write_multi_assay_optimized_blocked_ell(temp_cshard_path(), make_cshard_table(3u, "cell"), assays,
+                                                          cs::dataset_pairing_exact_observation, {}, &error),
+            "non-contiguous optimized local row range should be rejected");
+
+    assays[1].global_to_assay_row = exact;
+    assays[1].assay_row_to_global = exact;
+    assays[1].features = make_cshard_table(4u, "peak");
+    error.clear();
+    require(!csc::write_multi_assay_optimized_blocked_ell(temp_cshard_path(), make_cshard_table(3u, "cell"), assays,
+                                                          cs::dataset_pairing_exact_observation, {}, &error),
+            "optimized blob shape mismatch should be rejected");
+
+    assays[1].features = make_cshard_table(5u, "peak");
+    const std::string missing_blob_path = temp_cshard_path();
+    error.clear();
+    require(csc::write_multi_assay_optimized_blocked_ell(missing_blob_path, make_cshard_table(3u, "cell"), assays,
+                                                         cs::dataset_pairing_exact_observation, {}, &error),
+            error.c_str());
+    {
+        std::fstream out(missing_blob_path, std::ios::binary | std::ios::in | std::ios::out);
+        require((bool) out, "failed to reopen optimized cshard for blob corruption");
+        csc::spec::header header{};
+        csc::spec::matrix_descriptor matrix{};
+        out.read(reinterpret_cast<char *>(&header), sizeof(header));
+        out.seekg((std::streamoff) header.matrix_directory_offset);
+        out.read(reinterpret_cast<char *>(&matrix), sizeof(matrix));
+        matrix.section_a_id = 0u;
+        out.seekp((std::streamoff) header.matrix_directory_offset);
+        out.write(reinterpret_cast<const char *>(&matrix), sizeof(matrix));
+    }
+    error.clear();
+    require(!csc::cshard_file::validate(missing_blob_path, &error), "missing optimized blob section should be rejected");
+    std::remove(missing_blob_path.c_str());
+
+    cs::clear(&rna_shard);
+    cs::clear(&atac_shard);
+}
+
+void test_multi_assay_cshard_runtime() {
+    test_exact_multi_assay_cshard();
+    test_partial_multi_assay_cshard();
+    test_exact_optimized_blocked_multi_assay_cshard();
+    test_partial_optimized_blocked_multi_assay_cshard();
+    test_exact_optimized_sliced_multi_assay_cshard();
+    test_partial_optimized_sliced_multi_assay_cshard();
+    test_multi_assay_rejections();
+    test_multi_assay_corruption_rejections();
+    test_optimized_multi_assay_rejections();
+}
+
 } // namespace
 
 int main() {
-    char path[] = "/tmp/cellshard_export_runtimeXXXXXX.csh5";
-    const std::string derived_path = std::string(path) + ".derived.csh5";
-    const std::string derived_cache_root = std::string(path) + ".derived.cache";
-    const int fd = ::mkstemps(path, 5);
-    require(fd >= 0, "mkstemps failed");
-    ::close(fd);
-    std::remove(path);
+    test_multi_assay_cshard_runtime();
+
+    const char *requested_output = std::getenv("CELLSHARD_EXPORT_RUNTIME_OUTPUT");
+    const bool keep_output = std::getenv("CELLSHARD_EXPORT_RUNTIME_KEEP_OUTPUT") != nullptr;
+    std::string path_storage;
+    if (requested_output != nullptr && requested_output[0] != '\0') {
+        path_storage = requested_output;
+        std::remove(path_storage.c_str());
+    } else {
+        char temp_path[] = "/tmp/cellshard_export_runtimeXXXXXX.csh5";
+        const int fd = ::mkstemps(temp_path, 5);
+        require(fd >= 0, "mkstemps failed");
+        ::close(fd);
+        std::remove(temp_path);
+        path_storage = temp_path;
+    }
+    const char *path = path_storage.c_str();
+    const std::string derived_path = path_storage + ".derived.csh5";
+    const std::string derived_cache_root = path_storage + ".derived.cache";
 
     cs::sparse::blocked_ell part;
     cs::sparse::init(&part);
@@ -453,7 +1069,7 @@ int main() {
     bool found_parent_path = false;
     bool found_pack_name = false;
     for (const cse::dataset_attribute &entry : derived_attributes) {
-        if (entry.key == "derived.parent_path" && entry.value == path) found_parent_path = true;
+        if (entry.key == "derived.parent_path" && entry.value == path_storage) found_parent_path = true;
         if (entry.key == "derived.pack_name" && entry.value == "manual_group") found_pack_name = true;
     }
     require(found_parent_path, "derived parent path attribute missing");
@@ -569,6 +1185,6 @@ int main() {
     std::remove((derived_path + ".cache").c_str());
     std::error_code derived_ec;
     std::filesystem::remove_all(derived_cache_root, derived_ec);
-    std::remove(path);
+    if (!keep_output) std::remove(path);
     return 0;
 }

@@ -170,9 +170,10 @@ Execution artifact.
 
 ### Purpose
 
-`.cspack` is the GGUF-like CSPACK format for CellShard and Cellerator.
+`.cspack` is the shard-pack runtime format for CellShard and Cellerator.
 
-It is generated from an archive or interchange source and consumed directly by Cellerator for low-overhead sparse GPU execution.
+It is generated from `.csh5` and consumed by CellShard/Cellerator runtime paths
+for low-overhead sparse fetch, staging, and GPU execution.
 
 This is the current priority.
 
@@ -206,21 +207,23 @@ CSPACK payload.
 
 Supported in v1:
 
-- Blocked-ELL layout.
-- Sliced-ELL layout.
-- FP16 values.
-- `uint32` column-addressing indices.
-- Little-endian encoding.
-- 64-bit offsets.
-- Fixed payload alignment.
-- Explicit section directory.
-- Explicit shard and partition directories.
-- Required feature-order hash.
-- Required generation identifiers.
+- Per-shard files with magic `CSPACK01`.
+- Bucketed Blocked-ELL execution partitions.
+- Bucketed Sliced-ELL execution partitions.
+- Quantized Blocked-ELL runtime partitions.
+- Little-endian host-native encoding.
+- 64-bit shard/container counts and offsets.
+- `uint32` rows, cols, nnz, and index metadata inside partition payloads.
+- Raw matrix payload metadata carried inline by `io/common/raw_format.hh`.
+- Generation-qualified pack paths and external runtime metadata.
 
 Not supported in v1:
 
-- Quantized Blocked-ELL.
+- Rich in-band metadata tables.
+- Explicit in-band section directories.
+- In-band shard and partition directories beyond the current offset table.
+- Required in-band feature-order hashes.
+- Required in-band generation identifiers.
 - Distributed packs.
 - Trajectory indices.
 - Dynamic graph updates.

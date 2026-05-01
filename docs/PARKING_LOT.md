@@ -4,7 +4,7 @@ This file holds ideas that may be valuable later but should not distract from th
 
 The current priority is:
 
-> Define and implement `.cspack` v1 as the CSPACK format for CellShard and Cellerator.
+> Stabilize the current `.cspack` v1 shard-pack runtime contract for CellShard and Cellerator.
 
 Anything that does not directly help `.cspack` v1 become inspectable, loadable, and executable belongs here until the current milestone is complete.
 
@@ -22,20 +22,17 @@ Goal:
 
 The first successful version should:
 
-- Define the `.cspack` v1 binary contract.
-- Store Blocked-ELL execution payloads.
-- Support FP16 values.
-- Support `uint32` block column indices.
-- Use little-endian encoding.
-- Use 64-bit offsets.
-- Use fixed payload alignment.
-- Include a metadata table.
-- Include a section directory.
-- Include shard and partition directories.
-- Include generation identifiers.
-- Include a feature-order hash.
+- Use the implemented `CSPACK01` per-shard binary contract.
+- Store bucketed Blocked-ELL execution partitions.
+- Store bucketed Sliced-ELL execution partitions.
+- Store quantized Blocked-ELL runtime partitions.
+- Use little-endian host-native encoding.
+- Use 64-bit shard/container counts and offsets.
+- Use `uint32` rows, cols, nnz, and index metadata inside partition payloads.
+- Keep runtime/generation metadata outside the shard-pack bytes.
+- Keep feature-order hashes outside the shard-pack bytes.
 - Load without touching HDF5.
-- Run one Blocked-ELL SpMM benchmark from `.cspack`.
+- Run one representative GPU execution benchmark from `.cspack`.
 
 Everything else goes below.
 
@@ -62,9 +59,27 @@ Potential features:
 
 ---
 
-### Quantized `.cspack`
+### Rich in-band `.cspack` container
 
 A future CSPACK extension.
+
+Potential features:
+
+- Metadata table.
+- Section directory.
+- Shard and partition directories.
+- In-band generation identifiers.
+- In-band feature-order hash.
+- Fixed payload alignment independent of the current raw payload codec.
+
+The current implementation keeps runtime/generation metadata external to
+per-shard `CSPACK01` files.
+
+---
+
+### Expanded quantized `.cspack`
+
+A future extension beyond the current quantized Blocked-ELL runtime payload.
 
 Potential features:
 
@@ -77,15 +92,17 @@ Potential features:
 - Quantization calibration metadata.
 - Biological drift metrics.
 
-Do not implement until plain FP16 `.cspack` works end-to-end.
+Do not expand this until the current runtime pack path is stable end-to-end.
 
 ---
 
-### Sliced ELL support
+### Additional Sliced ELL research
 
-May be useful as a simpler or compatibility-oriented execution layout.
+Bucketed Sliced-ELL execution partitions are part of the current CSPACK shard
+pack support. Additional Sliced-ELL work may still be useful as a compatibility
+or benchmarking direction.
 
-Do not include in `.cspack` v1.
+Do not let this distract from stabilizing the implemented runtime path.
 
 Potential uses:
 

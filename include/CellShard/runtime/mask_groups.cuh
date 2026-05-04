@@ -82,15 +82,15 @@ struct alignas(16) sparse_group_reduce_fleet_result {
 };
 
 struct alignas(16) sparse_group_reduce_fleet_workspace {
-    distributed::local_context local;
+    ::cellerator::dist::local_context local;
     unsigned int slot_count;
     unsigned int *slots;
     sparse_group_reduce_workspace *devices;
     sparse_group_reduce_result *results;
     void **reduce_scratch;
     std::size_t *reduce_scratch_bytes;
-#if CELLSHARD_HAS_NCCL
-    distributed::nccl_communicator ranked_nccl;
+#if CELLERATOR_DIST_HAS_NCCL
+    ::cellerator::dist::nccl_communicator ranked_nccl;
 #endif
 };
 

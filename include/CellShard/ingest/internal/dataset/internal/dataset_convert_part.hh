@@ -81,7 +81,9 @@ static inline int convert_manifest_dataset_to_hdf5(const manifest *m,
 
         if (format_at(m, manifest_i) != source_mtx
             && format_at(m, manifest_i) != source_tenx_mtx
-            && format_at(m, manifest_i) != source_h5ad) continue;
+            && format_at(m, manifest_i) != source_tenx_h5
+            && format_at(m, manifest_i) != source_h5ad
+            && format_at(m, manifest_i) != source_loom) continue;
 
         common::init(&barcodes);
         common::init(&features);

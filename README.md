@@ -10,14 +10,15 @@ Its scope is narrow:
 - fetch and drop host-side partitions
 - stage partitions and shards to GPU
 - build and serve CSPACK generations from the canonical container
-- provide the sparse conversion and layout helpers needed for that runtime
+- serialize, load, cache, and stage CelleratorCore-owned sparse layouts
 - optionally stream source matrices and metadata into canonical CellShard containers
 
 CellShard is the storage, pack-delivery, and distributed execution base layer. It is not the analysis toolkit, model layer, or Torch integration layer. Those live on the Cellerator side.
 
 ## What CellShard Owns
 
-- sparse matrix formats such as `blocked_ell`, `compressed`, `dense`, and `triplet`
+- persisted matrix payloads that may contain CelleratorCore sparse layouts
+- CellShard-local fallback/interchange layouts such as `compressed`, `dense`, and `triplet`
 - sharded matrix metadata and layout helpers
 - on-disk matrix and dataset container persistence
 - CSPACK generation and delivery from canonical dataset containers
@@ -31,6 +32,7 @@ CellShard is the storage, pack-delivery, and distributed execution base layer. I
 
 CellShard does not own:
 
+- compute-oriented sparse layout definitions such as Blocked-ELL, Sliced-ELL, or quantized Blocked-ELL
 - biological preprocessing, normalization, and analytical row/column selection workflows
 - clustering, embedding, or neighbor analysis APIs
 - model training or inference
@@ -53,7 +55,7 @@ Main source areas:
 
 - `include/CellShard/CellShard.hh`: thin umbrella include for the main public surface
 - `include/CellShard/core/`: core types, spans, compatibility, and scalar helpers
-- `include/CellShard/formats/`: concrete matrix layouts such as `compressed`, `blocked_ell`, `dense`, `triplet`, and `diagonal`
+- `include/CellShard/formats/`: CellShard-local fallback layouts plus temporary compatibility shims for CelleratorCore sparse layouts
 - `include/CellShard/runtime/`: public sharded layout, host fetch/drop, device staging, storage dispatch, and local multi-GPU headers
 - `include/CellShard/io/`: public `.cspack`, `.csh5`, and standby `.cshard` entry headers
 - `include/CellShard/ingest/`: optional source ingest headers, enabled with `CELLSHARD_BUILD_INGEST=ON`
@@ -74,7 +76,7 @@ Useful public/runtime waypoints:
 - `include/CellShard/runtime/storage/shard_storage.cuh`: shard-storage backend, role, and capability definitions for the active `.csh5` runtime
 - `include/CellShard/runtime/host/sharded_host.cuh`: host-side fetch/drop and shard regrouping
 - `include/CellShard/runtime/device/sharded_device.cuh`: single-GPU upload and staging
-- `include/CellShard/runtime/distributed/distributed.cuh`: local multi-GPU shard placement and owner staging
+- `include/CellShard/runtime/distributed/distributed.cuh`: local multi-GPU shard placement and owner staging over CelleratorDist device contexts
 - `include/CellShard/runtime/mask_groups.cuh`: generic sparse row/feature
   masks, grouped row reductions, fleet dispatch, and the explicit masked-layout
   reoptimization hook
@@ -87,7 +89,7 @@ Useful public/runtime waypoints:
 
 - `partition`: one stored matrix chunk with explicit row bounds
 - `shard`: a group of partitions used as the higher-level fetch/staging unit
-- `blocked_ell`: the native sparse execution and persistence layout for new `.csh5` output
+- `blocked_ell`: a CelleratorCore-owned sparse execution layout that CellShard can persist and stage
 - `compressed`: an explicit row-compressed interop path, not a supported `.csh5` file format
 - `sharded<T>`: metadata plus optional loaded payload pointers for a partitioned matrix collection
 - `shard_storage`: the bound storage backend used for lazy fetch/materialization
@@ -96,7 +98,8 @@ Useful public/runtime waypoints:
 - `.cspool`: the local ingest-spool part format used before final `.csh5` assembly
 - `.cspack`: the generated execution artifact used for fast multithreaded fetch and delivery
 
-CellShard runtime masking is a generic sparse compute primitive, not a
+CellShard still exposes runtime masking as a compatibility runtime surface while
+generic sparse compute primitives migrate toward CelleratorCore. It is not a
 biology-specific QC policy. Biological group definitions such as mitochondrial,
 ribosomal, or hemoglobin feature rules are compiled by CellShardPreprocess and
 passed in as ordinary `uint32_t` feature-group masks. Runtime row masks and
@@ -158,7 +161,9 @@ When optional CellShard ingest is enabled, there is also a bounded local ingest 
 
 - ingest can spill intermediate `.cspool` partition artifacts to a machine-local SSD spool before the final `.csh5` is assembled
 - that spool is not an archive format and is not part of the steady-state runtime contract
-- its purpose is to avoid rereading an expensive source MTX while preserving `.csh5` as the durable source of truth
+- its purpose is to avoid rereading expensive source matrices while preserving `.csh5` as the durable source of truth
+- manifest-driven ingest accepts Matrix Market (`mtx`, `tenx_mtx`), 10x feature-barcode HDF5 (`tenx_h5`), sparse H5AD (`h5ad`), and dense count-like Loom matrices (`loom`); `binary` manifest rows remain unsupported
+- 10x HDF5 and Loom are interpreted as feature-by-cell source matrices and emitted as CellShard rows=cells, columns=features; Loom layer selection uses `matrix_source=layer:<name>`
 - row-aligned parts and shard-aligned fetch units are still the persistent contract; ingest does not split one cell across parts or shards
 
 The intended posture is:
@@ -219,7 +224,7 @@ Note on naming:
 - the older `runtime/layout/shard_paths.cuh` name is retained only as a compatibility shim
 - actual cache-pack path builders live in the `.csh5` runtime helpers, especially `src/io/csh5/preprocess_helpers_part.hh`
 
-For large or remote MTX ingest, the practical write-side workflow is:
+For large or remote source ingest, the practical write-side workflow is:
 
 1. stream the source matrix once through bounded conversion windows
 2. finish all filtering and shape-changing decisions before canonical CellShard emission
@@ -443,7 +448,7 @@ If you are browsing the code for the first time:
 - read `include/CellShard/runtime/layout/sharded.cuh` and `include/CellShard/runtime/host/sharded_host.cuh` for the host-side model
 - read `include/CellShard/runtime/device/sharded_device.cuh` for upload and staging
 - read `include/CellShard/io/csh5/api.cuh`, `src/io/csh5/create.cc`, `src/io/csh5/metadata.cc`, `src/io/csh5/finalize_preprocess.cc`, `src/io/csh5/write.cc`, and `src/io/csh5/runtime/` if you care about the `.csh5` container and shard `.cspack` runtime caches
-- read `include/CellShard/runtime/distributed/distributed.cuh` if you care about local multi-GPU placement
+- read `include/CellShard/runtime/distributed/distributed.cuh` if you care about local multi-GPU placement over CelleratorDist device contexts
 
 ## Notes
 

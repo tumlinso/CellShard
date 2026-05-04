@@ -2,10 +2,10 @@
 
 ## Scope And Ownership
 
-CellShard is the CellStack storage, layout, pack-delivery, and runtime-staging
-layer for large sharded sparse omics matrices. It owns:
+CellShard is the CellStack storage, pack-delivery, and runtime-staging layer for
+large sharded sparse omics matrices. It owns:
 
-- sparse matrix layouts and layout conversion helpers
+- persisted dataset, partition, shard, and pack layout metadata
 - partition, shard, and sharded-matrix metadata
 - `.csh5` canonical dataset storage
 - `.cspack` runtime pack generation, delivery, and fetch paths
@@ -14,15 +14,22 @@ layer for large sharded sparse omics matrices. It owns:
 - host fetch/drop, device upload, staging, and local distributed placement helpers
 - optional bounded ingest, export helpers, and Python bindings
 
+Sparse matrix representation primitives such as Blocked-ELL, Sliced-ELL, and
+quantized Blocked-ELL are CelleratorCore-owned compute/layout types. CellShard
+exposes temporary compatibility headers and may serialize, cache, stage, and
+ship those payloads, but it should not be the source of truth for their compute
+layout policy.
+
 Do not move model training, Torch/libtorch integration, trajectory logic, or ML
 compute into CellShard. Those belong in Cellerator. Do not move biological
 preprocessing policy, normalization decisions, marker/QC semantics, or workflow
 policy into CellShard. Those belong in CellShardPreprocess. Neighbor-caller
 orchestration and query policy belong in CellShardNeighbors.
 
-CellShard runtime masking is a generic sparse compute primitive. Biological
-feature groups may be passed in as ordinary feature masks, but CellShard should
-not define biological QC policy.
+CelleratorCore is the migration target for generic sparse compute primitives.
+CellShard may temporarily host compatibility runtime wrappers while callers are
+migrated. Biological feature groups may be passed in as ordinary feature masks,
+but neither CellShard nor CelleratorCore should define biological QC policy.
 
 ## Runtime And Format Posture
 
@@ -60,7 +67,8 @@ under `src/`, `export/`, and `python/`.
 
 Key areas:
 
-- `include/CellShard/formats/`: concrete sparse/dense matrix layouts
+- `include/CellShard/formats/`: compatibility headers for CelleratorCore-owned
+  sparse layouts plus CellShard-local dense/compressed fallback layouts
 - `include/CellShard/runtime/`: sharded layout, storage dispatch, host/device
   staging, masking, and local distributed helpers
 - `include/CellShard/io/`: `.cspack`, `.csh5`, `.cspool`, and `.cshard` public

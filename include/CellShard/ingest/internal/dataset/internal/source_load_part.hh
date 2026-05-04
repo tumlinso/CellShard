@@ -16,6 +16,17 @@ static inline int scan_source_row_nnz(const manifest *m,
         if (info.processed_like && !allow_processed_at(m, idx)) return 0;
         return h5ad::scan_row_nnz(matrix_path_at(m, idx), matrix_source_at(m, idx), header, row_nnz_out, &error);
     }
+    if (format == source_tenx_h5) {
+        return tenx_h5::scan_row_nnz(matrix_path_at(m, idx), header, row_nnz_out, &error);
+    }
+    if (format == source_loom) {
+        return loom::scan_row_nnz(matrix_path_at(m, idx),
+                                  matrix_source_at(m, idx),
+                                  allow_processed_at(m, idx) != 0,
+                                  header,
+                                  row_nnz_out,
+                                  &error);
+    }
     return 0;
 }
 
@@ -31,6 +42,12 @@ static inline int load_source_barcodes(const manifest *m,
     if (format == source_h5ad) {
         return h5ad::load_barcodes(matrix_path_at(m, idx), barcodes, &error);
     }
+    if (format == source_tenx_h5) {
+        return tenx_h5::load_barcodes(matrix_path_at(m, idx), barcodes, &error);
+    }
+    if (format == source_loom) {
+        return loom::load_barcodes(matrix_path_at(m, idx), matrix_source_at(m, idx), barcodes, &error);
+    }
     return 0;
 }
 
@@ -45,6 +62,12 @@ static inline int load_source_features(const manifest *m,
     }
     if (format == source_h5ad) {
         return h5ad::load_feature_table(matrix_path_at(m, idx), matrix_source_at(m, idx), features, &error);
+    }
+    if (format == source_tenx_h5) {
+        return tenx_h5::load_feature_table(matrix_path_at(m, idx), features, &error);
+    }
+    if (format == source_loom) {
+        return loom::load_feature_table(matrix_path_at(m, idx), matrix_source_at(m, idx), features, &error);
     }
     return 0;
 }
@@ -84,6 +107,30 @@ static inline int load_source_part_window_coo(const manifest *m,
                                           out,
                                           &error);
     }
+    if (format == source_tenx_h5) {
+        return tenx_h5::load_part_window_coo(matrix_path_at(m, idx),
+                                             header,
+                                             row_offsets,
+                                             part_nnz,
+                                             num_parts,
+                                             part_begin,
+                                             part_end,
+                                             out,
+                                             &error);
+    }
+    if (format == source_loom) {
+        return loom::load_part_window_coo(matrix_path_at(m, idx),
+                                          matrix_source_at(m, idx),
+                                          allow_processed_at(m, idx) != 0,
+                                          header,
+                                          row_offsets,
+                                          part_nnz,
+                                          num_parts,
+                                          part_begin,
+                                          part_end,
+                                          out,
+                                          &error);
+    }
     return 0;
 }
 
@@ -111,6 +158,17 @@ static inline int load_source_part_window_compressed(const manifest *m,
                                                  part_end,
                                                  out,
                                                  &error);
+    }
+    if (format == source_tenx_h5) {
+        return tenx_h5::load_part_window_compressed(matrix_path_at(m, idx),
+                                                    header,
+                                                    row_offsets,
+                                                    part_nnz,
+                                                    num_parts,
+                                                    part_begin,
+                                                    part_end,
+                                                    out,
+                                                    &error);
     }
     return 0;
 }

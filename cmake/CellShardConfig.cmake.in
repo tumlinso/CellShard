@@ -7,18 +7,47 @@ if(@CELLSHARD_ENABLE_CUDA@)
     find_dependency(CUDAToolkit REQUIRED)
 endif()
 
-if(@CELLSHARD_ENABLE_CELLERATOR_QUANTIZED@ AND NOT TARGET Cellerator::quantized_formats)
-    add_library(Cellerator::quantized_formats INTERFACE IMPORTED)
-    set_target_properties(Cellerator::quantized_formats PROPERTIES
+if(@CELLSHARD_ENABLE_CUDA@ AND NOT TARGET Cellerator::dist)
+    add_library(Cellerator::dist INTERFACE IMPORTED)
+    set_target_properties(Cellerator::dist PROPERTIES
+        INTERFACE_INCLUDE_DIRECTORIES "${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_INCLUDEDIR@"
+        INTERFACE_COMPILE_DEFINITIONS "CELLERATOR_DIST_HAS_NCCL=@CELLSHARD_CELLERATOR_DIST_HAS_NCCL@"
+    )
+    if(TARGET CUDA::cudart)
+        target_link_libraries(Cellerator::dist INTERFACE CUDA::cudart)
+    endif()
+    if(@CELLSHARD_CELLERATOR_DIST_HAS_NCCL@)
+        find_library(CELLERATOR_DIST_NCCL_LIBRARY
+            NAMES nccl
+            HINTS
+                /opt/nvidia/hpc_sdk/Linux_x86_64/26.1/comm_libs/12.9/nccl/lib
+        )
+        if(CELLERATOR_DIST_NCCL_LIBRARY)
+            target_link_libraries(Cellerator::dist INTERFACE ${CELLERATOR_DIST_NCCL_LIBRARY})
+        endif()
+    endif()
+endif()
+
+if(NOT TARGET Cellerator::core)
+    add_library(Cellerator::core INTERFACE IMPORTED)
+    set_target_properties(Cellerator::core PROPERTIES
         INTERFACE_INCLUDE_DIRECTORIES "${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_INCLUDEDIR@"
     )
     if(TARGET CUDA::cudart)
-        target_link_libraries(Cellerator::quantized_formats INTERFACE CUDA::cudart)
+        target_link_libraries(Cellerator::core INTERFACE CUDA::cudart)
     endif()
 endif()
 
 if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/CellShardTargets.cmake")
     include("${CMAKE_CURRENT_LIST_DIR}/CellShardTargets.cmake")
+endif()
+
+if(@CELLSHARD_ENABLE_CUDA@)
+    foreach(_cellshard_dist_consumer IN ITEMS CellShard::headers CellShard::runtime)
+        if(TARGET ${_cellshard_dist_consumer} AND TARGET Cellerator::dist)
+            target_link_libraries(${_cellshard_dist_consumer} INTERFACE Cellerator::dist)
+        endif()
+    endforeach()
 endif()
 
 set(CellShard_KNOWN_COMPONENTS

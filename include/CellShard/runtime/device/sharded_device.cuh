@@ -7,6 +7,8 @@
 
 #include <cuda_runtime.h>
 
+#include <Cellerator/core/matrix/views.cuh>
+
 #include "../host/sharded_host.cuh"
 
 namespace cellshard {
@@ -74,28 +76,8 @@ struct alignas(16) compressed_view {
     __half *val;
 };
 
-struct alignas(16) blocked_ell_view {
-    unsigned int rows;
-    unsigned int cols;
-    unsigned int nnz;
-    unsigned int block_size;
-    unsigned int ell_cols;
-    unsigned int *blockColIdx;
-    __half *val;
-};
-
-struct alignas(16) sliced_ell_view {
-    unsigned int rows;
-    unsigned int cols;
-    unsigned int nnz;
-    unsigned int slice_count;
-    unsigned int slice_rows;
-    unsigned int *slice_row_offsets;
-    unsigned int *slice_widths;
-    unsigned int *slice_slot_offsets;
-    unsigned int *col_idx;
-    __half *val;
-};
+using ::cellerator::core::matrix::device::blocked_ell_view;
+using ::cellerator::core::matrix::device::sliced_ell_view;
 
 struct alignas(16) coo_view {
     unsigned int rows;

@@ -24,6 +24,7 @@
 
 namespace dataset = cellshard::ingest::dataset;
 namespace tenx_h5 = cellshard::ingest::tenx_h5;
+namespace h5ad = cellshard::ingest::h5ad;
 namespace loom = cellshard::ingest::loom;
 namespace mtx = cellshard::ingest::mtx;
 namespace common = cellshard::ingest::common;
@@ -88,6 +89,67 @@ static void write_string_dataset(hid_t parent, const char *name, const std::vect
     assert(close_ok(H5Tclose(type)));
 }
 
+static void write_string_attr(hid_t parent, const char *name, const char *value) {
+    hid_t type = H5Tcopy(H5T_C_S1);
+    hid_t space = H5Screate(H5S_SCALAR);
+    assert(type >= 0 && space >= 0);
+    assert(H5Tset_size(type, std::strlen(value) + 1u) >= 0);
+    hid_t attr = H5Acreate2(parent, name, type, space, H5P_DEFAULT, H5P_DEFAULT);
+    assert(attr >= 0);
+    assert(H5Awrite(attr, type, value) >= 0);
+    assert(close_ok(H5Aclose(attr)));
+    assert(close_ok(H5Sclose(space)));
+    assert(close_ok(H5Tclose(type)));
+}
+
+static void write_u64_vector_attr(hid_t parent, const char *name, const std::vector<std::uint64_t> &values) {
+    hsize_t dims[1] = {(hsize_t) values.size()};
+    hid_t space = H5Screate_simple(1, dims, nullptr);
+    hid_t attr = H5Acreate2(parent, name, H5T_NATIVE_UINT64, space, H5P_DEFAULT, H5P_DEFAULT);
+    assert(space >= 0 && attr >= 0);
+    if (!values.empty()) assert(H5Awrite(attr, H5T_NATIVE_UINT64, values.data()) >= 0);
+    assert(close_ok(H5Aclose(attr)));
+    assert(close_ok(H5Sclose(space)));
+}
+
+static void write_legacy_axis_dataset(hid_t parent,
+                                      const char *name,
+                                      const std::vector<std::string> &index,
+                                      const std::vector<std::string> &gene_ids = {}) {
+    std::size_t index_width = 1u;
+    std::size_t gene_width = 1u;
+    std::size_t row_width = 0u;
+    for (const std::string &value : index) index_width = std::max(index_width, value.size() + 1u);
+    for (const std::string &value : gene_ids) gene_width = std::max(gene_width, value.size() + 1u);
+
+    hid_t index_type = H5Tcopy(H5T_C_S1);
+    hid_t gene_type = H5Tcopy(H5T_C_S1);
+    assert(index_type >= 0 && gene_type >= 0);
+    assert(H5Tset_size(index_type, index_width) >= 0);
+    assert(H5Tset_size(gene_type, gene_width) >= 0);
+    row_width = index_width + (gene_ids.empty() ? 0u : gene_width);
+    hid_t compound = H5Tcreate(H5T_COMPOUND, row_width);
+    assert(compound >= 0);
+    assert(H5Tinsert(compound, "index", 0u, index_type) >= 0);
+    if (!gene_ids.empty()) assert(H5Tinsert(compound, "gene_ids", index_width, gene_type) >= 0);
+
+    std::vector<char> rows(index.size() * row_width, '\0');
+    for (std::size_t i = 0; i < index.size(); ++i) {
+        std::memcpy(rows.data() + i * row_width, index[i].c_str(), index[i].size());
+        if (!gene_ids.empty()) std::memcpy(rows.data() + i * row_width + index_width, gene_ids[i].c_str(), gene_ids[i].size());
+    }
+    hsize_t dims[1] = {(hsize_t) index.size()};
+    hid_t space = H5Screate_simple(1, dims, nullptr);
+    hid_t dset = H5Dcreate2(parent, name, compound, space, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    assert(space >= 0 && dset >= 0);
+    if (!rows.empty()) assert(H5Dwrite(dset, compound, H5S_ALL, H5S_ALL, H5P_DEFAULT, rows.data()) >= 0);
+    assert(close_ok(H5Dclose(dset)));
+    assert(close_ok(H5Sclose(space)));
+    assert(close_ok(H5Tclose(compound)));
+    assert(close_ok(H5Tclose(gene_type)));
+    assert(close_ok(H5Tclose(index_type)));
+}
+
 static std::string make_path(const char *name) {
     std::filesystem::path root = std::filesystem::temp_directory_path()
         / ("cellshard_hdf5_ingest_" + std::to_string((long long) getpid()));
@@ -113,6 +175,21 @@ static void create_tenx(const std::string &path, bool bad_index = false, bool mi
         assert(close_ok(H5Gclose(features)));
         assert(close_ok(H5Gclose(matrix)));
     }
+    assert(close_ok(H5Fclose(file)));
+}
+
+static void create_legacy_h5ad(const std::string &path) {
+    hid_t file = H5Fcreate(path.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
+    hid_t x = H5Gcreate2(file, "/X", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+    assert(file >= 0 && x >= 0);
+    write_string_attr(x, "h5sparse_format", "csr");
+    write_u64_vector_attr(x, "h5sparse_shape", {2u, 3u});
+    write_double_dataset(x, "data", {5.0, 2.0, 7.0});
+    write_u64_dataset(x, "indices", {0u, 2u, 1u});
+    write_u64_dataset(x, "indptr", {0u, 2u, 3u});
+    write_legacy_axis_dataset(file, "/obs", {"cellA", "cellB"});
+    write_legacy_axis_dataset(file, "/var", {"G0", "G1", "G2"}, {"gene0", "gene1", "gene2"});
+    assert(close_ok(H5Gclose(x)));
     assert(close_ok(H5Fclose(file)));
 }
 
@@ -246,8 +323,51 @@ static void test_loom_reader() {
     std::free(row_nnz);
 }
 
+static void test_legacy_h5ad_reader() {
+    const std::string path = make_path("legacy_sparse.h5ad");
+    create_legacy_h5ad(path);
+
+    mtx::header header;
+    unsigned long *row_nnz = nullptr;
+    std::string error;
+    assert(h5ad::scan_row_nnz(path.c_str(), "x", &header, &row_nnz, &error));
+    assert(header.rows == 2ul);
+    assert(header.cols == 3ul);
+    assert(header.nnz_file == 3ul);
+    assert(header.row_sorted == 1);
+    assert(row_nnz[0] == 2ul && row_nnz[1] == 1ul);
+
+    common::barcode_table barcodes;
+    common::feature_table features;
+    common::init(&barcodes);
+    common::init(&features);
+    assert(h5ad::load_barcodes(path.c_str(), &barcodes, &error));
+    assert(common::count(&barcodes) == 2u);
+    assert(std::string(common::get(&barcodes, 0u)) == "cellA");
+    assert(h5ad::load_feature_table(path.c_str(), "x", &features, &error));
+    assert(common::count(&features) == 3u);
+    assert(std::string(common::id(&features, 2u)) == "G2");
+    assert(std::string(common::name(&features, 1u)) == "G1");
+    assert(std::string(common::type(&features, 0u)) == "gene");
+
+    unsigned long row_offsets[3] = {0ul, 1ul, 2ul};
+    unsigned long part_nnz[2] = {2ul, 1ul};
+    cellshard::sharded<sparse::compressed> compressed;
+    cellshard::init(&compressed);
+    assert(h5ad::load_part_window_compressed(path.c_str(), "x", &header, row_offsets, part_nnz, 2ul, 0ul, 2ul, &compressed, &error));
+    assert(compressed.num_partitions == 2ul);
+    assert(compressed.parts[0]->minorIdx[0] == 0u);
+    assert(compressed.parts[0]->minorIdx[1] == 2u);
+    assert(std::fabs(__half2float(compressed.parts[1]->val[0]) - 7.0f) < 0.01f);
+    cellshard::clear(&compressed);
+    common::clear(&barcodes);
+    common::clear(&features);
+    std::free(row_nnz);
+}
+
 int main() {
     test_tenx_reader();
+    test_legacy_h5ad_reader();
     test_loom_reader();
     return 0;
 }

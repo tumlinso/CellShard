@@ -456,19 +456,33 @@ if(CELLSHARD_BUILD_INGEST)
     if(NOT TARGET CellShard::runtime)
         message(FATAL_ERROR "CELLSHARD_BUILD_INGEST requires the CellShard CUDA runtime target")
     endif()
-    add_library(cellshard_ingest INTERFACE)
+    add_library(cellshard_ingest STATIC
+        src/ingest/mtx_series.cu
+    )
     add_library(CellShard::ingest ALIAS cellshard_ingest)
     set_target_properties(cellshard_ingest PROPERTIES EXPORT_NAME ingest)
-    target_link_libraries(cellshard_ingest INTERFACE
+    target_include_directories(cellshard_ingest
+        PUBLIC
+            ${HDF5_INCLUDE_DIRS}
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}
+            ${CMAKE_CURRENT_SOURCE_DIR}/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+    target_link_libraries(cellshard_ingest PUBLIC
         cellshard_runtime
         ${HDF5_LIBRARIES}
     )
-    target_include_directories(cellshard_ingest INTERFACE
-        ${HDF5_INCLUDE_DIRS}
+    set_target_properties(cellshard_ingest PROPERTIES
+        CXX_STANDARD 17
+        CXX_STANDARD_REQUIRED YES
+        CUDA_STANDARD 17
+        CUDA_STANDARD_REQUIRED YES
     )
-    target_compile_features(cellshard_ingest INTERFACE cxx_std_17)
+    cellshard_enable_perf(cellshard_ingest)
     cellshard_assert_no_torch_dependency(cellshard_ingest)
     list(APPEND CELLSHARD_EXPORT_TARGETS cellshard_ingest)
+    list(APPEND CELLSHARD_INSTALL_TARGETS cellshard_ingest)
     list(APPEND CELLSHARD_PACKAGE_COMPONENTS ingest)
 endif()
 
@@ -610,8 +624,12 @@ if(CELLSHARD_ENABLE_PYTHON)
 endif()
 
 if(CELLSHARD_BUILD_APPS AND CELLSHARD_BUILD_EXPORT)
+    set(cellshard_app_sources src/apps/cellshard_main.cc)
+    if(CELLSHARD_BUILD_INGEST)
+        list(APPEND cellshard_app_sources src/apps/cellshard_ingest_mtx_series.cu)
+    endif()
     add_executable(cellshard
-        src/apps/cellshard_main.cc
+        ${cellshard_app_sources}
     )
     target_include_directories(cellshard PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
@@ -622,10 +640,22 @@ if(CELLSHARD_BUILD_APPS AND CELLSHARD_BUILD_EXPORT)
     target_link_libraries(cellshard PRIVATE
         cellshard_export
     )
+    if(CELLSHARD_BUILD_INGEST)
+        target_link_libraries(cellshard PRIVATE cellshard_ingest)
+        target_compile_definitions(cellshard PRIVATE CELLSHARD_BUILD_INGEST_APP=1)
+    else()
+        target_compile_definitions(cellshard PRIVATE CELLSHARD_BUILD_INGEST_APP=0)
+    endif()
     set_target_properties(cellshard PROPERTIES
         CXX_STANDARD 17
         CXX_STANDARD_REQUIRED YES
     )
+    if(CELLSHARD_BUILD_INGEST)
+        set_target_properties(cellshard PROPERTIES
+            CUDA_STANDARD 17
+            CUDA_STANDARD_REQUIRED YES
+        )
+    endif()
     cellshard_assert_no_torch_dependency(cellshard)
 endif()
 
@@ -797,6 +827,27 @@ if(CELLSHARD_BUILD_TESTS AND CELLSHARD_BUILD_EXPORT)
             CUDA_STANDARD_REQUIRED YES
         )
         cellshard_enable_perf(cellShardHdf5SourceIngestTest)
+
+        add_executable(cellShardMtxSeriesIngestTest
+            tests/mtx_series_ingest_test.cu
+        )
+        target_link_libraries(cellShardMtxSeriesIngestTest PRIVATE
+            CellShard::ingest
+            ${HDF5_LIBRARIES}
+        )
+        target_include_directories(cellShardMtxSeriesIngestTest PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}
+            ${CMAKE_CURRENT_SOURCE_DIR}/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+            ${HDF5_INCLUDE_DIRS}
+        )
+        set_target_properties(cellShardMtxSeriesIngestTest PROPERTIES
+            CXX_STANDARD 17
+            CXX_STANDARD_REQUIRED YES
+            CUDA_STANDARD 17
+            CUDA_STANDARD_REQUIRED YES
+        )
+        cellshard_enable_perf(cellShardMtxSeriesIngestTest)
     endif()
 endif()
 
@@ -858,12 +909,6 @@ install(TARGETS ${CELLSHARD_INSTALL_TARGETS}
 install(TARGETS cellshard_headers
     EXPORT CellShardTargets
 )
-
-if(TARGET cellshard_ingest)
-    install(TARGETS cellshard_ingest
-        EXPORT CellShardTargets
-    )
-endif()
 
 if(TARGET _cellshard)
     install(TARGETS _cellshard

@@ -161,7 +161,15 @@ When optional CellShard ingest is enabled, there is also a bounded local ingest 
 - ingest can spill intermediate `.cspool` partition artifacts to a machine-local SSD spool before the final `.csh5` is assembled
 - that spool is not an archive format and is not part of the steady-state runtime contract
 - its purpose is to avoid rereading expensive source matrices while preserving `.csh5` as the durable source of truth
-- manifest-driven ingest accepts Matrix Market (`mtx`, `tenx_mtx`), 10x feature-barcode HDF5 (`tenx_h5`), sparse H5AD (`h5ad`), and dense count-like Loom matrices (`loom`); `binary` manifest rows remain unsupported
+- manifest-driven ingest accepts Matrix Market (`mtx`, `tenx_mtx`), 10x feature-barcode HDF5 (`tenx_h5`), sparse H5AD (`h5ad`, including legacy h5sparse CSR/CSC groups), and dense count-like Loom matrices (`loom`); `binary` manifest rows remain unsupported
+- optimized MTX-series ingest accepts feature-by-cell Matrix Market sources and
+  writes cells-by-features optimized bucketed Sliced-ELL payloads directly:
+  `cellshard ingest mtx-series (--manifest series.tsv | --root series_dir) --out dataset.csh5`
+  when built with `CELLSHARD_BUILD_INGEST=ON`
+- the MTX-series path defaults to cached row-NNZ planning, automatic CPU worker
+  selection, all visible CUDA devices, and serialized HDF5 append; use
+  `--prewarm-only`, `--cpu-workers`, `--gpus`, and `--cache-root` to make those
+  controls explicit
 - 10x HDF5 and Loom are interpreted as feature-by-cell source matrices and emitted as CellShard rows=cells, columns=features; Loom layer selection uses `matrix_source=layer:<name>`
 - row-aligned parts and shard-aligned fetch units are still the persistent contract; ingest does not split one cell across parts or shards
 

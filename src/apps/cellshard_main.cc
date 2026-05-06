@@ -8,11 +8,16 @@
 
 namespace csc = ::cellshard::cshard;
 
+#if CELLSHARD_BUILD_INGEST_APP
+int cellshard_ingest_mtx_series_main(int argc, char **argv);
+#endif
+
 namespace {
 
 void usage() {
     std::fprintf(stderr,
                  "usage:\n"
+                 "  cellshard ingest mtx-series (--manifest path.tsv | --root dir) --out dataset.csh5\n"
                  "  cellshard cshard inspect <dataset.cshard>\n"
                  "  cellshard cshard validate <dataset.cshard>\n"
                  "  cellshard cshard read-rows <dataset.cshard> --start N --count N\n"
@@ -102,6 +107,11 @@ int cshard_main(int argc, char **argv) {
 
 int main(int argc, char **argv) {
     try {
+#if CELLSHARD_BUILD_INGEST_APP
+        if (argc >= 3 && std::string(argv[1]) == "ingest" && std::string(argv[2]) == "mtx-series") {
+            return cellshard_ingest_mtx_series_main(argc - 3, argv + 3);
+        }
+#endif
         if (argc >= 2 && std::string(argv[1]) == "cshard") return cshard_main(argc - 1, argv + 1);
         usage();
         return 2;

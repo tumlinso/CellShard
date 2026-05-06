@@ -33,9 +33,10 @@ inline bool load_dataframe_columns(const char *path,
     }
     if (!load_dataframe_index(file, group_path, &axis_index, error)) goto done;
     rows = (unsigned long) axis_index.count;
-    axis = H5Gopen2(file, group_path, H5P_DEFAULT);
+    axis = open_optional_group(file, group_path);
     if (axis < 0) {
-        set_error(error, "failed to open h5ad dataframe group");
+        if (rows_out != nullptr) *rows_out = rows;
+        ok = true;
         goto done;
     }
     if (!list_child_names(axis, &names)) {
@@ -200,8 +201,19 @@ inline bool choose_feature_text_column(hid_t file,
     if (out == nullptr) return false;
     common::clear(out);
     common::init(out);
-    group = H5Gopen2(file, var_path.c_str(), H5P_DEFAULT);
-    if (group < 0) goto done;
+    group = open_optional_group(file, var_path.c_str());
+    if (group < 0) {
+        for (std::size_t i = 0; i < candidate_count; ++i) {
+            if (read_compound_string_field(file, var_path.c_str(), candidates[i], out)
+                && (unsigned long) out->count == expected_rows) {
+                ok = true;
+                break;
+            }
+            common::clear(out);
+            common::init(out);
+        }
+        goto done;
+    }
     for (std::size_t i = 0; i < candidate_count; ++i) {
         if (load_dataframe_text_column(group, candidates[i], expected_rows, out)) {
             ok = true;

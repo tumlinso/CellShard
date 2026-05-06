@@ -234,6 +234,15 @@ done:
     return ok;
 }
 
+inline bool attr_exists(hid_t obj, const char *name) {
+    htri_t exists = 0;
+    if (obj < 0 || name == nullptr) return false;
+    H5E_BEGIN_TRY {
+        exists = H5Aexists(obj, name);
+    } H5E_END_TRY;
+    return exists > 0;
+}
+
 inline bool read_attr_u64_vector(hid_t obj, const char *name, std::vector<std::uint64_t> *out) {
     hid_t attr = (hid_t) -1;
     hid_t type = (hid_t) -1;
@@ -269,6 +278,89 @@ done:
     if (type >= 0) H5Tclose(type);
     if (attr >= 0) H5Aclose(attr);
     if (!ok) out->clear();
+    return ok;
+}
+
+inline bool read_compound_string_field(hid_t parent,
+                                       const char *dataset_name,
+                                       const char *field_name,
+                                       common::text_column *out) {
+    hid_t dset = (hid_t) -1;
+    hid_t type = (hid_t) -1;
+    hid_t field_type = (hid_t) -1;
+    hid_t mem_type = (hid_t) -1;
+    hid_t space = (hid_t) -1;
+    hssize_t count = 0;
+    int field_idx = -1;
+    std::vector<char> fixed_values;
+    std::vector<char *> variable_values;
+    bool ok = false;
+
+    if (out == nullptr || dataset_name == nullptr || field_name == nullptr) return false;
+    common::clear(out);
+    common::init(out);
+    dset = open_optional_dataset(parent, dataset_name);
+    if (dset < 0) goto done;
+    type = H5Dget_type(dset);
+    if (type < 0 || H5Tget_class(type) != H5T_COMPOUND) goto done;
+    field_idx = H5Tget_member_index(type, field_name);
+    if (field_idx < 0) goto done;
+    field_type = H5Tget_member_type(type, (unsigned int) field_idx);
+    if (field_type < 0 || H5Tget_class(field_type) != H5T_STRING) goto done;
+    space = H5Dget_space(dset);
+    if (space < 0 || H5Sget_simple_extent_ndims(space) != 1) goto done;
+    count = H5Sget_simple_extent_npoints(space);
+    if (count < 0) goto done;
+
+    if (H5Tis_variable_str(field_type) > 0) {
+        hid_t mem_field_type = H5Tcopy(H5T_C_S1);
+        if (mem_field_type < 0) goto done;
+        if (H5Tset_size(mem_field_type, H5T_VARIABLE) < 0) {
+            H5Tclose(mem_field_type);
+            goto done;
+        }
+        mem_type = H5Tcreate(H5T_COMPOUND, sizeof(char *));
+        if (mem_type < 0 || H5Tinsert(mem_type, field_name, 0u, mem_field_type) < 0) {
+            H5Tclose(mem_field_type);
+            goto done;
+        }
+        H5Tclose(mem_field_type);
+        variable_values.assign((std::size_t) count, nullptr);
+        if (count != 0 && H5Dread(dset, mem_type, H5S_ALL, H5S_ALL, H5P_DEFAULT, variable_values.data()) < 0) goto done;
+        for (hssize_t i = 0; i < count; ++i) {
+            const char *value = variable_values[(std::size_t) i] != nullptr ? variable_values[(std::size_t) i] : "";
+            if (!common::append(out, value, std::strlen(value))) goto done;
+        }
+    } else {
+        const std::size_t item_size = H5Tget_size(field_type);
+        if (item_size == 0u) goto done;
+        mem_type = H5Tcreate(H5T_COMPOUND, item_size);
+        if (mem_type < 0 || H5Tinsert(mem_type, field_name, 0u, field_type) < 0) goto done;
+        fixed_values.assign((std::size_t) count * item_size, '\0');
+        if (count != 0 && H5Dread(dset, mem_type, H5S_ALL, H5S_ALL, H5P_DEFAULT, fixed_values.data()) < 0) goto done;
+        for (hssize_t i = 0; i < count; ++i) {
+            const char *value = fixed_values.data() + (std::size_t) i * item_size;
+            std::size_t value_len = 0u;
+            while (value_len < item_size && value[value_len] != '\0') ++value_len;
+            while (value_len > 0u && std::isspace((unsigned char) value[value_len - 1u])) --value_len;
+            if (!common::append(out, value, value_len)) goto done;
+        }
+    }
+    ok = true;
+
+done:
+    if (!variable_values.empty() && mem_type >= 0 && space >= 0) {
+        H5Dvlen_reclaim(mem_type, space, H5P_DEFAULT, variable_values.data());
+    }
+    if (space >= 0) H5Sclose(space);
+    if (mem_type >= 0) H5Tclose(mem_type);
+    if (field_type >= 0) H5Tclose(field_type);
+    if (type >= 0) H5Tclose(type);
+    if (dset >= 0) H5Dclose(dset);
+    if (!ok) {
+        common::clear(out);
+        common::init(out);
+    }
     return ok;
 }
 
@@ -554,9 +646,14 @@ inline bool load_dataframe_index(hid_t file,
     if (out == nullptr) return false;
     common::clear(out);
     common::init(out);
-    group = H5Gopen2(file, group_path.c_str(), H5P_DEFAULT);
+    group = open_optional_group(file, group_path.c_str());
     if (group < 0) {
-        set_error(error, "failed to open h5ad dataframe group");
+        if (read_compound_string_field(file, group_path.c_str(), "index", out)
+            || read_compound_string_field(file, group_path.c_str(), "_index", out)) {
+            ok = true;
+        } else {
+            set_error(error, "failed to open h5ad dataframe group");
+        }
         goto done;
     }
     if (!read_attr_string(group, "_index", &index_name) || index_name.empty()) index_name = "_index";
@@ -694,22 +791,39 @@ inline bool probe_selected_matrix(const char *path,
         }
         goto done;
     }
-    if (!read_attr_string(group, "encoding-type", &encoding)) {
-        set_error(error, "selected h5ad matrix is missing encoding-type");
-        goto done;
-    }
-    if (encoding == "csr_matrix") {
-        out->sparse = true;
-        out->csr = true;
-    } else if (encoding == "csc_matrix") {
-        out->sparse = true;
-        out->csc = true;
+    if (attr_exists(group, "encoding-type") && read_attr_string(group, "encoding-type", &encoding)) {
+        if (encoding == "csr_matrix") {
+            out->sparse = true;
+            out->csr = true;
+        } else if (encoding == "csc_matrix") {
+            out->sparse = true;
+            out->csc = true;
+        } else {
+            set_error(error, "selected h5ad matrix is not a supported sparse matrix group");
+            goto done;
+        }
+        if (!read_attr_u64_vector(group, "shape", &shape) || shape.size() < 2u) {
+            set_error(error, "selected h5ad matrix is missing shape");
+            goto done;
+        }
+    } else if (attr_exists(group, "h5sparse_format") && read_attr_string(group, "h5sparse_format", &encoding)) {
+        encoding = lower_copy(trim_copy(encoding));
+        if (encoding == "csr") {
+            out->sparse = true;
+            out->csr = true;
+        } else if (encoding == "csc") {
+            out->sparse = true;
+            out->csc = true;
+        } else {
+            set_error(error, "selected legacy h5ad matrix is not a supported sparse matrix group");
+            goto done;
+        }
+        if (!read_attr_u64_vector(group, "h5sparse_shape", &shape) || shape.size() < 2u) {
+            set_error(error, "selected legacy h5ad matrix is missing h5sparse_shape");
+            goto done;
+        }
     } else {
-        set_error(error, "selected h5ad matrix is not a supported sparse matrix group");
-        goto done;
-    }
-    if (!read_attr_u64_vector(group, "shape", &shape) || shape.size() < 2u) {
-        set_error(error, "selected h5ad matrix is missing shape");
+        set_error(error, "selected h5ad matrix is missing sparse encoding metadata");
         goto done;
     }
     if (shape[0] > (std::uint64_t) std::numeric_limits<unsigned long>::max()

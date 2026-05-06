@@ -7,7 +7,8 @@ enum {
     dataset_matrix_family_blocked_ell = 1u,
     dataset_matrix_family_optimized_blocked_ell = 2u,
     dataset_matrix_family_sliced_ell = 3u,
-    dataset_matrix_family_quantized_blocked_ell = 4u
+    dataset_matrix_family_quantized_blocked_ell = 4u,
+    dataset_matrix_family_dense = 5u
 };
 
 enum {
@@ -18,7 +19,8 @@ enum {
     dataset_execution_format_bucketed_blocked_ell = 4u,
     dataset_execution_format_sliced_ell = 5u,
     dataset_execution_format_bucketed_sliced_ell = 6u,
-    dataset_execution_format_quantized_blocked_ell = 7u
+    dataset_execution_format_quantized_blocked_ell = 7u,
+    dataset_execution_format_dense = 8u
 };
 
 } // namespace cellshard

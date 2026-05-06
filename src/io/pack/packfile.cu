@@ -204,6 +204,9 @@ done:
 
 // FILE* store writes one packed dense payload at the current file position.
 int store_dense_raw(std::FILE *fp, types::dim_t rows, types::dim_t cols, types::nnz_t nnz, const void *val, std::size_t value_size) {
+    const types::nnz_t packed_nnz = (types::nnz_t) ((std::size_t) rows * (std::size_t) cols);
+    if (nnz != packed_nnz) return 0;
+    if (nnz != 0 && val == 0) return 0;
     if (!write_header(fp, disk_format_dense, rows, cols, nnz)) return 0;
     if (!write_block(fp, val, value_size, nnz)) return 0;
     return 1;
@@ -232,6 +235,7 @@ int load_dense_raw(std::FILE *fp, std::size_t value_size, dense_load_result *out
     out->val = 0;
     if (!read_header(fp, &out->h)) goto done;
     if (!check_disk_format(disk_format_dense, out->h.format, "dense matrix")) goto done;
+    if (out->h.nnz != (types::nnz_t) ((std::size_t) out->h.rows * (std::size_t) out->h.cols)) goto done;
     out->storage = alloc_bytes((std::size_t) out->h.nnz * value_size);
     out->val = out->storage;
     if (out->h.nnz != 0 && out->storage == 0) goto done;
@@ -841,6 +845,7 @@ done:
 }
 
 int store(std::FILE *fp, const dense *m) {
+    if (!dense_is_packed_row_major(m)) return 0;
     return store_dense_raw(fp, m->rows, m->cols, (types::nnz_t) ((std::size_t) m->rows * (std::size_t) m->cols), m->val, sizeof(real::storage_t));
 }
 
@@ -851,7 +856,7 @@ int load(std::FILE *fp, dense *m) {
     tmp.val = 0;
     if (!load_dense_raw(fp, sizeof(real::storage_t), &tmp)) return 0;
     clear(m);
-    init(m, tmp.h.rows, tmp.h.cols);
+    init(m, tmp.h.rows, tmp.h.cols, dense_row_major, tmp.h.cols);
     m->storage = tmp.storage;
     m->val = (real::storage_t *) tmp.val;
     return 1;

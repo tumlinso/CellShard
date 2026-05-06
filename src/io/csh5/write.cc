@@ -1,5 +1,40 @@
 #include "execution_internal.hh"
 
+int append_dense_partition_h5(const char *filename,
+                              unsigned long partition_id,
+                              const dense *part) {
+    hid_t file = (hid_t) -1;
+    hid_t payload = (hid_t) -1;
+    char dataset_name[64];
+    char *buffer = 0;
+    std::size_t bytes = 0u;
+    std::FILE *fp = 0;
+    int ok = 0;
+
+    if (filename == 0 || part == 0 || !dense_is_packed_row_major(part)) return 0;
+    fp = open_memstream(&buffer, &bytes);
+    if (fp == 0) return 0;
+    if (!::cellshard::store(fp, part) || std::fclose(fp) != 0) {
+        std::free(buffer);
+        return 0;
+    }
+    fp = 0;
+
+    file = H5Fopen(filename, H5F_ACC_RDWR, H5P_DEFAULT);
+    if (file < 0) goto done;
+    payload = H5Gopen2(file, payload_dense_group, H5P_DEFAULT);
+    if (payload < 0) goto done;
+    if (!build_partition_blob_dataset_name(partition_id, dataset_name, sizeof(dataset_name))) goto done;
+    ok = write_blob_dataset(payload, dataset_name, (const unsigned char *) buffer, bytes);
+
+done:
+    if (fp != 0) std::fclose(fp);
+    if (payload >= 0) H5Gclose(payload);
+    if (file >= 0) H5Fclose(file);
+    std::free(buffer);
+    return ok;
+}
+
 int append_blocked_ell_partition_h5(const char *filename,
                                     unsigned long partition_id,
                                     const sparse::blocked_ell *part) {

@@ -89,6 +89,18 @@ int fetch_dataset_sliced_ell_h5_shard(sharded<sparse::sliced_ell> *m,
     return 1;
 }
 
+int fetch_dataset_dense_h5_partition(sharded<dense> *m,
+                                     const shard_storage *s,
+                                     unsigned long partition_id) {
+    return fetch_cached_partition_common(m, s, partition_id, load_dense_part_from_cspack);
+}
+
+int fetch_dataset_dense_h5_shard(sharded<dense> *m,
+                                 const shard_storage *s,
+                                 unsigned long shard_id) {
+    return fetch_cached_shard_common(m, s, shard_id, load_dense_part_from_cspack);
+}
+
 #if CELLSHARD_ENABLE_CUDA
 int acquire_dataset_sliced_ell_h5_bucketed_partition_device(dataset_sliced_bucketed_device_partition_view *out,
                                                             const sharded<sparse::sliced_ell> *m,
@@ -282,6 +294,18 @@ int prefetch_dataset_sliced_ell_h5_shard_cache(const sharded<sparse::sliced_ell>
     return ensure_cspack_ready(s, state, shard_id);
 }
 
+int prefetch_dataset_dense_h5_partition_cache(const sharded<dense> *m,
+                                              shard_storage *s,
+                                              unsigned long partition_id) {
+    return prefetch_partition_cache_common(m, s, partition_id);
+}
+
+int prefetch_dataset_dense_h5_shard_cache(const sharded<dense> *m,
+                                          shard_storage *s,
+                                          unsigned long shard_id) {
+    return prefetch_shard_cache_common(m, s, shard_id);
+}
+
 int fetch_dataset_sliced_ell_h5_bucketed_partition(bucketed_sliced_ell_partition *out,
                                                    const sharded<sparse::sliced_ell> *m,
                                                    const shard_storage *s,
@@ -341,6 +365,12 @@ int build_bucketed_sliced_ell_partition(bucketed_sliced_ell_partition *out,
                                         std::uint32_t requested_bucket_count,
                                         std::uint64_t *bucketed_bytes_out) {
     return build_bucketed_sliced_execution_partition(out, part, requested_bucket_count, bucketed_bytes_out);
+}
+
+int choose_bucket_count_for_sliced_ell_partition(const sparse::sliced_ell *part,
+                                                 std::uint32_t *bucket_count_out,
+                                                 std::uint64_t *bucketed_bytes_out) {
+    return choose_bucket_count_for_sliced_part(part, bucket_count_out, bucketed_bytes_out);
 }
 
 } // namespace cellshard

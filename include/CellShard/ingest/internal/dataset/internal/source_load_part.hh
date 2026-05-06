@@ -4,11 +4,12 @@ static inline int scan_source_row_nnz(const manifest *m,
                                       unsigned int idx,
                                       mtx::header *header,
                                       unsigned long **row_nnz_out,
-                                      std::size_t reader_bytes) {
+                                      std::size_t reader_bytes,
+                                      const std::string &cache_root) {
     std::string error;
     const unsigned int format = format_at(m, idx);
     if (format == source_mtx || format == source_tenx_mtx) {
-        return mtx::scan_row_nnz(matrix_path_at(m, idx), header, row_nnz_out, reader_bytes);
+        return mtx::scan_row_nnz_cached(matrix_path_at(m, idx), cache_root.c_str(), header, row_nnz_out, reader_bytes);
     }
     if (format == source_h5ad) {
         h5ad::selected_matrix_info info;

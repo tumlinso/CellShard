@@ -4,6 +4,9 @@
 // Keep this include local to `src/io/csh5`; it is not part of the public header surface.
 
 #include "api.cuh"
+#if CELLSHARD_ENABLE_CUDA
+#include "sliced_execution_cuda.hh"
+#endif
 
 #include "../../../include/CellShard/io/common/layout_policy.hh"
 #include "../../bucket/blocked_ell_bipartite_optimize_host.cuh"

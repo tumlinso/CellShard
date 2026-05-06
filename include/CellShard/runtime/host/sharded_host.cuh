@@ -434,6 +434,13 @@ __host__ __forceinline__ int fetch_partition(sharded<sparse::sliced_ell> *m, con
     return fetch_dataset_sliced_ell_h5_partition(m, s, partId);
 }
 
+__host__ __forceinline__ int fetch_partition(sharded<dense> *m, const shard_storage *s, unsigned long partId) {
+    shard_storage *storage = const_cast<shard_storage *>(s);
+
+    if (partId >= m->num_partitions || storage == 0 || storage->backend != shard_storage_backend_dataset_h5) return 0;
+    return fetch_dataset_dense_h5_partition(m, s, partId);
+}
+
 template<typename MatrixT>
 __host__ __forceinline__ int fetch_all_partitions(sharded<MatrixT> *m, const shard_storage *s) {
     (void) m;
@@ -486,6 +493,18 @@ __host__ __forceinline__ int fetch_all_partitions(sharded<sparse::sliced_ell> *m
     return 1;
 }
 
+__host__ __forceinline__ int fetch_all_partitions(sharded<dense> *m, const shard_storage *s) {
+    unsigned long i = 0;
+    shard_storage *storage = const_cast<shard_storage *>(s);
+
+    if (storage == 0 || storage->backend != shard_storage_backend_dataset_h5) return 0;
+    for (i = 0; i < m->num_partitions; ++i) {
+        if (!fetch_dataset_dense_h5_partition(m, s, i)) return 0;
+    }
+    if (m->num_shards == 0) return set_shards_to_partitions(m);
+    return 1;
+}
+
 template<typename MatrixT>
 __host__ __forceinline__ int fetch_shard(sharded<MatrixT> *m, const shard_storage *s, unsigned long shardId) {
     (void) m;
@@ -523,6 +542,13 @@ __host__ __forceinline__ int fetch_shard(sharded<sparse::sliced_ell> *m, const s
 
     if (shardId >= m->num_shards || storage == 0 || storage->backend != shard_storage_backend_dataset_h5) return 0;
     return fetch_dataset_sliced_ell_h5_shard(m, s, shardId);
+}
+
+__host__ __forceinline__ int fetch_shard(sharded<dense> *m, const shard_storage *s, unsigned long shardId) {
+    shard_storage *storage = const_cast<shard_storage *>(s);
+
+    if (shardId >= m->num_shards || storage == 0 || storage->backend != shard_storage_backend_dataset_h5) return 0;
+    return fetch_dataset_dense_h5_shard(m, s, shardId);
 }
 
 template<typename MatrixT>

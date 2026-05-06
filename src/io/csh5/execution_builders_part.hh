@@ -24,6 +24,13 @@ inline int ensure_blocked_ell_payload_open(dataset_h5_state *state) {
     return 1;
 }
 
+inline int ensure_dense_payload_open(dataset_h5_state *state) {
+    if (state == 0 || state->file < 0) return 0;
+    if (state->payload_dense >= 0) return 1;
+    state->payload_dense = H5Gopen2(state->file, payload_dense_group, H5P_DEFAULT);
+    return state->payload_dense >= 0;
+}
+
 inline int ensure_sliced_ell_payload_open(dataset_h5_state *state) {
     if (state == 0 || state->file < 0) return 0;
     if (state->payload_sliced_ell >= 0) return 1;
@@ -127,6 +134,31 @@ inline int load_bucketed_sliced_ell_partition_payload(dataset_h5_state *state,
     ok = load_sliced_execution_partition_blob(fp, part);
     std::fclose(fp);
     return ok;
+}
+
+inline int load_dense_partition_payload(dataset_h5_state *state,
+                                        unsigned long partition_id,
+                                        dense *part) {
+    std::vector<unsigned char> blob;
+    char dataset_name[64];
+    std::FILE *fp = 0;
+    int ok = 0;
+
+    if (state == 0 || part == 0 || partition_id >= state->num_partitions) return 0;
+    if (!ensure_dense_payload_open(state)) return 0;
+    if (!build_partition_blob_dataset_name(partition_id, dataset_name, sizeof(dataset_name))) return 0;
+    if (!read_blob_dataset(state->payload_dense, dataset_name, &blob)) return 0;
+    fp = fmemopen(blob.data(), blob.size(), "rb");
+    if (fp == 0) return 0;
+    clear(part);
+    init(part);
+    ok = ::cellshard::load(fp, part);
+    std::fclose(fp);
+    if (!ok || !dense_is_packed_row_major(part)) {
+        clear(part);
+        return 0;
+    }
+    return 1;
 }
 
 #if CELLSHARD_ENABLE_CELLERATOR_QUANTIZED
@@ -1428,6 +1460,17 @@ inline int build_sliced_execution_bucket_layout(const sparse::sliced_ell *part,
     return 1;
 }
 
+inline std::uint64_t sliced_execution_layout_bytes(const sliced_execution_bucket_layout &layout) {
+    std::uint64_t bytes = 0u;
+    if (layout.segment_widths.empty()) return 0u;
+    for (std::uint32_t segment = 0u; segment < (std::uint32_t) layout.segment_widths.size(); ++segment) {
+        const std::uint32_t rows = layout.segment_row_offsets[(std::size_t) segment + 1u]
+            - layout.segment_row_offsets[segment];
+        bytes += packed_single_slice_segment_bytes(rows, layout.segment_widths[segment]);
+    }
+    return bytes;
+}
+
 inline int allocate_bucketed_sliced_execution_partition(bucketed_sliced_ell_partition *out,
                                                         const sparse::sliced_ell *part,
                                                         const sliced_execution_bucket_layout &layout) {
@@ -1540,27 +1583,37 @@ inline int build_bucketed_sliced_execution_partition(bucketed_sliced_ell_partiti
                                                      std::uint64_t *bucketed_bytes_out) {
     sliced_execution_bucket_layout layout;
     std::uint64_t candidate_bytes = 0u;
-    std::uint64_t original_bytes = 0u;
     if (out == 0 || part == 0) return 0;
     if (!build_sliced_execution_bucket_layout(part, requested_bucket_count, &layout)) return 0;
+    candidate_bytes = sliced_execution_layout_bytes(layout);
+    if (layout.segment_widths.size() > 1u) {
+        sliced_execution_bucket_layout one_bucket_layout;
+        const std::uint64_t multi_bytes = candidate_bytes;
+        if (!build_sliced_execution_bucket_layout(part, 1u, &one_bucket_layout)) return 0;
+        const std::uint64_t one_bucket_bytes = sliced_execution_layout_bytes(one_bucket_layout);
+        if (one_bucket_bytes <= multi_bytes) {
+            layout = one_bucket_layout;
+            candidate_bytes = one_bucket_bytes;
+        }
+    }
     if (!allocate_bucketed_sliced_execution_partition(out, part, layout)) return 0;
+#if CELLSHARD_ENABLE_CUDA
+    {
+        const ::cellshard::sliced_execution_cuda_layout cuda_layout{
+            layout.row_order.data(),
+            layout.segment_row_offsets.data(),
+            layout.segment_widths.data(),
+            (std::uint32_t) layout.segment_widths.size()
+        };
+        if (::cellshard::fill_bucketed_sliced_execution_partition_cuda(out, part, &cuda_layout)) {
+            if (bucketed_bytes_out != 0) *bucketed_bytes_out = candidate_bytes;
+            return 1;
+        }
+    }
+#endif
     if (!fill_bucketed_sliced_execution_partition(out, part, layout)) {
         clear(out);
         return 0;
-    }
-    for (std::uint32_t segment = 0u; segment < out->segment_count; ++segment) {
-        candidate_bytes += sliced_execution_segment_bytes(out->segments + segment);
-    }
-    original_bytes = sliced_execution_segment_bytes(part);
-    if (out->segment_count > 1u && candidate_bytes >= original_bytes) {
-        clear(out);
-        if (!build_sliced_execution_bucket_layout(part, 1u, &layout)) return 0;
-        if (!allocate_bucketed_sliced_execution_partition(out, part, layout)) return 0;
-        if (!fill_bucketed_sliced_execution_partition(out, part, layout)) {
-            clear(out);
-            return 0;
-        }
-        candidate_bytes = original_bytes;
     }
     if (bucketed_bytes_out != 0) *bucketed_bytes_out = candidate_bytes;
     return 1;
@@ -1571,25 +1624,18 @@ inline int choose_bucket_count_for_sliced_part(const sparse::sliced_ell *part,
                                                std::uint64_t *bucketed_bytes_out) {
     const std::uint32_t rows = part != 0 ? part->rows : 0u;
     const std::uint32_t max_buckets = std::min<std::uint32_t>(8u, rows);
-    bucketed_sliced_ell_partition trial;
     std::uint32_t best_buckets = 1u;
     std::uint64_t best_bytes = std::numeric_limits<std::uint64_t>::max();
     if (part == 0 || bucket_count_out == 0 || bucketed_bytes_out == 0) return 0;
-    init(&trial);
     for (std::uint32_t buckets = 1u; buckets <= std::max<std::uint32_t>(1u, max_buckets); ++buckets) {
-        std::uint64_t bytes = 0u;
-        clear(&trial);
-        init(&trial);
-        if (!build_bucketed_sliced_execution_partition(&trial, part, buckets, &bytes)) {
-            clear(&trial);
-            return 0;
-        }
+        sliced_execution_bucket_layout layout;
+        if (!build_sliced_execution_bucket_layout(part, buckets, &layout)) return 0;
+        const std::uint64_t bytes = sliced_execution_layout_bytes(layout);
         if (bytes < best_bytes || (bytes == best_bytes && buckets < best_buckets)) {
             best_bytes = bytes;
             best_buckets = buckets;
         }
     }
-    clear(&trial);
     *bucket_count_out = best_buckets;
     *bucketed_bytes_out = best_bytes;
     return 1;

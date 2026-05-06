@@ -25,9 +25,9 @@ struct matrix_traits;
 template<>
 struct matrix_traits<dense> {
     static constexpr disk_format raw_disk_format = disk_format_dense;
-    static constexpr std::uint32_t matrix_family = dataset_matrix_family_none;
-    static constexpr std::uint32_t execution_format = dataset_execution_format_unknown;
-    static constexpr std::uint32_t codec_family = dataset_codec_family_none;
+    static constexpr std::uint32_t matrix_family = dataset_matrix_family_dense;
+    static constexpr std::uint32_t execution_format = dataset_execution_format_dense;
+    static constexpr std::uint32_t codec_family = dataset_codec_family_dense;
     static inline const char *matrix_format_name() { return "dense"; }
     static inline const char *name() { return "dense matrix"; }
 };
@@ -107,6 +107,7 @@ inline std::uint32_t default_execution_format_for_matrix_family(std::uint32_t ma
     if (matrix_family == dataset_matrix_family_quantized_blocked_ell) return dataset_execution_format_quantized_blocked_ell;
 #endif
     if (matrix_family == dataset_matrix_family_sliced_ell) return dataset_execution_format_bucketed_sliced_ell;
+    if (matrix_family == dataset_matrix_family_dense) return dataset_execution_format_dense;
     return dataset_execution_format_unknown;
 }
 

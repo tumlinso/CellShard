@@ -101,7 +101,7 @@ Useful public/runtime waypoints:
 CellShard still exposes runtime masking as a compatibility runtime surface while
 generic sparse compute primitives migrate toward CelleratorCore. It is not a
 biology-specific QC policy. Biological group definitions such as mitochondrial,
-ribosomal, or hemoglobin feature rules are compiled by CellShardPreprocess and
+ribosomal, or hemoglobin feature rules are compiled by Cellerator preprocessing and
 passed in as ordinary `uint32_t` feature-group masks. Runtime row masks and
 feature masks are independent: a feature can belong to one or more groups and
 still be excluded from a particular masked reduction or explicit rebuild.
@@ -138,8 +138,7 @@ needs expanded floats.
 ## Ownership Boundary
 
 - CellShard owns optional bounded source ingest, metadata capture, local `.cspool` staging, and one-pass emission of an immutable canonical sparse matrix when `CELLSHARD_BUILD_INGEST=ON`.
-- Cellerator owns ML compute, model workflows, Torch interop, trajectory logic, and reusable analysis kernels above CellShard storage/runtime surfaces.
-- CellShardPreprocess owns accelerated standard-biology preprocessing and requires CellShard ingest when installed through CellShard.
+- Cellerator owns preprocessing, ML compute, model workflows, Torch interop, trajectory logic, and reusable analysis kernels above CellShard storage/runtime surfaces.
 - CellShard owns partitioning, sharding, blocking, bucketing, rebucketing, CSPACK generation, CSPACK delivery, and append-only canonical/runtime generation management.
 - Once ingest emits a canonical matrix to CellShard storage, row and column membership is immutable for that canonical generation.
 

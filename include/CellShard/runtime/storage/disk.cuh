@@ -14,6 +14,7 @@
 #include "../../formats/quantized_blocked_ell.cuh"
 #endif
 #include "../../formats/sliced_ell.cuh"
+#include "../../formats/dense.cuh"
 #include "../layout/sharded.cuh"
 #include "shard_storage.cuh"
 #include "../../io/csh5/api.cuh"
@@ -111,6 +112,23 @@ inline int load_header(const char *filename, sharded<sparse::sliced_ell> *m, sha
 }
 
 inline int load_header(const char *filename, sharded<sparse::sliced_ell> *m) {
+    return load_header(filename, m, 0);
+}
+
+inline int load_header(const char *filename, sharded<dense> *m, shard_storage *s) {
+    const char *ext = std::strrchr(filename != 0 ? filename : "", '.');
+    if (ext != 0) {
+        if (std::strcmp(ext, ".csh5") == 0 || std::strcmp(ext, ".h5") == 0 || std::strcmp(ext, ".hdf5") == 0) {
+            return load_dataset_dense_h5_header(filename, m, s);
+        }
+    }
+    std::fprintf(stderr,
+                 "Error: dense sharded load_header requires a .csh5/.h5/.hdf5 dataset file: %s\n",
+                 filename != 0 ? filename : "(null)");
+    return 0;
+}
+
+inline int load_header(const char *filename, sharded<dense> *m) {
     return load_header(filename, m, 0);
 }
 

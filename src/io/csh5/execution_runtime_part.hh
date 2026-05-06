@@ -408,6 +408,57 @@ inline void close_cached_shard_file(dataset_h5_state *state, unsigned long shard
     }
 }
 
+inline int load_dense_part_from_cspack(sharded<dense> *m,
+                                       dataset_h5_state *state,
+                                       unsigned long partition_id) {
+    const unsigned long shard_id = state != 0 && state->partition_shard_ids != 0 ? (unsigned long) state->partition_shard_ids[partition_id] : 0ul;
+    dense *part = 0;
+    char path[4096];
+    std::FILE *fp = 0;
+    unsigned char magic[8];
+    std::uint64_t file_shard_id = 0u;
+    std::uint64_t partition_count = 0u;
+    std::uint64_t *partition_offsets = 0;
+    std::uint64_t local_partition_id = 0u;
+    int ok = 0;
+
+    if (m == 0 || state == 0 || shard_id >= state->num_shards || partition_id >= m->num_partitions) return 0;
+    if (!build_cspack_path(state, shard_id, path, sizeof(path))) return 0;
+    fp = std::fopen(path, "rb");
+    if (fp == 0) return 0;
+    if (!read_sharded_block(fp, magic, sizeof(magic), 1u)) goto done;
+    if (std::memcmp(magic, cspack_magic, sizeof(magic)) != 0) goto done;
+    if (!read_sharded_block(fp, &file_shard_id, sizeof(file_shard_id), 1u)) goto done;
+    if (!read_sharded_block(fp, &partition_count, sizeof(partition_count), 1u)) goto done;
+    if (file_shard_id != shard_id) goto done;
+    local_partition_id = partition_id - state->shard_part_begin[shard_id];
+    if (local_partition_id >= partition_count) goto done;
+    partition_offsets = (std::uint64_t *) std::calloc((std::size_t) partition_count, sizeof(std::uint64_t));
+    if (partition_count != 0u && partition_offsets == 0) goto done;
+    if (!read_sharded_block(fp, partition_offsets, sizeof(std::uint64_t), (std::size_t) partition_count)) goto done;
+    if (fseeko(fp, (off_t) partition_offsets[local_partition_id], SEEK_SET) != 0) goto done;
+    part = new dense;
+    init(part);
+    if (!::cellshard::load(fp, part)) goto done;
+    if (!dense_is_packed_row_major(part)) goto done;
+    if (part->rows != m->partition_rows[partition_id]) goto done;
+    if (part->cols != m->cols) goto done;
+    if (::cellshard::partition_nnz(part) != m->partition_nnz[partition_id]) goto done;
+    if (m->parts[partition_id] != 0) destroy(m->parts[partition_id]);
+    m->parts[partition_id] = part;
+    part = 0;
+    ok = 1;
+
+done:
+    if (fp != 0) std::fclose(fp);
+    std::free(partition_offsets);
+    if (part != 0) {
+        clear(part);
+        delete part;
+    }
+    return ok;
+}
+
 #if CELLSHARD_ENABLE_CELLERATOR_QUANTIZED
 inline int load_quantized_blocked_ell_part_from_cspack(sharded<sparse::quantized_blocked_ell> *m,
                                                        dataset_h5_state *state,
@@ -854,8 +905,67 @@ done:
 }
 #endif
 
+inline int materialize_dense_cspack(shard_storage *s, dataset_h5_state *state, unsigned long shard_id) {
+    const std::uint64_t begin = state != 0 && state->shard_part_begin != 0 ? state->shard_part_begin[shard_id] : 0u;
+    const std::uint64_t end = state != 0 && state->shard_part_end != 0 ? state->shard_part_end[shard_id] : 0u;
+    const std::uint64_t partition_count = end >= begin ? (end - begin) : 0u;
+    std::uint64_t *partition_offsets = 0;
+    char tmp_path[4096];
+    char final_path[4096];
+    std::uint64_t local = 0u;
+    std::FILE *fp = 0;
+    int ok = 0;
+
+    if (s == 0 || state == 0 || shard_id >= state->num_shards) return 0;
+    if (!open_dataset_h5_backend(s)) return 0;
+    if (partition_count != 0u) {
+        partition_offsets = (std::uint64_t *) std::calloc((std::size_t) partition_count, sizeof(std::uint64_t));
+        if (partition_offsets == 0) return 0;
+    }
+    if (!build_cspack_temp_path(state, shard_id, tmp_path, sizeof(tmp_path))) goto done;
+    if (!build_cspack_path(state, shard_id, final_path, sizeof(final_path))) goto done;
+    fp = std::fopen(tmp_path, "wb");
+    if (fp == 0) goto done;
+    std::setvbuf(fp, 0, _IOFBF, (std::size_t) 8u << 20u);
+    if (!write_sharded_block(fp, cspack_magic, sizeof(cspack_magic), 1u)) goto done;
+    if (!write_sharded_block(fp, &shard_id, sizeof(shard_id), 1u)) goto done;
+    if (!write_sharded_block(fp, &partition_count, sizeof(partition_count), 1u)) goto done;
+    for (local = 0u; local < partition_count; ++local) {
+        const std::uint64_t zero = 0u;
+        if (!write_sharded_block(fp, &zero, sizeof(zero), 1u)) goto done;
+    }
+    for (local = 0u; local < partition_count; ++local) {
+        dense part;
+        init(&part);
+        partition_offsets[local] = (std::uint64_t) ftello(fp);
+        if (!load_dense_partition_payload(state, (unsigned long) (begin + local), &part)
+            || !::cellshard::store(fp, &part)) {
+            clear(&part);
+            goto done;
+        }
+        clear(&part);
+    }
+    if (fseeko(fp, (off_t) (sizeof(cspack_magic) + sizeof(std::uint64_t) * 2u), SEEK_SET) != 0) goto done;
+    if (!write_sharded_block(fp, partition_offsets, sizeof(std::uint64_t), (std::size_t) partition_count)) goto done;
+    if (std::fflush(fp) != 0) goto done;
+    std::fclose(fp);
+    fp = 0;
+    if (::rename(tmp_path, final_path) != 0) {
+        std::remove(tmp_path);
+        goto done;
+    }
+    ok = 1;
+
+done:
+    if (fp != 0) std::fclose(fp);
+    if (!ok && build_cspack_temp_path(state, shard_id, tmp_path, sizeof(tmp_path))) std::remove(tmp_path);
+    std::free(partition_offsets);
+    return ok;
+}
+
 inline int materialize_cspack(shard_storage *s, dataset_h5_state *state, unsigned long shard_id) {
     if (state == 0) return 0;
+    if (state->matrix_family == dataset_matrix_family_dense) return materialize_dense_cspack(s, state, shard_id);
     if (state->matrix_family == dataset_matrix_family_blocked_ell) return materialize_blocked_ell_cspack(s, state, shard_id);
 #if CELLSHARD_ENABLE_CELLERATOR_QUANTIZED
     if (state->matrix_family == dataset_matrix_family_quantized_blocked_ell) return materialize_quantized_blocked_ell_cspack(s, state, shard_id);
@@ -1020,6 +1130,7 @@ inline void close_dataset_h5_open_handles(dataset_h5_state *state) {
     if (state->d_blocked_ell_values >= 0) H5Dclose(state->d_blocked_ell_values);
     if (state->d_blocked_ell_block_idx >= 0) H5Dclose(state->d_blocked_ell_block_idx);
     if (state->payload_blocked_ell >= 0) H5Gclose(state->payload_blocked_ell);
+    if (state->payload_dense >= 0) H5Gclose(state->payload_dense);
     if (state->payload_quantized_blocked_ell >= 0) H5Gclose(state->payload_quantized_blocked_ell);
     if (state->payload_sliced_ell >= 0) H5Gclose(state->payload_sliced_ell);
     if (state->payload_optimized_blocked_ell >= 0) H5Gclose(state->payload_optimized_blocked_ell);
@@ -1028,6 +1139,7 @@ inline void close_dataset_h5_open_handles(dataset_h5_state *state) {
     state->d_blocked_ell_values = (hid_t) -1;
     state->d_blocked_ell_block_idx = (hid_t) -1;
     state->payload_blocked_ell = (hid_t) -1;
+    state->payload_dense = (hid_t) -1;
     state->payload_quantized_blocked_ell = (hid_t) -1;
     state->payload_sliced_ell = (hid_t) -1;
     state->payload_optimized_blocked_ell = (hid_t) -1;

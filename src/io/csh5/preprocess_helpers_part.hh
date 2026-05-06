@@ -876,6 +876,13 @@ inline std::uint64_t estimate_cspack_bytes(const dataset_h5_state *state, unsign
     for (i = begin; i < end; ++i) {
         if (state->partition_execution_bytes != 0 && state->partition_execution_bytes[i] != 0u) {
             bytes += state->partition_execution_bytes[i];
+        } else if (state->matrix_family == dataset_matrix_family_dense) {
+            bytes += (std::uint64_t) packed_bytes((const dense *) 0,
+                                                  (types::dim_t) state->partition_rows[i],
+                                                  (types::dim_t) state->cols,
+                                                  (types::nnz_t) state->partition_nnz[i],
+                                                  0ul,
+                                                  sizeof(real::storage_t));
         } else if (state->matrix_family == dataset_matrix_family_blocked_ell && state->partition_bucketed_blocked_ell_bytes != 0) {
             bytes += state->partition_bucketed_blocked_ell_bytes[i];
         } else if (state->matrix_family == dataset_matrix_family_sliced_ell && state->partition_bucketed_sliced_ell_bytes != 0) {

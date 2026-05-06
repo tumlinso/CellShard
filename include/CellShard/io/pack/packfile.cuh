@@ -271,6 +271,7 @@ int load(std::FILE *fp, sparse::dia *m);
 // Filename variants open a file and do a full synchronous host I/O operation.
 // Load paths allocate and take ownership of a fresh host payload every call.
 inline int store(const char *filename, const dense *m) {
+    if (!dense_is_packed_row_major(m)) return 0;
     return store_dense_raw(
         filename,
         m->rows,
@@ -288,7 +289,7 @@ inline int load(const char *filename, dense *m) {
     tmp.val = 0;
     if (!load_dense_raw(filename, sizeof(real::storage_t), &tmp)) return 0;
     clear(m);
-    init(m, tmp.h.rows, tmp.h.cols);
+    init(m, tmp.h.rows, tmp.h.cols, dense_row_major, tmp.h.cols);
     m->storage = tmp.storage;
     m->val = (real::storage_t *) tmp.val;
     return 1;

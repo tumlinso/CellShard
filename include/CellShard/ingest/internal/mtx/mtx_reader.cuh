@@ -6,6 +6,11 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
+#include <functional>
+#include <fstream>
+#include <string>
+#include <sys/stat.h>
 
 #include <CellShard/core/offset_span.cuh>
 #include <CellShard/formats/triplet.cuh>
@@ -218,6 +223,110 @@ done:
     }
     *row_nnz_out = row_nnz;
     return 1;
+}
+
+static inline std::string row_nnz_cache_path(const char *path, const char *cache_root, const header *h) {
+    namespace fs = std::filesystem;
+    struct stat st;
+    fs::path source(path != 0 ? path : "");
+    fs::path root(cache_root != 0 ? cache_root : "");
+    std::string stem = source.filename().string();
+    if (::stat(path, &st) != 0) return std::string();
+    for (char &c : stem) {
+        if (c == '/' || c == '\\' || c == ':' || c == ' ') c = '_';
+    }
+    stem += ".";
+    stem += std::to_string((unsigned long long) std::hash<std::string>{}(source.string()));
+    stem += ".";
+    stem += std::to_string((unsigned long long) st.st_size);
+    stem += ".";
+    stem += std::to_string((long long) st.st_mtim.tv_sec);
+    stem += ".";
+    stem += std::to_string((long long) st.st_mtim.tv_nsec);
+    stem += ".";
+    stem += std::to_string((unsigned long long) h->rows);
+    stem += ".";
+    stem += std::to_string((unsigned long long) h->cols);
+    stem += ".";
+    stem += std::to_string((unsigned long long) h->nnz_file);
+    stem += ".row_nnz.u64";
+    return (root / "row_nnz" / stem).string();
+}
+
+static inline int load_row_nnz_cache(const char *cache_path,
+                                     const header *h,
+                                     unsigned long **row_nnz_out) {
+    const char magic[8] = {'C','S','R','N','N','Z','1','\0'};
+    char found[8];
+    unsigned long rows = 0, cols = 0, nnz_file = 0;
+    unsigned long *row_nnz = 0;
+    std::ifstream in;
+
+    *row_nnz_out = 0;
+    if (cache_path == 0 || *cache_path == 0 || h == 0) return 0;
+    in.open(cache_path, std::ios::binary);
+    if (!in) return 0;
+    in.read(found, sizeof(found));
+    in.read(reinterpret_cast<char *>(&rows), sizeof(rows));
+    in.read(reinterpret_cast<char *>(&cols), sizeof(cols));
+    in.read(reinterpret_cast<char *>(&nnz_file), sizeof(nnz_file));
+    if (!in
+        || std::memcmp(found, magic, sizeof(magic)) != 0
+        || rows != h->rows
+        || cols != h->cols
+        || nnz_file != h->nnz_file) {
+        return 0;
+    }
+    row_nnz = (unsigned long *) std::calloc((std::size_t) h->rows, sizeof(unsigned long));
+    if (h->rows != 0 && row_nnz == 0) return 0;
+    in.read(reinterpret_cast<char *>(row_nnz), (std::streamsize) ((std::size_t) h->rows * sizeof(unsigned long)));
+    if (!in) {
+        std::free(row_nnz);
+        return 0;
+    }
+    *row_nnz_out = row_nnz;
+    return 1;
+}
+
+static inline void store_row_nnz_cache(const char *cache_path,
+                                       const header *h,
+                                       const unsigned long *row_nnz) {
+    const char magic[8] = {'C','S','R','N','N','Z','1','\0'};
+    std::ofstream out;
+    if (cache_path == 0 || *cache_path == 0 || h == 0 || row_nnz == 0) return;
+    std::error_code ec;
+    std::filesystem::create_directories(std::filesystem::path(cache_path).parent_path(), ec);
+    if (ec) return;
+    out.open(cache_path, std::ios::binary | std::ios::trunc);
+    if (!out) return;
+    out.write(magic, sizeof(magic));
+    out.write(reinterpret_cast<const char *>(&h->rows), sizeof(h->rows));
+    out.write(reinterpret_cast<const char *>(&h->cols), sizeof(h->cols));
+    out.write(reinterpret_cast<const char *>(&h->nnz_file), sizeof(h->nnz_file));
+    out.write(reinterpret_cast<const char *>(row_nnz), (std::streamsize) ((std::size_t) h->rows * sizeof(unsigned long)));
+}
+
+static inline int scan_row_nnz_cached(const char *path,
+                                      const char *cache_root,
+                                      header *h,
+                                      unsigned long **row_nnz_out,
+                                      std::size_t reader_bytes = (std::size_t) 8u << 20u) {
+    header cached_header;
+    std::string cache_path;
+    int ok = 0;
+
+    *row_nnz_out = 0;
+    init(&cached_header);
+    if (cache_root == 0 || *cache_root == 0) return scan_row_nnz(path, h, row_nnz_out, reader_bytes);
+    if (!read_header(path, &cached_header)) return 0;
+    cache_path = row_nnz_cache_path(path, cache_root, &cached_header);
+    if (!cache_path.empty() && load_row_nnz_cache(cache_path.c_str(), &cached_header, row_nnz_out)) {
+        *h = cached_header;
+        return 1;
+    }
+    ok = scan_row_nnz(path, h, row_nnz_out, reader_bytes);
+    if (ok && !cache_path.empty()) store_row_nnz_cache(cache_path.c_str(), h, *row_nnz_out);
+    return ok;
 }
 
 // Reduce row counts into per-part counts using precomputed row offsets.

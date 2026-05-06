@@ -10,6 +10,7 @@
 #include "../../formats/quantized_blocked_ell.cuh"
 #endif
 #include "../../formats/sliced_ell.cuh"
+#include "../../formats/dense.cuh"
 #include "../../core/real.cuh"
 #include "../../runtime/storage/shard_storage.cuh"
 #include "../../runtime/layout/sharded.cuh"
@@ -510,6 +511,10 @@ int create_dataset_sliced_ell_h5(const char *filename,
                                  const dataset_layout_view *layout,
                                  const dataset_dataset_table_view *datasets,
                                  const dataset_provenance_view *provenance);
+int create_dataset_dense_h5(const char *filename,
+                            const dataset_layout_view *layout,
+                            const dataset_dataset_table_view *datasets,
+                            const dataset_provenance_view *provenance);
 
 int append_dataset_embedded_metadata_h5(const char *filename,
                                        const dataset_embedded_metadata_view *metadata);
@@ -601,6 +606,9 @@ int append_quantized_blocked_ell_partition_h5(const char *filename,
 int append_sliced_ell_partition_h5(const char *filename,
                                    unsigned long partition_id,
                                    const bucketed_sliced_ell_partition *part);
+int append_dense_partition_h5(const char *filename,
+                              unsigned long partition_id,
+                              const dense *part);
 int append_bucketed_blocked_ell_shard_h5(const char *filename,
                                          unsigned long shard_id,
                                          const bucketed_blocked_ell_shard *shard);
@@ -643,6 +651,9 @@ int load_dataset_quantized_blocked_ell_h5_header(const char *filename,
 int load_dataset_sliced_ell_h5_header(const char *filename,
                                       sharded<sparse::sliced_ell> *m,
                                       shard_storage *s);
+int load_dataset_dense_h5_header(const char *filename,
+                                 sharded<dense> *m,
+                                 shard_storage *s);
 int prefetch_dataset_blocked_ell_h5_partition_cache(const sharded<sparse::blocked_ell> *m,
                                               shard_storage *s,
                                               unsigned long partition_id);
@@ -663,6 +674,12 @@ int prefetch_dataset_sliced_ell_h5_partition_cache(const sharded<sparse::sliced_
 int prefetch_dataset_sliced_ell_h5_shard_cache(const sharded<sparse::sliced_ell> *m,
                                                shard_storage *s,
                                                unsigned long shard_id);
+int prefetch_dataset_dense_h5_partition_cache(const sharded<dense> *m,
+                                              shard_storage *s,
+                                              unsigned long partition_id);
+int prefetch_dataset_dense_h5_shard_cache(const sharded<dense> *m,
+                                          shard_storage *s,
+                                          unsigned long shard_id);
 int warm_dataset_blocked_ell_h5_cache_range(const char *filename,
                                            const char *cache_root,
                                            unsigned long shard_begin,
@@ -683,6 +700,12 @@ int warm_dataset_sliced_ell_h5_cache_range(const char *filename,
                                            unsigned long shard_end);
 int warm_dataset_sliced_ell_h5_cache(const char *filename,
                                      const char *cache_root);
+int warm_dataset_dense_h5_cache_range(const char *filename,
+                                      const char *cache_root,
+                                      unsigned long shard_begin,
+                                      unsigned long shard_end);
+int warm_dataset_dense_h5_cache(const char *filename,
+                                const char *cache_root);
 int fetch_dataset_blocked_ell_h5_pack_partition(bucketed_blocked_ell_partition *out,
                                                 const sharded<sparse::blocked_ell> *m,
                                                 const shard_storage *s,
@@ -723,6 +746,12 @@ int fetch_dataset_sliced_ell_h5_partition(sharded<sparse::sliced_ell> *m,
 int fetch_dataset_sliced_ell_h5_shard(sharded<sparse::sliced_ell> *m,
                                       const shard_storage *s,
                                       unsigned long shard_id);
+int fetch_dataset_dense_h5_partition(sharded<dense> *m,
+                                     const shard_storage *s,
+                                     unsigned long partition_id);
+int fetch_dataset_dense_h5_shard(sharded<dense> *m,
+                                 const shard_storage *s,
+                                 unsigned long shard_id);
 int build_bucketed_blocked_ell_partition(bucketed_blocked_ell_partition *out,
                                          const sparse::blocked_ell *part,
                                          std::uint32_t requested_bucket_count,
@@ -731,6 +760,9 @@ int build_bucketed_sliced_ell_partition(bucketed_sliced_ell_partition *out,
                                         const sparse::sliced_ell *part,
                                         std::uint32_t requested_bucket_count,
                                         std::uint64_t *bucketed_bytes_out);
+int choose_bucket_count_for_sliced_ell_partition(const sparse::sliced_ell *part,
+                                                 std::uint32_t *bucket_count_out,
+                                                 std::uint64_t *bucketed_bytes_out);
 
 // Temporary compatibility wrappers for repo-internal callers while the new
 // cache manager surface propagates through the tree.

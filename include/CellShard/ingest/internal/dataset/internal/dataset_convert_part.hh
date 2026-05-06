@@ -88,7 +88,7 @@ static inline int convert_manifest_dataset_to_hdf5(const manifest *m,
         common::init(&barcodes);
         common::init(&features);
         mtx::init(&header);
-        if (!scan_source_row_nnz(m, manifest_i, &header, &row_nnz, opts->reader_bytes)) {
+        if (!scan_source_row_nnz(m, manifest_i, &header, &row_nnz, opts->reader_bytes, opts->cache_root)) {
             common::clear(&barcodes);
             common::clear(&features);
             goto done;

@@ -63,6 +63,8 @@ inline cudaError_t upload_partition_async(sharded_device<MatrixT> *state, const 
 struct alignas(16) dense_view {
     unsigned int rows;
     unsigned int cols;
+    unsigned int stride;
+    unsigned int order;
     __half *val;
 };
 
@@ -241,8 +243,11 @@ __host__ __forceinline__ cudaError_t upload(const ::cellshard::dense *src, parti
     cudaError_t err = cudaSuccess;
 
     zero_record(record);
+    if (!::cellshard::dense_is_packed_row_major(src)) return cudaErrorInvalidValue;
     host.rows = src->rows;
     host.cols = src->cols;
+    host.stride = src->stride;
+    host.order = src->order;
     host.val = 0;
 
     if (count != 0) {
@@ -286,8 +291,11 @@ __host__ __forceinline__ cudaError_t upload_async(const ::cellshard::dense *src,
     cudaError_t err = cudaSuccess;
 
     zero_record(record);
+    if (!::cellshard::dense_is_packed_row_major(src)) return cudaErrorInvalidValue;
     host.rows = src->rows;
     host.cols = src->cols;
+    host.stride = src->stride;
+    host.order = src->order;
     host.val = 0;
 
     if (count != 0) {

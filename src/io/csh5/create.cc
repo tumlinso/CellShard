@@ -446,6 +446,85 @@ done:
 }
 #endif
 
+int create_dataset_dense_h5(const char *filename,
+                            const dataset_layout_view *layout,
+                            const dataset_dataset_table_view *datasets,
+                            const dataset_provenance_view *provenance) {
+    hid_t file = (hid_t) -1;
+    hid_t matrix = (hid_t) -1;
+    hid_t dsets = (hid_t) -1;
+    hid_t prov = (hid_t) -1;
+    hid_t codecs = (hid_t) -1;
+    hid_t payload_root = (hid_t) -1;
+    hid_t payload = (hid_t) -1;
+    const std::uint64_t dim_limit = local_dim_limit();
+    const std::uint64_t nnz_limit = local_nnz_limit();
+    const std::uint64_t idx_limit = local_index_limit();
+    std::vector<std::uint64_t> partition_aux;
+    std::vector<std::uint32_t> partition_axes;
+    int ok = 0;
+
+    if (!validate_common_layout_for_create(filename, layout, idx_limit)) return 0;
+
+    partition_aux.assign((std::size_t) layout->num_partitions, 0u);
+    partition_axes.assign((std::size_t) layout->num_partitions, 0u);
+    for (std::uint32_t i = 0u; i < layout->num_partitions; ++i) {
+        const std::uint64_t packed_nnz = layout->partition_rows[i] * layout->cols;
+        if (layout->partition_rows[i] > dim_limit) {
+            ok = fail_dataset_u32_limit(filename, "part", i, "rows", layout->partition_rows[i], dim_limit);
+            goto done;
+        }
+        if (packed_nnz > nnz_limit) {
+            ok = fail_dataset_u32_limit(filename, "part", i, "dense_value_count", packed_nnz, nnz_limit);
+            goto done;
+        }
+        if (layout->partition_nnz[i] != packed_nnz) {
+            std::fprintf(stderr,
+                         "cellshard: dense partition %u in %s must use packed rows*cols nnz metadata\n",
+                         (unsigned int) i,
+                         filename != 0 ? filename : "(null)");
+            goto done;
+        }
+        partition_aux[(std::size_t) i] = 0u;
+        partition_axes[(std::size_t) i] = layout->partition_axes != 0 ? layout->partition_axes[i] : 0u;
+    }
+
+    if (!write_common_dataset_file_scaffold(&file,
+                                            &matrix,
+                                            &dsets,
+                                            &prov,
+                                            &codecs,
+                                            &payload_root,
+                                            filename,
+                                            layout,
+                                            datasets,
+                                            matrix_traits<dense>::matrix_format_name(),
+                                            payload_layout_shard_packed)) {
+        goto done;
+    }
+    payload = payload_root >= 0 ? create_group(payload_root, matrix_traits<dense>::matrix_format_name()) : (hid_t) -1;
+    if (payload < 0) goto done;
+
+    if (!write_common_matrix_tables(matrix, layout, partition_aux.data(), partition_axes.data())
+        || !write_dataset_table_group(dsets, datasets)
+        || !write_provenance_group(prov, layout, datasets, provenance)
+        || !write_codec_table_group(codecs, layout)) {
+        goto done;
+    }
+
+    ok = 1;
+
+done:
+    if (payload >= 0) H5Gclose(payload);
+    if (payload_root >= 0) H5Gclose(payload_root);
+    if (codecs >= 0) H5Gclose(codecs);
+    if (prov >= 0) H5Gclose(prov);
+    if (dsets >= 0) H5Gclose(dsets);
+    if (matrix >= 0) H5Gclose(matrix);
+    if (file >= 0) H5Fclose(file);
+    return ok;
+}
+
 int create_dataset_sliced_ell_h5(const char *filename,
                                  const dataset_layout_view *layout,
                                  const dataset_dataset_table_view *datasets,

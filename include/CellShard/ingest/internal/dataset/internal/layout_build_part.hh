@@ -153,29 +153,7 @@ static inline int clone_bucketed_sliced_partition(cellshard::bucketed_sliced_ell
 static inline int choose_bucket_count_for_sliced_part_exact(const sparse::sliced_ell *part,
                                                             std::uint32_t *bucket_count_out,
                                                             std::uint64_t *bucketed_bytes_out = nullptr) {
-    const std::uint32_t max_buckets = std::min<std::uint32_t>(8u, part != nullptr ? part->rows : 0u);
-    cellshard::bucketed_sliced_ell_partition trial;
-    std::uint32_t best_buckets = 1u;
-    std::uint64_t best_bytes = std::numeric_limits<std::uint64_t>::max();
-    if (part == nullptr || bucket_count_out == nullptr) return 0;
-    cellshard::init(&trial);
-    for (std::uint32_t buckets = 1u; buckets <= std::max<std::uint32_t>(1u, max_buckets); ++buckets) {
-        std::uint64_t bytes = 0u;
-        cellshard::clear(&trial);
-        cellshard::init(&trial);
-        if (!cellshard::build_bucketed_sliced_ell_partition(&trial, part, buckets, &bytes)) {
-            cellshard::clear(&trial);
-            return 0;
-        }
-        if (bytes < best_bytes || (bytes == best_bytes && buckets < best_buckets)) {
-            best_bytes = bytes;
-            best_buckets = buckets;
-        }
-    }
-    cellshard::clear(&trial);
-    *bucket_count_out = best_buckets;
-    if (bucketed_bytes_out != nullptr) *bucketed_bytes_out = best_bytes == std::numeric_limits<std::uint64_t>::max() ? 0u : best_bytes;
-    return 1;
+    return cellshard::choose_bucket_count_for_sliced_ell_partition(part, bucket_count_out, bucketed_bytes_out);
 }
 
 static inline int build_bucketed_optimized_sliced_shard(const std::vector<sparse::sliced_ell> &parts,

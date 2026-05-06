@@ -28,7 +28,8 @@ enum {
     dataset_codec_family_quantized_csr = 2u,
     dataset_codec_family_blocked_ell = 3u,
     dataset_codec_family_sliced_ell = 4u,
-    dataset_codec_family_quantized_blocked_ell = 5u
+    dataset_codec_family_quantized_blocked_ell = 5u,
+    dataset_codec_family_dense = 6u
 };
 
 enum {

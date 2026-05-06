@@ -129,6 +129,7 @@ static const char preprocess_group[] = "/preprocess";
 static const char execution_group[] = "/execution";
 static const char runtime_service_group[] = "/runtime_service";
 static const char payload_group[] = "/payload";
+static const char payload_dense_group[] = "/payload/dense";
 static const char payload_blocked_ell_group[] = "/payload/blocked_ell";
 static const char payload_quantized_blocked_ell_group[] = "/payload/quantized_blocked_ell";
 static const char payload_sliced_ell_group[] = "/payload/sliced_ell";
@@ -204,6 +205,7 @@ struct dataset_h5_state {
     std::uint32_t *partition_codec_ids;
     dataset_codec_descriptor *codecs;
     hid_t payload_blocked_ell;
+    hid_t payload_dense;
     hid_t payload_quantized_blocked_ell;
     hid_t d_blocked_ell_block_idx;
     hid_t d_blocked_ell_values;
@@ -291,6 +293,7 @@ inline void dataset_h5_state_init(dataset_h5_state *state) {
     state->partition_codec_ids = 0;
     state->codecs = 0;
     state->payload_blocked_ell = (hid_t) -1;
+    state->payload_dense = (hid_t) -1;
     state->payload_quantized_blocked_ell = (hid_t) -1;
     state->d_blocked_ell_block_idx = (hid_t) -1;
     state->d_blocked_ell_values = (hid_t) -1;
@@ -374,6 +377,7 @@ inline void dataset_h5_state_clear(dataset_h5_state *state) {
     if (state->d_blocked_ell_values >= 0) H5Dclose(state->d_blocked_ell_values);
     if (state->d_blocked_ell_block_idx >= 0) H5Dclose(state->d_blocked_ell_block_idx);
     if (state->payload_blocked_ell >= 0) H5Gclose(state->payload_blocked_ell);
+    if (state->payload_dense >= 0) H5Gclose(state->payload_dense);
     if (state->payload_quantized_blocked_ell >= 0) H5Gclose(state->payload_quantized_blocked_ell);
     if (state->payload_sliced_ell >= 0) H5Gclose(state->payload_sliced_ell);
     if (state->payload_optimized_blocked_ell >= 0) H5Gclose(state->payload_optimized_blocked_ell);
@@ -451,6 +455,7 @@ inline void dataset_h5_state_clear(dataset_h5_state *state) {
     state->partition_codec_ids = 0;
     state->codecs = 0;
     state->payload_blocked_ell = (hid_t) -1;
+    state->payload_dense = (hid_t) -1;
     state->payload_quantized_blocked_ell = (hid_t) -1;
     state->d_blocked_ell_block_idx = (hid_t) -1;
     state->d_blocked_ell_values = (hid_t) -1;

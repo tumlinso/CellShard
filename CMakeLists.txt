@@ -689,6 +689,25 @@ if(CELLSHARD_BUILD_TESTS AND CELLSHARD_BUILD_EXPORT)
         )
     endif()
 
+    add_executable(cellShardH5adCsh5AxisValidationTest
+        tests/h5ad_csh5_axis_validation_test.cc
+    )
+    target_include_directories(cellShardH5adCsh5AxisValidationTest PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/export
+        ${HDF5_INCLUDE_DIRS}
+    )
+    target_link_libraries(cellShardH5adCsh5AxisValidationTest PRIVATE
+        cellshard_export
+        ${HDF5_LIBRARIES}
+    )
+    set_target_properties(cellShardH5adCsh5AxisValidationTest PROPERTIES
+        CXX_STANDARD 17
+        CXX_STANDARD_REQUIRED YES
+    )
+
     if(CELLSHARD_ENABLE_CUDA)
         add_executable(cellShardMaskGroupsRuntimeTest
             tests/mask_groups_runtime_test.cu

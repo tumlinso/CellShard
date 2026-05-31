@@ -8,7 +8,7 @@ Use this file as the quick pickup register for `todos.md` workstreams.
 - `closed`: completed or removed from pickup rotation.
 
 ## Workstreams
-- `cellshard-cpp-access-adapter-refactor` | status: in_progress | execution: claimed | owner: codex | file: `todos/cellshard-cpp-access-adapter-refactor.md` | next: Route CSH5/CSPACK materialization through archive_to_pack and narrow remaining CellShard pack internals that still describe optimized layouts as CellShard-owned formats.
+- `cellshard-cpp-access-adapter-refactor` | status: in_progress | execution: claimed | owner: codex | file: `todos/cellshard-cpp-access-adapter-refactor.md` | next: Commit the CSH5/CSPACK routing checkpoint, update root submodule pointers, and recheck repository statuses.
 
 ## Staleness Review
 _No staleness review recorded yet._

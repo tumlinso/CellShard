@@ -691,7 +691,7 @@ done:
     return ok;
 }
 
-inline int materialize_blocked_ell_cspack(shard_storage *s, dataset_h5_state *state, unsigned long shard_id) {
+inline int materialize_blocked_ell_cspack_impl(shard_storage *s, dataset_h5_state *state, unsigned long shard_id) {
     const std::uint64_t begin = state != 0 && state->shard_part_begin != 0 ? state->shard_part_begin[shard_id] : 0u;
     const std::uint64_t end = state != 0 && state->shard_part_end != 0 ? state->shard_part_end[shard_id] : 0u;
     const std::uint64_t partition_count = end >= begin ? (end - begin) : 0u;
@@ -783,7 +783,7 @@ done:
     return ok;
 }
 
-inline int materialize_sliced_ell_cspack(shard_storage *s, dataset_h5_state *state, unsigned long shard_id) {
+inline int materialize_sliced_ell_cspack_impl(shard_storage *s, dataset_h5_state *state, unsigned long shard_id) {
     const std::uint64_t begin = state != 0 && state->shard_part_begin != 0 ? state->shard_part_begin[shard_id] : 0u;
     const std::uint64_t end = state != 0 && state->shard_part_end != 0 ? state->shard_part_end[shard_id] : 0u;
     const std::uint64_t partition_count = end >= begin ? (end - begin) : 0u;
@@ -846,7 +846,7 @@ done:
 }
 
 #if CELLSHARD_ENABLE_CELLERATOR_QUANTIZED
-inline int materialize_quantized_blocked_ell_cspack(shard_storage *s, dataset_h5_state *state, unsigned long shard_id) {
+inline int materialize_quantized_blocked_ell_cspack_impl(shard_storage *s, dataset_h5_state *state, unsigned long shard_id) {
     const std::uint64_t begin = state != 0 && state->shard_part_begin != 0 ? state->shard_part_begin[shard_id] : 0u;
     const std::uint64_t end = state != 0 && state->shard_part_end != 0 ? state->shard_part_end[shard_id] : 0u;
     const std::uint64_t partition_count = end >= begin ? (end - begin) : 0u;
@@ -905,7 +905,7 @@ done:
 }
 #endif
 
-inline int materialize_dense_cspack(shard_storage *s, dataset_h5_state *state, unsigned long shard_id) {
+inline int materialize_dense_cspack_impl(shard_storage *s, dataset_h5_state *state, unsigned long shard_id) {
     const std::uint64_t begin = state != 0 && state->shard_part_begin != 0 ? state->shard_part_begin[shard_id] : 0u;
     const std::uint64_t end = state != 0 && state->shard_part_end != 0 ? state->shard_part_end[shard_id] : 0u;
     const std::uint64_t partition_count = end >= begin ? (end - begin) : 0u;
@@ -963,15 +963,142 @@ done:
     return ok;
 }
 
-inline int materialize_cspack(shard_storage *s, dataset_h5_state *state, unsigned long shard_id) {
-    if (state == 0) return 0;
-    if (state->matrix_family == dataset_matrix_family_dense) return materialize_dense_cspack(s, state, shard_id);
-    if (state->matrix_family == dataset_matrix_family_blocked_ell) return materialize_blocked_ell_cspack(s, state, shard_id);
+} // namespace
+
+struct csh5_shard_archive_binding {
+    void *storage;
+    void *state;
+    unsigned long shard_id;
+};
+
+struct cspack_shard_pack_binding {
+    void *state;
+    unsigned long shard_id;
+};
+
+struct csh5_to_cspack_default_policy : access::passthrough_pack_policy {};
+
+inline disk_format csh5_archive_disk_format_for_state(const dataset_h5_state *state) {
+    if (state == 0) return disk_format_none;
+    if (state->matrix_family == dataset_matrix_family_dense) return disk_format_dense;
+    if (state->matrix_family == dataset_matrix_family_blocked_ell) return disk_format_blocked_ell;
 #if CELLSHARD_ENABLE_CELLERATOR_QUANTIZED
-    if (state->matrix_family == dataset_matrix_family_quantized_blocked_ell) return materialize_quantized_blocked_ell_cspack(s, state, shard_id);
+    if (state->matrix_family == dataset_matrix_family_quantized_blocked_ell) return disk_format_quantized_blocked_ell;
 #endif
-    if (state->matrix_family == dataset_matrix_family_sliced_ell) return materialize_sliced_ell_cspack(s, state, shard_id);
-    return 0;
+    if (state->matrix_family == dataset_matrix_family_sliced_ell) return disk_format_sliced_ell;
+    return disk_format_none;
+}
+
+inline std::uint32_t csh5_execution_format_for_state(const dataset_h5_state *state) {
+    if (state == 0) return dataset_execution_format_unknown;
+    return default_execution_format_for_matrix_family(state->matrix_family, blocked_ell_uses_execution_payload(state));
+}
+
+namespace access {
+
+template<>
+struct archive_adapter<csh5_shard_archive_binding> {
+    static archive_descriptor describe(const adapter_view<csh5_shard_archive_binding> &view) {
+        const dataset_h5_state *state = view.binding != 0 ? static_cast<const dataset_h5_state *>(view.binding->state) : 0;
+        if (state == 0) return archive_descriptor{};
+        return archive_descriptor{
+            state->rows,
+            state->cols,
+            state->nnz,
+            0u,
+            types::value_code<types::storage_value_t>::code,
+            csh5_archive_disk_format_for_state(state),
+            csh5_execution_format_for_state(state),
+            capability_archive_to_pack | capability_pack_write
+        };
+    }
+};
+
+template<>
+struct pack_adapter<cspack_shard_pack_binding> {
+    static pack_descriptor describe(const adapter_view<cspack_shard_pack_binding> &view) {
+        const dataset_h5_state *state = view.binding != 0 ? static_cast<const dataset_h5_state *>(view.binding->state) : 0;
+        const unsigned long shard_id = view.binding != 0 ? view.binding->shard_id : 0ul;
+        if (state == 0 || shard_id >= state->num_shards) return pack_descriptor{};
+        return pack_descriptor{
+            state->shard_offsets != 0 ? state->shard_offsets[shard_id + 1u] - state->shard_offsets[shard_id] : 0u,
+            state->cols,
+            0u,
+            types::value_code<types::storage_value_t>::code,
+            csh5_execution_format_for_state(state),
+            estimate_cspack_bytes(state, shard_id),
+            capability_pack_read | capability_pack_write
+        };
+    }
+};
+
+template<>
+struct archive_to_pack<csh5_shard_archive_binding, cspack_shard_pack_binding, csh5_to_cspack_default_policy> {
+    static pack_build_result build(
+        const adapter_view<csh5_shard_archive_binding> &archive,
+        const adapter_view<cspack_shard_pack_binding> &pack,
+        const pack_build_request &request) {
+        shard_storage *storage = archive.binding != 0 ? static_cast<shard_storage *>(archive.binding->storage) : 0;
+        dataset_h5_state *state = archive.binding != 0 ? static_cast<dataset_h5_state *>(archive.binding->state) : 0;
+        const unsigned long shard_id = archive.binding != 0 ? archive.binding->shard_id : 0ul;
+        const std::uint32_t execution_format = request.requested_execution_format != dataset_execution_format_unknown
+            ? request.requested_execution_format
+            : csh5_execution_format_for_state(state);
+        int ok = 0;
+
+        (void) pack;
+        if (state == 0 || shard_id >= state->num_shards) return pack_build_result{};
+        if (state->matrix_family == dataset_matrix_family_dense) ok = materialize_dense_cspack_impl(storage, state, shard_id);
+        else if (state->matrix_family == dataset_matrix_family_blocked_ell) ok = materialize_blocked_ell_cspack_impl(storage, state, shard_id);
+#if CELLSHARD_ENABLE_CELLERATOR_QUANTIZED
+        else if (state->matrix_family == dataset_matrix_family_quantized_blocked_ell) ok = materialize_quantized_blocked_ell_cspack_impl(storage, state, shard_id);
+#endif
+        else if (state->matrix_family == dataset_matrix_family_sliced_ell) ok = materialize_sliced_ell_cspack_impl(storage, state, shard_id);
+        if (!ok) return pack_build_result{};
+        return pack_build_result{
+            state->shard_offsets != 0 ? state->shard_offsets[shard_id + 1u] - state->shard_offsets[shard_id] : 0u,
+            state->cols,
+            0u,
+            static_cast<std::size_t>(estimate_cspack_bytes(state, shard_id)),
+            execution_format,
+            1u
+        };
+    }
+};
+
+} // namespace access
+
+template<class Policy = csh5_to_cspack_default_policy>
+inline int materialize_cspack_with_policy(shard_storage *s, dataset_h5_state *state, unsigned long shard_id) {
+    if (s == 0 || state == 0 || shard_id >= state->num_shards) return 0;
+    csh5_shard_archive_binding archive_binding{s, state, shard_id};
+    cspack_shard_pack_binding pack_binding{state, shard_id};
+    const access::pack_build_result result = access::build_pack<csh5_shard_archive_binding, cspack_shard_pack_binding, Policy>(
+        access::make_adapter_view(archive_binding),
+        access::make_adapter_view(pack_binding),
+        access::pack_build_request{
+            dataset_generation_ref{
+                state->runtime_service.canonical_generation,
+                state->runtime_service.execution_plan_generation,
+                state->runtime_service.pack_generation,
+                state->runtime_service.service_epoch
+            },
+            dataset_partition_ref{shard_id, 0u},
+            access::cell_selection_view{},
+            access::feature_selection_view{},
+            access::mutable_byte_span{},
+            access::mutable_byte_span{},
+            csh5_execution_format_for_state(state),
+            0u,
+            0
+        });
+    return result.status != 0u;
+}
+
+namespace {
+
+inline int materialize_cspack(shard_storage *s, dataset_h5_state *state, unsigned long shard_id) {
+    return materialize_cspack_with_policy<>(s, state, shard_id);
 }
 
 inline int ensure_cspack_ready(shard_storage *s, dataset_h5_state *state, unsigned long shard_id) {

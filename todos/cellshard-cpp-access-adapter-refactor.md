@@ -4,8 +4,8 @@ status: "in_progress"
 execution: "claimed"
 owner: "codex"
 created_at: "2026-05-31T14:17:11Z"
-last_heartbeat_at: "2026-05-31T14:50:08Z"
-last_reviewed_at: "2026-05-31T14:50:08Z"
+last_heartbeat_at: "2026-05-31T14:56:59Z"
+last_reviewed_at: "2026-05-31T14:56:59Z"
 stale_after_days: 3
 objective: "Implement max-performance C++ access adapters so CellShard owns biological delivery and dense/compressed fallbacks while Cellerator owns optimized sparse bindings."
 ---
@@ -49,7 +49,7 @@ _None recorded yet._
 ## Tasks
 - [x] Create CellShard access adapter contract and fake external adapter compile/runtime smoke.
 - [x] Document dense/compressed fallback ownership and adapter-owned optimized layouts.
-- [ ] Migrate CellShard CSH5/CSPACK path toward adapter-based archive-to-pack hooks without changing CSPACK01 bytes.
+- [x] Migrate CellShard CSH5/CSPACK path toward adapter-based archive-to-pack hooks without changing CSPACK01 bytes.
 - [x] Move CelleratorCore optimized sparse binding ownership into Cellerator headers and update consumers.
 - [~] Run CellShard and Cellerator validation gates or record blockers.
 
@@ -67,9 +67,11 @@ _None recorded yet._
 - Integrated CellShard runtime sharded payload helpers with access::payload_traits<MatrixT>, so MatrixT policy now comes from the adapter/fallback trait surface for aux, nnz, byte sizing, and optional debug scalar inspection.
 - Hard-cut Cellerator optimized CellShard consumers from CellShard format aliases to CelleratorCore matrix types plus Cellerator-owned CellShard access interop traits.
 - Validation passed after the sharded/MatrixT cutover: CellShard full build, cellShardAccessAdapterTest, cellShardDenseRuntimeTest, cellShardOptimizedSlicedExecutionTest, cellShardExportRuntimeTest, cellShardCshardTest, and cellShardInspectPackageTest; Cellerator adapter/sparse/model runtime targets and quantizedMatrixTest/exactSearchRuntimeTest passed.
+- Routed production ensure_cspack_ready materialization through access::archive_to_pack<csh5_shard_archive_binding, cspack_shard_pack_binding, csh5_to_cspack_default_policy>; typed dense, quantized, blocked, and sliced CSPACK01 writers remain byte-compatible implementation functions.
+- Validation passed after the CSH5/CSPACK routing change: CellShard full build, cellShardAccessAdapterTest, cellShardDenseRuntimeTest, cellShardOptimizedSlicedExecutionTest, cellShardExportRuntimeTest, cellShardCshardTest, and cellShardInspectPackageTest.
 
 ## Next Actions
-- Finish the hard cutover by routing CSH5/CSPACK materialization through archive_to_pack and replacing remaining Cellerator consumers of CellShard/formats optimized-layout aliases.
+- Finish by committing the CSH5/CSPACK routing checkpoint, updating root submodule pointers, and rechecking repository statuses.
 
 ## Done Criteria
 - CellShard exposes a documented header-only C++ adapter API with dense/compressed fallback adapters and a fake external adapter test.

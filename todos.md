@@ -36,10 +36,12 @@ _None recorded yet._
 - Integrated CellShard runtime sharded payload helpers with access::payload_traits<MatrixT>, so MatrixT policy now comes from adapter/fallback traits for aux, nnz, byte sizing, and optional debug scalar inspection.
 - Hard-cut Cellerator optimized consumers from CellShard format aliases to CelleratorCore matrix types plus Cellerator-owned CellShard access interop traits.
 - Validation passed after the sharded/MatrixT cutover: CellShard full build, focused runtime/package tests, Cellerator adapter/sparse/model runtime targets, quantizedMatrixTest, and exactSearchRuntimeTest.
+- Routed production ensure_cspack_ready materialization through access::archive_to_pack<csh5_shard_archive_binding, cspack_shard_pack_binding, csh5_to_cspack_default_policy>; typed dense, quantized, blocked, and sliced CSPACK01 writers remain byte-compatible implementation functions.
+- Validation passed after the CSH5/CSPACK routing change: CellShard full build, cellShardAccessAdapterTest, cellShardDenseRuntimeTest, cellShardOptimizedSlicedExecutionTest, cellShardExportRuntimeTest, cellShardCshardTest, and cellShardInspectPackageTest.
 
 ## Next Actions
 - Create or resume a workstream ledger under `todos/` for the next substantial task.
-- Finish the hard cutover by routing CSH5/CSPACK materialization through archive_to_pack and replacing remaining CellShard pack internals that still describe optimized layouts as CellShard-owned formats.
+- Commit the CSH5/CSPACK routing checkpoint, update root submodule pointers, and recheck repository statuses.
 
 ## Done Criteria
 - Every active workstream in `todos/` is reflected here with a current status.

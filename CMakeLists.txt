@@ -708,6 +708,22 @@ if(CELLSHARD_BUILD_TESTS AND CELLSHARD_BUILD_EXPORT)
         CXX_STANDARD_REQUIRED YES
     )
 
+    add_executable(cellShardAccessAdapterTest
+        tests/access_adapter_test.cc
+    )
+    target_include_directories(cellShardAccessAdapterTest PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+    target_link_libraries(cellShardAccessAdapterTest PRIVATE
+        CellShard::headers
+    )
+    set_target_properties(cellShardAccessAdapterTest PROPERTIES
+        CXX_STANDARD 17
+        CXX_STANDARD_REQUIRED YES
+    )
+
     if(CELLSHARD_ENABLE_CUDA)
         add_executable(cellShardMaskGroupsRuntimeTest
             tests/mask_groups_runtime_test.cu

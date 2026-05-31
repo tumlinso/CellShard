@@ -9,6 +9,11 @@ low-overhead shard fetch, staging, and execution.
 CSPACK is not the archive format. It is not the full biological dataset. It is
 the shard-pack artifact family used by the runtime/cache layer.
 
+CSPACK bytes remain CellShard-owned, but optimized matrix layout policy is not.
+The production path is `.csh5 -> .cspack`; callers can override the
+archive-to-pack conversion by specializing the header-only C++ access adapter
+contract for their own archive and pack bindings.
+
 ## Non-goals
 
 - Not a replacement for AnnData/H5AD as an ecosystem interchange format.
@@ -47,9 +52,13 @@ vocabulary shared with CSPOOL and future CSHARD staging lives in
 
 CSPACK files currently support:
 
-- Bucketed Blocked-ELL execution partitions
-- Bucketed Sliced-ELL execution partitions
-- Quantized Blocked-ELL runtime partitions
+- packed dense and compressed sparse fallback/interchange payloads
+- bucketed Blocked-ELL execution partitions when supplied by a caller-owned
+  adapter such as CelleratorCore
+- bucketed Sliced-ELL execution partitions when supplied by a caller-owned
+  adapter such as CelleratorCore
+- quantized Blocked-ELL runtime partitions when supplied by a caller-owned
+  adapter such as CelleratorCore
 
 Shared current assumptions:
 

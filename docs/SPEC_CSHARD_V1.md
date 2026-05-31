@@ -9,6 +9,11 @@ It does not replace `.csh5` yet. Existing production paths continue to treat
 `.csh5` as the durable compatibility source, and `.cspack` remains the optional
 derived execution cache.
 
+CSHARD follows the same ownership boundary as `.csh5`: CellShard owns
+biological metadata, assay pairing, row maps, feature tables, and archive
+inspection. Optimized matrix layouts are caller-owned and should be exposed
+through the C++ access adapter contract when generating packs or staging data.
+
 ## Role
 
 `.cshard` is an archive format, not a model artifact and not the hot execution
@@ -109,14 +114,14 @@ v1 execution pairing supports exact and partial observation-level pairing.
 Donor- and sample-level relationships are metadata only until a future
 execution contract is defined.
 
-Multi-assay writers may store CSR fallback payloads or already optimized
-bucketed Blocked-ELL/Sliced-ELL shard blobs. The optimized writers do not
-convert CSR into ELL inside `.cshard`; callers provide the assay-local optimized
-shards in memory. Readers resolve global observations through the loaded
-row-map sections and read assay rows against only that assay's matrix
-descriptor range. Optimized shard descriptors also carry the shared global row
-window in `aux0`/`aux1`, while `row_begin` and `rows` remain the assay-local row
-range.
+Multi-assay writers may store compressed sparse fallback payloads or
+caller-owned optimized bucketed Blocked-ELL/Sliced-ELL shard blobs. The
+optimized writers do not convert CSR into ELL inside `.cshard`; callers provide
+the assay-local optimized shards in memory through adapter bindings. Readers
+resolve global observations through the loaded row-map sections and read assay
+rows against only that assay's matrix descriptor range. Optimized shard
+descriptors also carry the shared global row window in `aux0`/`aux1`, while
+`row_begin` and `rows` remain the assay-local row range.
 
 ## Matrix Layouts
 

@@ -1,31 +1,38 @@
 # CellShard
 
-CellShard is a low-level, header-first library for large sharded sparse omics matrices.
+CellShard is a low-level, header-first library for biology-centric sharded
+omics archives, metadata, pack generation, and distributed data delivery.
 
 Its scope is narrow:
 
-- represent sparse matrices as partitions and shards
-- persist them in CellShard container formats
+- represent assays as cell/feature partitions and shards
+- persist biological annotation, feature metadata, observation metadata, and
+  payload references in CellShard container formats
 - load metadata without materializing full payloads
 - fetch and drop host-side partitions
 - stage partitions and shards to GPU
 - build and serve CSPACK generations from the canonical container
-- serialize, load, cache, and stage CelleratorCore-owned sparse layouts
+- serialize, load, cache, and stage caller-owned matrix layouts through a
+  header-only C++ adapter contract
+- ship packed dense and compressed sparse fallback/interchange payloads
 - optionally stream source matrices and metadata into canonical CellShard containers
 
 CellShard is the storage, pack-delivery, and distributed execution base layer. It is not the analysis toolkit, model layer, or Torch integration layer. Those live on the Cellerator side.
 
 ## What CellShard Owns
 
-- persisted matrix payloads that may contain CelleratorCore sparse layouts
-- CellShard-local fallback/interchange layouts such as `compressed`, `dense`, and `triplet`
-- sharded matrix metadata and layout helpers
+- biological annotation and metadata formatting for cells, features, assays,
+  pairing, processing state, and generated runtime metadata
+- persisted matrix payloads that may contain caller-owned sparse layouts
+- CellShard-local fallback/interchange payloads: packed row-major `dense` and
+  compressed sparse
+- sharded assay metadata, cell/feature indexing, and delivery planning helpers
 - on-disk matrix and dataset container persistence
 - CSPACK generation and delivery from canonical dataset containers
 - host fetch and drop operations
 - device upload and staging helpers
-- sparse row/feature masking and grouped row reductions for runtime-ready
-  Blocked-ELL, Sliced-ELL, and compressed fallback views
+- sparse row/feature masking and grouped row reductions for adapter-supplied
+  runtime-ready views and compressed fallback views
 - owner-hosted runtime metadata and distributed shard/CSPACK delivery
 - optional bounded source ingest when configured with `CELLSHARD_BUILD_INGEST=ON`
 - optional export helpers and optional Python bindings
@@ -33,6 +40,7 @@ CellShard is the storage, pack-delivery, and distributed execution base layer. I
 CellShard does not own:
 
 - compute-oriented sparse layout definitions such as Blocked-ELL, Sliced-ELL, or quantized Blocked-ELL
+- optimized archive-to-pack layout policy for third-party matrix types
 - biological preprocessing, normalization, and analytical row/column selection workflows
 - clustering, embedding, or neighbor analysis APIs
 - model training or inference
@@ -54,8 +62,13 @@ Naming is mostly `snake_case` for files, functions, variables, and structs.
 Main source areas:
 
 - `include/CellShard/CellShard.hh`: thin umbrella include for the main public surface
+- `include/CellShard/access/`: header-only adapter contract for archive access,
+  cell-span copy, pack payload description, and caller-overridable
+  archive-to-pack conversion
 - `include/CellShard/core/`: core types, spans, compatibility, and scalar helpers
-- `include/CellShard/formats/`: CellShard-local fallback layouts plus temporary compatibility shims for CelleratorCore sparse layouts
+- `include/CellShard/formats/`: CellShard fallback payload aliases plus
+  temporary compatibility shims; optimized project layouts should integrate
+  through `include/CellShard/access/`
 - `include/CellShard/runtime/`: public sharded layout, host fetch/drop, device staging, storage dispatch, and local multi-GPU headers
 - `include/CellShard/io/`: public `.cspack`, `.csh5`, and standby `.cshard` entry headers
 - `include/CellShard/ingest/`: optional source ingest headers, enabled with `CELLSHARD_BUILD_INGEST=ON`
@@ -84,13 +97,25 @@ Useful public/runtime waypoints:
 - `include/CellShard/io/csh5/api.cuh`, `src/io/csh5/create.cc`, `src/io/csh5/metadata.cc`, `src/io/csh5/finalize_preprocess.cc`, `src/io/csh5/write.cc`, and `src/io/csh5/runtime/`: the `.csh5` container backend plus shard `.cspack` runtime caches
 - `include/CellShard/io/cshard.hh` and `include/CellShard/io/cshard/spec.hh`: the standby `.cshard` archive API and fixed v1 POD records
 - `include/CellShard/io/pack/packfile.cuh` and `src/io/pack/packfile.cu`: the per-partition packed payload codec used inside shard `.cspack` cache files
+- `include/CellShard/access/adapter.cuh` and
+  `include/CellShard/access/fallback_adapters.cuh`: compile-time adapter
+  handles and dense/compressed fallback adapters
 
 ## Core Concepts
 
 - `partition`: one stored matrix chunk with explicit row bounds
 - `shard`: a group of partitions used as the higher-level fetch/staging unit
-- `blocked_ell`: a CelleratorCore-owned sparse execution layout that CellShard can persist and stage
-- `compressed`: an explicit row-compressed interop path, not a supported `.csh5` file format
+- `adapter_view<Binding>`: a typed header-only handle that lets callers bind
+  their own archive and pack contexts to CellShard metadata without virtual
+  dispatch
+- `archive_adapter<Binding>`: caller-specialized access to shape, assay,
+  cell-span, feature, partition, shard, and payload metadata
+- `pack_adapter<Binding>`: caller-specialized execution payload description,
+  byte preflight, staging, and pack read/write hooks
+- `archive_to_pack<ArchiveBinding, PackBinding, Policy>`:
+  caller-overridable conversion from archive payload to pack payload
+- `blocked_ell`: a CelleratorCore-owned sparse execution layout that CellShard can persist and stage through adapters
+- `compressed`: an explicit row-compressed fallback/interchange path, not the preferred `.csh5` file format
 - `sharded<T>`: metadata plus optional loaded payload pointers for a partitioned matrix collection
 - `shard_storage`: the bound storage backend used for lazy fetch/materialization
 - `.csh5`: the canonical CellShard dataset container and archive format
@@ -139,7 +164,12 @@ needs expanded floats.
 
 - CellShard owns optional bounded source ingest, metadata capture, local `.cspool` staging, and one-pass emission of an immutable canonical sparse matrix when `CELLSHARD_BUILD_INGEST=ON`.
 - Cellerator owns preprocessing, ML compute, model workflows, Torch interop, trajectory logic, and reusable analysis kernels above CellShard storage/runtime surfaces.
-- CellShard owns partitioning, sharding, blocking, bucketing, rebucketing, CSPACK generation, CSPACK delivery, and append-only canonical/runtime generation management.
+- CellShard owns partitioning, sharding, biological cell/feature/assay indexing,
+  CSPACK generation, CSPACK delivery, and append-only canonical/runtime
+  generation management.
+- The caller owns optimized matrix layout policy. Cellerator-owned layouts such
+  as Blocked-ELL, Sliced-ELL, and quantized Blocked-ELL bind to CellShard
+  through Cellerator adapter headers instead of public CellShard matrix aliases.
 - Once ingest emits a canonical matrix to CellShard storage, row and column membership is immutable for that canonical generation.
 
 ## Storage Model

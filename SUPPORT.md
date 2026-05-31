@@ -10,6 +10,12 @@ CellShard `0.1.x` is intentionally narrow.
   - `CellShard::runtime` when CUDA is enabled
   - `CellShard::export`
   - `CellShard::h5ad_python` when Python is enabled
+- Header-only C++ access adapters:
+  - `cellshard::access::adapter_view<Binding>`
+  - `cellshard::access::archive_adapter<Binding>`
+  - `cellshard::access::pack_adapter<Binding>`
+  - `cellshard::access::archive_to_pack<ArchiveBinding, PackBinding, Policy>`
+  - dense and compressed sparse fallback bindings
 - Python package/module:
   - `open`
   - `Dataset`
@@ -56,6 +62,10 @@ CellShard `0.1.x` is intentionally narrow.
   Torch are explicit conversion formats or explicit `to_*` calls.
 - Torch is optional interop, not the default representation and not a CellShard
   build dependency.
+- CellShard-owned payload layouts are intentionally limited to packed dense and
+  compressed sparse fallback/interchange bindings. Optimized layouts such as
+  Blocked-ELL, Sliced-ELL, and quantized Blocked-ELL are caller-owned and should
+  be exposed to CellShard through the C++ adapter contract.
 - `.csh5` is the canonical archive/container format. High-throughput repeated fetch is expected to run through generated shard `.cspack` cache files built from that container.
 - The normal runtime path is therefore `bind .csh5` -> `materialize cspack` -> `fetch from .cspack` -> `stage to GPU`, not repeated direct HDF5 payload reads as the final execution substrate.
 - Optional CellShard ingest may use bounded local `.cspool` part files, generally sliced-ELL but also blocked-ELL when appropriate, to avoid rereading expensive source matrices before `.csh5` assembly. That spool is an implementation detail, not a supported archival surface.

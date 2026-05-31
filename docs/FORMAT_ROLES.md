@@ -6,8 +6,11 @@ The guiding rule is simple:
 
 > Archive formats preserve meaning. Pack formats preserve speed.
 
-CellShard should own storage, conversion, sharding, packing, and inspection.
-Cellerator should consume execution-ready packs and run biological sparse compute.
+CellShard should own biological metadata, storage roles, sharding, packing,
+delivery, and inspection. Optimized matrix layouts and the fastest
+archive-to-pack conversions are caller-owned through the header-only C++ access
+adapter contract. Cellerator should consume execution-ready packs and run
+biological sparse compute.
 
 ---
 
@@ -59,6 +62,13 @@ It is useful because HDF5 is accessible and inspectable, but it should not be tr
 For multiome datasets, `.csh5` owns archive-level assay semantics: one global
 observation table, per-assay sparse matrices and feature tables, and row maps
 that connect global observations to assay-local rows.
+
+The archive payload vocabulary is intentionally separate from optimized
+execution layout ownership. CellShard owns the annotation and metadata contract
+and can provide dense/compressed fallback payload access. Projects such as
+Cellerator bind their own Core matrix layouts by specializing
+`cellshard::access::archive_adapter`, `pack_adapter`, and
+`archive_to_pack`.
 
 ### Use `.csh5` for
 
@@ -199,6 +209,7 @@ CSPACK payload.
 - Raw ecosystem interchange.
 - Long-term metadata-rich archiving.
 - Storing every possible sparse layout.
+- Making CellShard the source of truth for optimized sparse layout policy.
 - Replacing `.h5ad` as a community format.
 
 ### v1 policy
@@ -208,9 +219,10 @@ CSPACK payload.
 Supported in v1:
 
 - Per-shard files with magic `CSPACK01`.
-- Bucketed Blocked-ELL execution partitions.
-- Bucketed Sliced-ELL execution partitions.
-- Quantized Blocked-ELL runtime partitions.
+- CellShard dense and compressed fallback/interchange payloads.
+- Caller-owned bucketed Blocked-ELL execution partitions through adapters.
+- Caller-owned bucketed Sliced-ELL execution partitions through adapters.
+- Caller-owned quantized Blocked-ELL runtime partitions through adapters.
 - Little-endian host-native encoding.
 - 64-bit shard/container counts and offsets.
 - `uint32` rows, cols, nnz, and index metadata inside partition payloads.

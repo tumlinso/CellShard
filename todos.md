@@ -33,10 +33,13 @@ _None recorded yet._
 - Validation passed: Cellerator configure, cellshardAccessAdapterCompileTest build/run, quantizedMatrixTest, and exactSearchRuntimeTest.
 - Validation caveats: cellShardMaskGroupsRuntimeTest exits 14 at the row-keep assertion with no stderr; computeAutogradRuntimeTest and quantizeModelTest are not present in the current Cellerator CMake target list.
 - Package consumer now includes CellShard/access.hh and static-checks dense fallback adapter visibility from the installed package.
+- Integrated CellShard runtime sharded payload helpers with access::payload_traits<MatrixT>, so MatrixT policy now comes from adapter/fallback traits for aux, nnz, byte sizing, and optional debug scalar inspection.
+- Hard-cut Cellerator optimized consumers from CellShard format aliases to CelleratorCore matrix types plus Cellerator-owned CellShard access interop traits.
+- Validation passed after the sharded/MatrixT cutover: CellShard full build, focused runtime/package tests, Cellerator adapter/sparse/model runtime targets, quantizedMatrixTest, and exactSearchRuntimeTest.
 
 ## Next Actions
 - Create or resume a workstream ledger under `todos/` for the next substantial task.
-- Finish the hard cutover by routing CSH5/CSPACK materialization through archive_to_pack and replacing remaining Cellerator consumers of CellShard/formats optimized-layout aliases.
+- Finish the hard cutover by routing CSH5/CSPACK materialization through archive_to_pack and replacing remaining CellShard pack internals that still describe optimized layouts as CellShard-owned formats.
 
 ## Done Criteria
 - Every active workstream in `todos/` is reflected here with a current status.

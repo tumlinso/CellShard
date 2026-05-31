@@ -6,6 +6,7 @@
 
 #include "../../core/offset_span.cuh"
 #include "../../core/real.cuh"
+#include "../../access/fallback_adapters.cuh"
 #include "../../formats/compressed.cuh"
 #include "../../formats/blocked_ell.cuh"
 #if CELLSHARD_ENABLE_CELLERATOR_QUANTIZED
@@ -15,6 +16,11 @@
 #include "../../formats/dense.cuh"
 #include "../../formats/diagonal.cuh"
 #include "../../formats/triplet.cuh"
+#if defined(__has_include)
+#if __has_include(<Cellerator/core/interop/cellshard_access.cuh>)
+#include <Cellerator/core/interop/cellshard_access.cuh>
+#endif
+#endif
 
 #include <cstddef>
 
@@ -70,43 +76,13 @@ __host__ __device__ __forceinline__ void init(sharded<MatrixT> * __restrict__ m)
 
 // Default auxiliary metadata for formats that do not need it.
 template<typename MatrixT>
-__host__ __device__ __forceinline__ unsigned int partition_aux(const MatrixT *) {
-    return 0;
+__host__ __device__ __forceinline__ unsigned long partition_aux(const MatrixT *m) {
+    return access::payload_traits<MatrixT>::aux(m);
 }
 
-// Dense parts derive nnz from rows*cols.
-__host__ __device__ __forceinline__ unsigned long partition_nnz(const dense *m) {
-    return (unsigned long) m->rows * (unsigned long) m->cols;
-}
-
-// Generic sparse path reads nnz directly from the materialized part.
 template<typename MatrixT>
 __host__ __device__ __forceinline__ unsigned long partition_nnz(const MatrixT *m) {
-    return m->nnz;
-}
-
-// DIA needs num_diagonals when the part payload is absent.
-__host__ __device__ __forceinline__ unsigned int partition_aux(const sparse::dia *m) {
-    return m->num_diagonals;
-}
-
-// Compressed storage needs axis metadata when only the sharded header is live.
-__host__ __device__ __forceinline__ unsigned int partition_aux(const sparse::compressed *m) {
-    return m->axis;
-}
-
-__host__ __device__ __forceinline__ unsigned long partition_aux(const sparse::blocked_ell *m) {
-    return sparse::pack_blocked_ell_aux(m->block_size, sparse::ell_width_blocks(m));
-}
-
-#if CELLSHARD_ENABLE_CELLERATOR_QUANTIZED
-__host__ __device__ __forceinline__ unsigned long partition_aux(const sparse::quantized_blocked_ell *m) {
-    return sparse::pack_quantized_blocked_ell_aux(m->bits, m->block_size, sparse::ell_width_blocks(m));
-}
-#endif
-
-__host__ __device__ __forceinline__ unsigned long partition_aux(const sparse::sliced_ell *m) {
-    return sparse::pack_sliced_ell_aux(m->slice_count, sparse::total_slots(m));
+    return access::payload_traits<MatrixT>::nnz(m);
 }
 
 // Row -> part lookup over partition_offsets[].
@@ -154,7 +130,7 @@ __host__ __device__ __forceinline__ const real::storage_t *at(const sharded<Matr
     if (partId >= m->num_partitions) return 0;
     part = m->parts[partId];
     if (part == 0) return 0;
-    return at(part, (types::dim_t) (r - m->partition_offsets[partId]), c);
+    return access::payload_traits<MatrixT>::debug_at(part, r - m->partition_offsets[partId], c);
 }
 
 template<typename MatrixT>
@@ -164,7 +140,7 @@ __host__ __device__ __forceinline__ real::storage_t *at(sharded<MatrixT> * __res
     if (partId >= m->num_partitions) return 0;
     part = m->parts[partId];
     if (part == 0) return 0;
-    return at(part, (types::dim_t) (r - m->partition_offsets[partId]), c);
+    return const_cast<real::storage_t *>(access::payload_traits<MatrixT>::debug_at(part, r - m->partition_offsets[partId], c));
 }
 
 // Shard membership is derived from row boundaries and therefore stays aligned
@@ -251,83 +227,17 @@ __host__ __device__ __forceinline__ unsigned long nnz_in_shard(const sharded<Mat
     return total;
 }
 
-// Host-side footprint estimates. If a part is not materialized, bytes are
-// reconstructed from metadata only.
-__host__ __device__ __forceinline__ std::size_t partition_bytes(const sharded<dense> *m, unsigned long partId) {
+// Host-side footprint estimates. If a part is not materialized, the active
+// access payload trait reconstructs bytes from partition metadata.
+template<typename MatrixT>
+__host__ __device__ __forceinline__ std::size_t partition_bytes(const sharded<MatrixT> *m, unsigned long partId) {
     if (partId >= m->num_partitions) return 0;
-    if (m->parts[partId] != 0) return bytes(m->parts[partId]);
-    return sizeof(dense) + (std::size_t) m->partition_nnz[partId] * sizeof(real::storage_t);
-}
-
-__host__ __device__ __forceinline__ std::size_t partition_bytes(const sharded<sparse::compressed> *m, unsigned long partId) {
-    const unsigned long ptr_dim = m->partition_aux[partId] == sparse::compressed_by_col ? m->cols : m->partition_rows[partId];
-    if (partId >= m->num_partitions) return 0;
-    if (m->parts[partId] != 0) return bytes(m->parts[partId]);
-    return sizeof(sparse::compressed)
-        + (std::size_t) (ptr_dim + 1) * sizeof(types::ptr_t)
-        + (std::size_t) m->partition_nnz[partId] * sizeof(types::idx_t)
-        + (std::size_t) m->partition_nnz[partId] * sizeof(real::storage_t);
-}
-
-__host__ __device__ __forceinline__ std::size_t partition_bytes(const sharded<sparse::blocked_ell> *m, unsigned long partId) {
-    const unsigned long aux = m->partition_aux[partId];
-    const types::u32 block_size = sparse::unpack_blocked_ell_block_size(aux);
-    const unsigned long ell_width = sparse::unpack_blocked_ell_ell_width(aux);
-    if (partId >= m->num_partitions) return 0;
-    if (m->parts[partId] != 0) return bytes(m->parts[partId]);
-    return sizeof(sparse::blocked_ell)
-        + (std::size_t) ((m->partition_rows[partId] + block_size - 1u) / block_size) * (std::size_t) ell_width * sizeof(types::idx_t)
-        + (std::size_t) m->partition_rows[partId] * (std::size_t) (ell_width * block_size) * sizeof(real::storage_t);
-}
-
-#if CELLSHARD_ENABLE_CELLERATOR_QUANTIZED
-__host__ __device__ __forceinline__ std::size_t partition_bytes(const sharded<sparse::quantized_blocked_ell> *m, unsigned long partId) {
-    const unsigned long aux = m->partition_aux[partId];
-    const unsigned long bits = sparse::unpack_quantized_blocked_ell_bits(aux);
-    const unsigned long block_size = sparse::unpack_quantized_blocked_ell_block_size(aux);
-    const unsigned long ell_cols = sparse::unpack_quantized_blocked_ell_cols(aux);
-    const unsigned long row_stride_bytes = sparse::quantized_blocked_ell_aligned_row_bytes((types::u32) bits, (types::u32) ell_cols);
-    const unsigned long row_blocks = block_size == 0u ? 0u : (m->partition_rows[partId] + block_size - 1u) / block_size;
-    const unsigned long ell_width = block_size == 0u ? 0u : ell_cols / block_size;
-    if (partId >= m->num_partitions) return 0;
-    if (m->parts[partId] != 0) return bytes(m->parts[partId]);
-    return sizeof(sparse::quantized_blocked_ell)
-        + (std::size_t) row_blocks * (std::size_t) ell_width * sizeof(types::idx_t)
-        + (std::size_t) m->partition_rows[partId] * (std::size_t) row_stride_bytes
-        + (std::size_t) m->cols * sizeof(float)
-        + (std::size_t) m->cols * sizeof(float)
-        + (std::size_t) m->partition_rows[partId] * sizeof(float);
-}
-#endif
-
-__host__ __device__ __forceinline__ std::size_t partition_bytes(const sharded<sparse::sliced_ell> *m, unsigned long partId) {
-    const unsigned long aux = m->partition_aux[partId];
-    const types::u32 slice_count = sparse::unpack_sliced_ell_slice_count(aux);
-    const types::u32 total_slot_count = sparse::unpack_sliced_ell_total_slots(aux);
-    if (partId >= m->num_partitions) return 0;
-    if (m->parts[partId] != 0) return bytes(m->parts[partId]);
-    return sizeof(sparse::sliced_ell)
-        + (std::size_t) (slice_count + 1u) * sizeof(types::u32)
-        + (std::size_t) slice_count * sizeof(types::u32)
-        + (std::size_t) total_slot_count * sizeof(types::idx_t)
-        + (std::size_t) total_slot_count * sizeof(real::storage_t);
-}
-
-__host__ __device__ __forceinline__ std::size_t partition_bytes(const sharded<sparse::coo> *m, unsigned long partId) {
-    if (partId >= m->num_partitions) return 0;
-    if (m->parts[partId] != 0) return bytes(m->parts[partId]);
-    return sizeof(sparse::coo)
-        + (std::size_t) m->partition_nnz[partId] * sizeof(types::idx_t)
-        + (std::size_t) m->partition_nnz[partId] * sizeof(types::idx_t)
-        + (std::size_t) m->partition_nnz[partId] * sizeof(real::storage_t);
-}
-
-__host__ __device__ __forceinline__ std::size_t partition_bytes(const sharded<sparse::dia> *m, unsigned long partId) {
-    if (partId >= m->num_partitions) return 0;
-    if (m->parts[partId] != 0) return bytes(m->parts[partId]);
-    return sizeof(sparse::dia)
-        + (std::size_t) m->partition_aux[partId] * sizeof(int)
-        + (std::size_t) m->partition_nnz[partId] * sizeof(real::storage_t);
+    return access::payload_traits<MatrixT>::host_bytes(
+        m->parts[partId],
+        m->partition_rows[partId],
+        m->cols,
+        m->partition_nnz[partId],
+        m->partition_aux[partId]);
 }
 
 template<typename MatrixT>

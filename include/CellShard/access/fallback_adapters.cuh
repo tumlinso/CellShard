@@ -21,6 +21,81 @@ struct compressed_fallback_binding {
     std::uint32_t assay_id;
 };
 
+template<>
+struct payload_traits<cellshard::dense> {
+    __host__ __device__ __forceinline__ static std::uint64_t rows(const cellshard::dense *matrix) {
+        return matrix != nullptr ? matrix->rows : 0u;
+    }
+
+    __host__ __device__ __forceinline__ static std::uint64_t cols(const cellshard::dense *matrix) {
+        return matrix != nullptr ? matrix->cols : 0u;
+    }
+
+    __host__ __device__ __forceinline__ static std::uint64_t nnz(const cellshard::dense *matrix) {
+        return matrix != nullptr ? static_cast<std::uint64_t>(matrix->rows) * static_cast<std::uint64_t>(matrix->cols) : 0u;
+    }
+
+    __host__ __device__ __forceinline__ static std::uint64_t aux(const cellshard::dense *) {
+        return 0u;
+    }
+
+    __host__ __device__ __forceinline__ static std::size_t host_bytes(
+        const cellshard::dense *matrix,
+        std::uint64_t,
+        std::uint64_t,
+        std::uint64_t nnz,
+        std::uint64_t) {
+        return matrix != nullptr ? cellshard::bytes(matrix) : sizeof(cellshard::dense) + static_cast<std::size_t>(nnz) * sizeof(types::storage_value_t);
+    }
+
+    __host__ __device__ __forceinline__ static const types::storage_value_t *debug_at(
+        const cellshard::dense *matrix,
+        std::uint64_t row,
+        types::idx_t col) {
+        return cellshard::at(matrix, static_cast<types::dim_t>(row), col);
+    }
+};
+
+template<>
+struct payload_traits<cellshard::sparse::compressed> {
+    __host__ __device__ __forceinline__ static std::uint64_t rows(const cellshard::sparse::compressed *matrix) {
+        return matrix != nullptr ? matrix->rows : 0u;
+    }
+
+    __host__ __device__ __forceinline__ static std::uint64_t cols(const cellshard::sparse::compressed *matrix) {
+        return matrix != nullptr ? matrix->cols : 0u;
+    }
+
+    __host__ __device__ __forceinline__ static std::uint64_t nnz(const cellshard::sparse::compressed *matrix) {
+        return matrix != nullptr ? matrix->nnz : 0u;
+    }
+
+    __host__ __device__ __forceinline__ static std::uint64_t aux(const cellshard::sparse::compressed *matrix) {
+        return matrix != nullptr ? matrix->axis : 0u;
+    }
+
+    __host__ __device__ __forceinline__ static std::size_t host_bytes(
+        const cellshard::sparse::compressed *matrix,
+        std::uint64_t rows,
+        std::uint64_t cols,
+        std::uint64_t nnz,
+        std::uint64_t aux_value) {
+        const std::uint64_t ptr_dim = aux_value == cellshard::sparse::compressed_by_col ? cols : rows;
+        return matrix != nullptr ? cellshard::sparse::bytes(matrix)
+                                 : sizeof(cellshard::sparse::compressed)
+                                     + static_cast<std::size_t>(ptr_dim + 1u) * sizeof(types::ptr_t)
+                                     + static_cast<std::size_t>(nnz) * sizeof(types::idx_t)
+                                     + static_cast<std::size_t>(nnz) * sizeof(types::storage_value_t);
+    }
+
+    __host__ __device__ __forceinline__ static const types::storage_value_t *debug_at(
+        const cellshard::sparse::compressed *matrix,
+        std::uint64_t row,
+        types::idx_t col) {
+        return cellshard::sparse::at(matrix, static_cast<types::dim_t>(row), col);
+    }
+};
+
 namespace detail {
 
 inline bool selection_is_all(const cell_selection_view &selection) {

@@ -8,11 +8,11 @@ Use this file as the quick pickup register for `todos.md` workstreams.
 - `closed`: completed or removed from pickup rotation.
 
 ## Workstreams
-- `cellshard-cpp-access-adapter-refactor` | status: in_progress | execution: claimed | owner: codex | file: `todos/cellshard-cpp-access-adapter-refactor.md` | next: Commit the CSH5/CSPACK routing checkpoint, update root submodule pointers, and recheck repository statuses.
+- `cellshard-cpp-access-adapter-refactor` | status: closed | execution: closed | owner: codex | file: `todos/cellshard-cpp-access-adapter-refactor.md` | next: closed; reopen only for compatibility-header removal or broader external policy injection.
 
 ## Staleness Review
 _No staleness review recorded yet._
 
 ## Cleanup Status
 - Cleanup mode is explicit only.
-- Safe to call `todo-cleanup`: no, active workstreams: cellshard-cpp-access-adapter-refactor.
+- Safe to call `todo-cleanup`: yes, active workstreams: none.

@@ -1,11 +1,11 @@
 ---
 slug: "cellshard-cpp-access-adapter-refactor"
-status: "in_progress"
-execution: "claimed"
+status: "closed"
+execution: "closed"
 owner: "codex"
 created_at: "2026-05-31T14:17:11Z"
-last_heartbeat_at: "2026-05-31T14:56:59Z"
-last_reviewed_at: "2026-05-31T14:56:59Z"
+last_heartbeat_at: "2026-05-31T14:58:38Z"
+last_reviewed_at: "2026-05-31T14:58:38Z"
 stale_after_days: 3
 objective: "Implement max-performance C++ access adapters so CellShard owns biological delivery and dense/compressed fallbacks while Cellerator owns optimized sparse bindings."
 ---
@@ -51,7 +51,7 @@ _None recorded yet._
 - [x] Document dense/compressed fallback ownership and adapter-owned optimized layouts.
 - [x] Migrate CellShard CSH5/CSPACK path toward adapter-based archive-to-pack hooks without changing CSPACK01 bytes.
 - [x] Move CelleratorCore optimized sparse binding ownership into Cellerator headers and update consumers.
-- [~] Run CellShard and Cellerator validation gates or record blockers.
+- [x] Run CellShard and Cellerator validation gates or record blockers.
 
 ## Blockers
 _None recorded yet._
@@ -69,9 +69,10 @@ _None recorded yet._
 - Validation passed after the sharded/MatrixT cutover: CellShard full build, cellShardAccessAdapterTest, cellShardDenseRuntimeTest, cellShardOptimizedSlicedExecutionTest, cellShardExportRuntimeTest, cellShardCshardTest, and cellShardInspectPackageTest; Cellerator adapter/sparse/model runtime targets and quantizedMatrixTest/exactSearchRuntimeTest passed.
 - Routed production ensure_cspack_ready materialization through access::archive_to_pack<csh5_shard_archive_binding, cspack_shard_pack_binding, csh5_to_cspack_default_policy>; typed dense, quantized, blocked, and sliced CSPACK01 writers remain byte-compatible implementation functions.
 - Validation passed after the CSH5/CSPACK routing change: CellShard full build, cellShardAccessAdapterTest, cellShardDenseRuntimeTest, cellShardOptimizedSlicedExecutionTest, cellShardExportRuntimeTest, cellShardCshardTest, and cellShardInspectPackageTest.
+- Closed after CellShard, Cellerator, and CellStack root pointer commits were pushed. Known caveats remain tracked as validation notes rather than active implementation blockers.
 
 ## Next Actions
-- Finish by committing the CSH5/CSPACK routing checkpoint, updating root submodule pointers, and rechecking repository statuses.
+- Workstream closed. Reopen only for a follow-up that removes remaining compatibility format headers or broadens external policy injection.
 
 ## Done Criteria
 - CellShard exposes a documented header-only C++ adapter API with dense/compressed fallback adapters and a fake external adapter test.

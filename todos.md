@@ -20,7 +20,7 @@ _None recorded yet._
 - `../Cellerator/AGENTS.md` - Cellerator ownership for Core layouts and optimized compute bindings.
 
 ## Workstreams
-- `cellshard-cpp-access-adapter-refactor` | status: in_progress | owner: codex | file: `todos/cellshard-cpp-access-adapter-refactor.md` | objective: Implement max-performance C++ access adapters so CellShard owns biological delivery and dense/compressed fallbacks while Cellerator owns optimized sparse bindings.
+- `cellshard-cpp-access-adapter-refactor` | status: closed | owner: codex | file: `todos/cellshard-cpp-access-adapter-refactor.md` | objective: Implement max-performance C++ access adapters so CellShard owns biological delivery and dense/compressed fallbacks while Cellerator owns optimized sparse bindings.
 
 ## Global Blockers
 _None recorded yet._
@@ -38,10 +38,11 @@ _None recorded yet._
 - Validation passed after the sharded/MatrixT cutover: CellShard full build, focused runtime/package tests, Cellerator adapter/sparse/model runtime targets, quantizedMatrixTest, and exactSearchRuntimeTest.
 - Routed production ensure_cspack_ready materialization through access::archive_to_pack<csh5_shard_archive_binding, cspack_shard_pack_binding, csh5_to_cspack_default_policy>; typed dense, quantized, blocked, and sliced CSPACK01 writers remain byte-compatible implementation functions.
 - Validation passed after the CSH5/CSPACK routing change: CellShard full build, cellShardAccessAdapterTest, cellShardDenseRuntimeTest, cellShardOptimizedSlicedExecutionTest, cellShardExportRuntimeTest, cellShardCshardTest, and cellShardInspectPackageTest.
+- Closed after CellShard, Cellerator, and CellStack root pointer commits were pushed. Known caveats remain tracked as validation notes rather than active implementation blockers.
 
 ## Next Actions
 - Create or resume a workstream ledger under `todos/` for the next substantial task.
-- Commit the CSH5/CSPACK routing checkpoint, update root submodule pointers, and recheck repository statuses.
+- Reopen a new workstream only for a follow-up that removes remaining compatibility format headers or broadens external policy injection.
 
 ## Done Criteria
 - Every active workstream in `todos/` is reflected here with a current status.

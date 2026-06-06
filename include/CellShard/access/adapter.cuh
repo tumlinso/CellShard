@@ -201,7 +201,10 @@ struct payload_traits {
         const MatrixT *matrix,
         std::uint64_t row,
         types::idx_t col) {
-        return matrix != nullptr ? at(matrix, static_cast<types::dim_t>(row), col) : nullptr;
+        (void) matrix;
+        (void) row;
+        (void) col;
+        return nullptr;
     }
 };
 

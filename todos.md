@@ -34,7 +34,7 @@ _None recorded yet._
 - Validation caveats: cellShardMaskGroupsRuntimeTest exits 14 at the row-keep assertion with no stderr; computeAutogradRuntimeTest and quantizeModelTest are not present in the current Cellerator CMake target list.
 - Package consumer now includes CellShard/access.hh and static-checks dense fallback adapter visibility from the installed package.
 - Integrated CellShard runtime sharded payload helpers with access::payload_traits<MatrixT>, so MatrixT policy now comes from adapter/fallback traits for aux, nnz, byte sizing, and optional debug scalar inspection.
-- Hard-cut Cellerator optimized consumers from CellShard format aliases to CelleratorCore matrix types plus Cellerator-owned CellShard access interop traits.
+- Hard-cut Cellerator optimized consumers from CellShard format aliases to Cellerator matrix types plus Cellerator-owned CellShard access interop traits.
 - Validation passed after the sharded/MatrixT cutover: CellShard full build, focused runtime/package tests, Cellerator adapter/sparse/model runtime targets, quantizedMatrixTest, and exactSearchRuntimeTest.
 - Routed production ensure_cspack_ready materialization through access::archive_to_pack<csh5_shard_archive_binding, cspack_shard_pack_binding, csh5_to_cspack_default_policy>; typed dense, quantized, blocked, and sliced CSPACK01 writers remain byte-compatible implementation functions.
 - Validation passed after the CSH5/CSPACK routing change: CellShard full build, cellShardAccessAdapterTest, cellShardDenseRuntimeTest, cellShardOptimizedSlicedExecutionTest, cellShardExportRuntimeTest, cellShardCshardTest, and cellShardInspectPackageTest.
@@ -47,5 +47,5 @@ _None recorded yet._
 ## Done Criteria
 - Every active workstream in `todos/` is reflected here with a current status.
 - CellShard exposes a documented header-only C++ adapter API with dense/compressed fallback adapters and a fake external adapter test.
-- Public docs no longer imply CellShard owns CelleratorCore optimized sparse matrix layouts.
+- Public docs no longer imply CellShard owns Cellerator optimized sparse matrix layouts.
 - Current CellShard and Cellerator build/test gates pass or failures are classified with exact commands.

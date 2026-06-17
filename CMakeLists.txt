@@ -158,16 +158,16 @@ elseif(CELLSHARD_ENABLE_CUDA AND TARGET Cellerator::dist)
 endif()
 
 if(CELLSHARD_ENABLE_CELLERATOR_QUANTIZED)
-    if(NOT TARGET Cellerator::core)
-        if(NOT CELLSHARD_CELLERATOR_SOURCE_DIR AND EXISTS "${CMAKE_CURRENT_LIST_DIR}/../Cellerator/include/Cellerator/core/matrix/quantized_blocked_ell.cuh")
+    if(NOT TARGET Cellerator::runtime)
+        if(NOT CELLSHARD_CELLERATOR_SOURCE_DIR AND EXISTS "${CMAKE_CURRENT_LIST_DIR}/../Cellerator/include/Cellerator/matrix/quantized_blocked_ell.cuh")
             set(CELLSHARD_CELLERATOR_SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}/../Cellerator" CACHE PATH
-                "Local Cellerator source checkout used for standalone CelleratorCore sparse layout headers." FORCE)
+                "Local Cellerator source checkout used for standalone Cellerator sparse layout headers." FORCE)
         endif()
         if(CELLSHARD_CELLERATOR_SOURCE_DIR)
-            if(NOT EXISTS "${CELLSHARD_CELLERATOR_SOURCE_DIR}/include/Cellerator/core/matrix/quantized_blocked_ell.cuh")
+            if(NOT EXISTS "${CELLSHARD_CELLERATOR_SOURCE_DIR}/include/Cellerator/matrix/quantized_blocked_ell.cuh")
                 message(FATAL_ERROR
                     "CELLSHARD_CELLERATOR_SOURCE_DIR must point at a Cellerator checkout with "
-                    "include/Cellerator/core/matrix/quantized_blocked_ell.cuh")
+                    "include/Cellerator/matrix/quantized_blocked_ell.cuh")
             endif()
             set(CELLSHARD_CELLERATOR_QUANTIZED_INCLUDE_ROOT "${CELLSHARD_CELLERATOR_SOURCE_DIR}/include")
         else()
@@ -184,54 +184,54 @@ if(CELLSHARD_ENABLE_CELLERATOR_QUANTIZED)
             endif()
             set(CELLSHARD_CELLERATOR_QUANTIZED_INCLUDE_ROOT "${cellshard_cellerator_quantized_source_SOURCE_DIR}/include")
         endif()
-    elseif(EXISTS "${CMAKE_SOURCE_DIR}/include/Cellerator/core/matrix/quantized_blocked_ell.cuh")
+    elseif(EXISTS "${CMAKE_SOURCE_DIR}/include/Cellerator/matrix/quantized_blocked_ell.cuh")
         set(CELLSHARD_CELLERATOR_QUANTIZED_INCLUDE_ROOT "${CMAKE_SOURCE_DIR}/include")
     endif()
 endif()
 
-if(NOT TARGET Cellerator::core)
+if(NOT TARGET Cellerator::runtime)
     if(NOT CELLSHARD_CELLERATOR_QUANTIZED_INCLUDE_ROOT)
         message(FATAL_ERROR
-            "CellShard requires CelleratorCore sparse layout headers. "
+            "CellShard requires Cellerator sparse layout headers. "
             "Set CELLSHARD_CELLERATOR_SOURCE_DIR or build inside a workspace where Cellerator is available.")
     endif()
     if(CELLSHARD_CELLERATOR_SOURCE_DIR
-       AND EXISTS "${CELLSHARD_CELLERATOR_SOURCE_DIR}/src/core/runtime/runtime.cu")
-        add_library(cellshard_cellerator_core STATIC
-            "${CELLSHARD_CELLERATOR_SOURCE_DIR}/src/core/runtime/runtime.cu"
+       AND EXISTS "${CELLSHARD_CELLERATOR_SOURCE_DIR}/src/runtime/runtime.cu")
+        add_library(cellshard_cellerator_runtime STATIC
+            "${CELLSHARD_CELLERATOR_SOURCE_DIR}/src/runtime/runtime.cu"
         )
-        add_library(Cellerator::core ALIAS cellshard_cellerator_core)
-        target_include_directories(cellshard_cellerator_core PUBLIC
-            "${CELLSHARD_CELLERATOR_QUANTIZED_INCLUDE_ROOT}"
+        add_library(Cellerator::runtime ALIAS cellshard_cellerator_runtime)
+        target_include_directories(cellshard_cellerator_runtime PUBLIC
+            "$<BUILD_INTERFACE:${CELLSHARD_CELLERATOR_QUANTIZED_INCLUDE_ROOT}>"
         )
-        target_compile_features(cellshard_cellerator_core PUBLIC cxx_std_17)
+        target_compile_features(cellshard_cellerator_runtime PUBLIC cxx_std_17)
         if(TARGET CUDA::cudart)
-            target_link_libraries(cellshard_cellerator_core PUBLIC CUDA::cudart)
+            target_link_libraries(cellshard_cellerator_runtime PUBLIC CUDA::cudart)
         endif()
         if(TARGET CUDA::cusparse)
-            target_link_libraries(cellshard_cellerator_core PRIVATE CUDA::cusparse)
+            target_link_libraries(cellshard_cellerator_runtime PRIVATE CUDA::cusparse)
         endif()
         if(TARGET CUDA::cublas)
-            target_link_libraries(cellshard_cellerator_core PRIVATE CUDA::cublas)
+            target_link_libraries(cellshard_cellerator_runtime PRIVATE CUDA::cublas)
         endif()
-        set_target_properties(cellshard_cellerator_core PROPERTIES
+        set_target_properties(cellshard_cellerator_runtime PROPERTIES
             CXX_STANDARD 17
             CXX_STANDARD_REQUIRED YES
         )
         if(CELLSHARD_ENABLE_CUDA)
-            set_target_properties(cellshard_cellerator_core PROPERTIES
+            set_target_properties(cellshard_cellerator_runtime PROPERTIES
                 CUDA_STANDARD 17
                 CUDA_STANDARD_REQUIRED YES
             )
         endif()
     else()
-        add_library(Cellerator::core INTERFACE IMPORTED GLOBAL)
-        set_target_properties(Cellerator::core PROPERTIES
+        add_library(Cellerator::runtime INTERFACE IMPORTED GLOBAL)
+        set_target_properties(Cellerator::runtime PROPERTIES
             INTERFACE_INCLUDE_DIRECTORIES "${CELLSHARD_CELLERATOR_QUANTIZED_INCLUDE_ROOT}"
             INTERFACE_COMPILE_FEATURES cxx_std_17
         )
         if(TARGET CUDA::cudart)
-            target_link_libraries(Cellerator::core INTERFACE CUDA::cudart)
+            target_link_libraries(Cellerator::runtime INTERFACE CUDA::cudart)
         endif()
     endif()
 endif()
@@ -246,10 +246,10 @@ if(CELLSHARD_ENABLE_CUDA AND NOT TARGET Cellerator::compute_matrix_convert)
         )
         add_library(Cellerator::compute_matrix_convert ALIAS cellshard_cellerator_compute_matrix_convert)
         target_include_directories(cellshard_cellerator_compute_matrix_convert PUBLIC
-            "${CELLSHARD_CELLERATOR_QUANTIZED_INCLUDE_ROOT}"
+            "$<BUILD_INTERFACE:${CELLSHARD_CELLERATOR_QUANTIZED_INCLUDE_ROOT}>"
         )
         target_compile_features(cellshard_cellerator_compute_matrix_convert PUBLIC cxx_std_17)
-        target_link_libraries(cellshard_cellerator_compute_matrix_convert PUBLIC Cellerator::core)
+        target_link_libraries(cellshard_cellerator_compute_matrix_convert PUBLIC Cellerator::runtime)
         if(TARGET CUDA::cudart)
             target_link_libraries(cellshard_cellerator_compute_matrix_convert PRIVATE CUDA::cudart)
         endif()
@@ -317,7 +317,7 @@ target_include_directories(cellshard_headers INTERFACE
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 target_compile_features(cellshard_headers INTERFACE cxx_std_17)
-target_link_libraries(cellshard_headers INTERFACE $<BUILD_INTERFACE:Cellerator::core>)
+target_link_libraries(cellshard_headers INTERFACE $<BUILD_INTERFACE:Cellerator::runtime>)
 if(CELLSHARD_ENABLE_CUDA)
     target_link_libraries(cellshard_headers INTERFACE $<BUILD_INTERFACE:Cellerator::compute_matrix_convert>)
 endif()
@@ -411,9 +411,9 @@ set(CELLSHARD_PACKAGE_COMPONENTS
     headers
     inspect
 )
-if(TARGET cellshard_cellerator_core)
-    list(APPEND CELLSHARD_EXPORT_TARGETS cellshard_cellerator_core)
-    list(APPEND CELLSHARD_INSTALL_TARGETS cellshard_cellerator_core)
+if(TARGET cellshard_cellerator_runtime)
+    list(APPEND CELLSHARD_EXPORT_TARGETS cellshard_cellerator_runtime)
+    list(APPEND CELLSHARD_INSTALL_TARGETS cellshard_cellerator_runtime)
 endif()
 if(TARGET cellshard_cellerator_compute_matrix_convert)
     list(APPEND CELLSHARD_EXPORT_TARGETS cellshard_cellerator_compute_matrix_convert)
@@ -994,12 +994,20 @@ endif()
 
 if(CELLSHARD_ENABLE_CELLERATOR_QUANTIZED)
     if(NOT CELLSHARD_CELLERATOR_QUANTIZED_INCLUDE_ROOT)
-        message(FATAL_ERROR "Unable to locate CelleratorCore sparse layout headers for install")
+        message(FATAL_ERROR "Unable to locate Cellerator sparse layout headers for install")
     endif()
-    install(DIRECTORY "${CELLSHARD_CELLERATOR_QUANTIZED_INCLUDE_ROOT}/Cellerator/core"
+    foreach(cellshard_cellerator_public_dir matrix quantized runtime interop)
+        install(DIRECTORY "${CELLSHARD_CELLERATOR_QUANTIZED_INCLUDE_ROOT}/Cellerator/${cellshard_cellerator_public_dir}"
+            DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/Cellerator
+            FILES_MATCHING
+                PATTERN "*.cuh"
+        )
+    endforeach()
+    install(FILES
+        "${CELLSHARD_CELLERATOR_QUANTIZED_INCLUDE_ROOT}/Cellerator/matrix.cuh"
+        "${CELLSHARD_CELLERATOR_QUANTIZED_INCLUDE_ROOT}/Cellerator/types.cuh"
+        "${CELLSHARD_CELLERATOR_QUANTIZED_INCLUDE_ROOT}/Cellerator/parameters.hh"
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/Cellerator
-        FILES_MATCHING
-            PATTERN "*.cuh"
     )
     if(CELLSHARD_CELLERATOR_SOURCE_DIR
        AND EXISTS "${CELLSHARD_CELLERATOR_SOURCE_DIR}/include/Cellerator/compute/matrix/convert/compressed.cuh")

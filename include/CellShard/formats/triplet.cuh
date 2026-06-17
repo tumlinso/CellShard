@@ -1,18 +1,18 @@
 #pragma once
 
-#include <Cellerator/core/matrix/coo.cuh>
+#include <Cellerator/matrix/coo.cuh>
 
 namespace cellshard {
 namespace sparse {
 
-using ::cellerator::core::matrix::coo;
-using ::cellerator::core::matrix::allocate;
-using ::cellerator::core::matrix::append_rows;
-using ::cellerator::core::matrix::at;
-using ::cellerator::core::matrix::bytes;
-using ::cellerator::core::matrix::clear;
-using ::cellerator::core::matrix::concatenate_rows;
-using ::cellerator::core::matrix::init;
+using ::cellerator::matrix::coo;
+using ::cellerator::matrix::allocate;
+using ::cellerator::matrix::append_rows;
+using ::cellerator::matrix::at;
+using ::cellerator::matrix::bytes;
+using ::cellerator::matrix::clear;
+using ::cellerator::matrix::concatenate_rows;
+using ::cellerator::matrix::init;
 
 } // namespace sparse
 } // namespace cellshard

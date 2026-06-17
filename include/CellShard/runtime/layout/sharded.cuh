@@ -17,8 +17,8 @@
 #include "../../formats/diagonal.cuh"
 #include "../../formats/triplet.cuh"
 #if defined(__has_include)
-#if __has_include(<Cellerator/core/interop/cellshard_access.cuh>)
-#include <Cellerator/core/interop/cellshard_access.cuh>
+#if __has_include(<Cellerator/interop/cellshard_access.cuh>)
+#include <Cellerator/interop/cellshard_access.cuh>
 #endif
 #endif
 

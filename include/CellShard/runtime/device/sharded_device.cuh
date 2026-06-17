@@ -7,7 +7,7 @@
 
 #include <cuda_runtime.h>
 
-#include <Cellerator/core/matrix/views.cuh>
+#include <Cellerator/matrix/views.cuh>
 
 #include "../host/sharded_host.cuh"
 
@@ -78,8 +78,8 @@ struct alignas(16) compressed_view {
     __half *val;
 };
 
-using ::cellerator::core::matrix::device::blocked_ell_view;
-using ::cellerator::core::matrix::device::sliced_ell_view;
+using ::cellerator::matrix::device::blocked_ell_view;
+using ::cellerator::matrix::device::sliced_ell_view;
 
 struct alignas(16) coo_view {
     unsigned int rows;

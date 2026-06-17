@@ -114,7 +114,7 @@ Useful public/runtime waypoints:
   byte preflight, staging, and pack read/write hooks
 - `archive_to_pack<ArchiveBinding, PackBinding, Policy>`:
   caller-overridable conversion from archive payload to pack payload
-- `blocked_ell`: a CelleratorCore-owned sparse execution layout that CellShard can persist and stage through adapters
+- `blocked_ell`: a Cellerator-owned sparse execution layout that CellShard can persist and stage through adapters
 - `compressed`: an explicit row-compressed fallback/interchange path, not the preferred `.csh5` file format
 - `sharded<T>`: metadata plus optional loaded payload pointers for a partitioned matrix collection
 - `shard_storage`: the bound storage backend used for lazy fetch/materialization
@@ -124,7 +124,7 @@ Useful public/runtime waypoints:
 - `.cspack`: the generated execution artifact used for fast multithreaded fetch and delivery
 
 CellShard still exposes runtime masking as a compatibility runtime surface while
-generic sparse compute primitives migrate toward CelleratorCore. It is not a
+generic sparse compute primitives migrate toward Cellerator. It is not a
 biology-specific QC policy. Biological group definitions such as mitochondrial,
 ribosomal, or hemoglobin feature rules are compiled by Cellerator preprocessing and
 passed in as ordinary `uint32_t` feature-group masks. Runtime row masks and

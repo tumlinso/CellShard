@@ -5,7 +5,7 @@
 namespace cellshard {
 namespace convert {
 
-// Compatibility surface for CelleratorCore-owned transpose and COO scatter
+// Compatibility surface for Cellerator-owned transpose and COO scatter
 // helpers. CellShard callers keep stable names during the ownership migration.
 using ::cellerator::compute::matrix::convert::build_compressed_transpose_raw;
 using ::cellerator::compute::matrix::convert::build_compressed_transpose_custom_raw;

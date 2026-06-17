@@ -28,13 +28,13 @@ if(@CELLSHARD_ENABLE_CUDA@ AND NOT TARGET Cellerator::dist)
     endif()
 endif()
 
-if(NOT TARGET Cellerator::core)
-    add_library(Cellerator::core INTERFACE IMPORTED)
-    set_target_properties(Cellerator::core PROPERTIES
+if(NOT TARGET Cellerator::runtime)
+    add_library(Cellerator::runtime INTERFACE IMPORTED)
+    set_target_properties(Cellerator::runtime PROPERTIES
         INTERFACE_INCLUDE_DIRECTORIES "${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_INCLUDEDIR@"
     )
     if(TARGET CUDA::cudart)
-        target_link_libraries(Cellerator::core INTERFACE CUDA::cudart)
+        target_link_libraries(Cellerator::runtime INTERFACE CUDA::cudart)
     endif()
 endif()
 

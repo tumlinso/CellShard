@@ -1,24 +1,24 @@
 #pragma once
 
-#include <Cellerator/core/matrix/compressed.cuh>
+#include <Cellerator/matrix/compressed.cuh>
 
 namespace cellshard {
 namespace sparse {
 
-using ::cellerator::core::matrix::compressed;
-using ::cellerator::core::matrix::compressed_by_col;
-using ::cellerator::core::matrix::compressed_by_row;
-using ::cellerator::core::matrix::compressed_host_registered;
-using ::cellerator::core::matrix::allocate;
-using ::cellerator::core::matrix::at;
-using ::cellerator::core::matrix::bytes;
-using ::cellerator::core::matrix::clear;
-using ::cellerator::core::matrix::host_registered;
-using ::cellerator::core::matrix::init;
-using ::cellerator::core::matrix::major_dim;
-using ::cellerator::core::matrix::minor_dim;
-using ::cellerator::core::matrix::pin;
-using ::cellerator::core::matrix::unpin;
+using ::cellerator::matrix::compressed;
+using ::cellerator::matrix::compressed_by_col;
+using ::cellerator::matrix::compressed_by_row;
+using ::cellerator::matrix::compressed_host_registered;
+using ::cellerator::matrix::allocate;
+using ::cellerator::matrix::at;
+using ::cellerator::matrix::bytes;
+using ::cellerator::matrix::clear;
+using ::cellerator::matrix::host_registered;
+using ::cellerator::matrix::init;
+using ::cellerator::matrix::major_dim;
+using ::cellerator::matrix::minor_dim;
+using ::cellerator::matrix::pin;
+using ::cellerator::matrix::unpin;
 
 } // namespace sparse
 } // namespace cellshard

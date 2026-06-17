@@ -15,7 +15,7 @@ large sharded sparse omics matrices. It owns:
 - optional bounded ingest, export helpers, and Python bindings
 
 Sparse matrix representation primitives such as Blocked-ELL, Sliced-ELL, and
-quantized Blocked-ELL are CelleratorCore-owned compute/layout types. CellShard
+quantized Blocked-ELL are Cellerator-owned compute/layout types. CellShard
 exposes temporary compatibility headers and may serialize, cache, stage, and
 ship those payloads, but it should not be the source of truth for their compute
 layout policy.
@@ -26,7 +26,7 @@ preprocessing policy, normalization decisions, marker/QC semantics, or workflow
 policy into CellShard. Those belong in Cellerator preprocessing. Neighbor-caller
 orchestration and query policy belong in CellShardNeighbors.
 
-CelleratorCore is the migration target for generic sparse compute primitives.
+Cellerator is the migration target for generic sparse compute primitives.
 CellShard may temporarily host compatibility runtime wrappers while callers are
 migrated. Biological feature groups may be passed in as ordinary feature masks,
 but CellShard should not define biological QC policy.
@@ -67,7 +67,7 @@ under `src/`, `export/`, and `python/`.
 
 Key areas:
 
-- `include/CellShard/formats/`: compatibility headers for CelleratorCore-owned
+- `include/CellShard/formats/`: compatibility headers for Cellerator-owned
   sparse layouts plus CellShard-local dense/compressed fallback layouts
 - `include/CellShard/runtime/`: sharded layout, storage dispatch, host/device
   staging, masking, and local distributed helpers

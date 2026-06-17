@@ -54,11 +54,11 @@ CSPACK files currently support:
 
 - packed dense and compressed sparse fallback/interchange payloads
 - bucketed Blocked-ELL execution partitions when supplied by a caller-owned
-  adapter such as CelleratorCore
+  adapter such as Cellerator
 - bucketed Sliced-ELL execution partitions when supplied by a caller-owned
-  adapter such as CelleratorCore
+  adapter such as Cellerator
 - quantized Blocked-ELL runtime partitions when supplied by a caller-owned
-  adapter such as CelleratorCore
+  adapter such as Cellerator
 
 Shared current assumptions:
 

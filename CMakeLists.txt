@@ -352,6 +352,8 @@ target_compile_definitions(cellshard_headers INTERFACE
 
 set(cellshard_inspect_sources
     src/io/pack/packfile.cu
+    # CP-BP-13: CellShard-owned generic CSPACK execution envelope and staging.
+    src/io/pack/execution_payload.cu
     src/io/csh5/create.cc
     src/io/csh5/metadata.cc
     src/io/csh5/finalize_preprocess.cc
@@ -725,6 +727,26 @@ if(CELLSHARD_BUILD_TESTS AND CELLSHARD_BUILD_EXPORT)
     )
 
     if(CELLSHARD_ENABLE_CUDA)
+        # CP-BP-13: envelope identity/checksum/fetch and contiguous async upload.
+        add_executable(cellShardExecutionPayloadTest
+            tests/execution_payload_test.cu
+        )
+        target_include_directories(cellShardExecutionPayloadTest PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}
+            ${CMAKE_CURRENT_SOURCE_DIR}/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+        )
+        target_link_libraries(cellShardExecutionPayloadTest PRIVATE
+            CellShard::inspect
+        )
+        set_target_properties(cellShardExecutionPayloadTest PROPERTIES
+            CXX_STANDARD 17
+            CXX_STANDARD_REQUIRED YES
+            CUDA_STANDARD 17
+            CUDA_STANDARD_REQUIRED YES
+        )
+        cellshard_enable_perf(cellShardExecutionPayloadTest)
+
         add_executable(cellShardMaskGroupsRuntimeTest
             tests/mask_groups_runtime_test.cu
         )

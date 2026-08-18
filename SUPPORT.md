@@ -67,6 +67,10 @@ CellShard `0.1.x` is intentionally narrow.
   Blocked-ELL, Sliced-ELL, and quantized Blocked-ELL are caller-owned and should
   be exposed to CellShard through the C++ adapter contract.
 - `.csh5` is the canonical archive/container format. High-throughput repeated fetch is expected to run through generated shard `.cspack` cache files built from that container.
+- `store_execution_cspack`, `load_execution_cspack_partition`, and
+  `upload_execution_payload_async` support versioned, checksummed opaque
+  execution images with explicit dataset/generation/partition/feature-axis
+  compatibility. CellShard does not interpret caller-owned inner layouts.
 - The normal runtime path is therefore `bind .csh5` -> `materialize cspack` -> `fetch from .cspack` -> `stage to GPU`, not repeated direct HDF5 payload reads as the final execution substrate.
 - Optional CellShard ingest may use bounded local `.cspool` part files, generally sliced-ELL but also blocked-ELL when appropriate, to avoid rereading expensive source matrices before `.csh5` assembly. That spool is an implementation detail, not a supported archival surface.
 - Optional manifest-driven ingest supports `mtx`, `tenx_mtx`, `tenx_h5`, sparse `h5ad` including legacy h5sparse CSR/CSC groups, and dense count-like `loom` sources. Loom graph ingestion and `binary` manifest rows are not supported.

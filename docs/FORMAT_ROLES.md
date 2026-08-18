@@ -223,6 +223,8 @@ Supported in v1:
 - Caller-owned bucketed Blocked-ELL execution partitions through adapters.
 - Caller-owned bucketed Sliced-ELL execution partitions through adapters.
 - Caller-owned quantized Blocked-ELL runtime partitions through adapters.
+- Opaque caller-owned execution images in a versioned, checksummed `CPEXEC01`
+  compatibility envelope; the caller remains responsible for inner semantics.
 - Little-endian host-native encoding.
 - 64-bit shard/container counts and offsets.
 - `uint32` rows, cols, nnz, and index metadata inside partition payloads.
@@ -234,8 +236,8 @@ Not supported in v1:
 - Rich in-band metadata tables.
 - Explicit in-band section directories.
 - In-band shard and partition directories beyond the current offset table.
-- Required in-band feature-order hashes.
-- Required in-band generation identifiers.
+- Universal in-band feature-order hashes across legacy/raw payload families.
+- Universal in-band generation identifiers across legacy/raw payload families.
 - Distributed packs.
 - Trajectory indices.
 - Dynamic graph updates.

@@ -93,6 +93,10 @@ are currently external to the shard-pack bytes.
 `dataset.feature_order_hash` is not currently embedded in the shard-pack file
 payloads.
 
+One explicit exception is the generic `CPEXEC01` execution envelope described
+below. It carries the exact dataset generation and canonical feature-axis
+identity required to reject a stale opaque caller payload before exposure.
+
 ## Shard Pack File Layout
 
 CSPACK files use the magic `CSPACK01` and the following top-level
@@ -109,6 +113,29 @@ layout:
 Each payload begins at the corresponding `partition_offsets[i]`.
 
 ## Payload Region
+
+### Generic Opaque Execution Envelope
+
+`store_execution_cspack` may wrap a caller-owned, pointer-free execution image
+in a `CPEXEC01` envelope. The envelope records its own schema/endian marker,
+payload byte count, checksum, and explicit compatibility identity:
+
+- dataset identity and all four `dataset_generation_ref` fields;
+- partition identity, global row start, row and feature counts;
+- canonical feature-axis fingerprint and fingerprint version;
+- caller payload kind, schema version, row-domain identity, and payload
+  identity.
+
+CellShard validates those fields, partition bounds, the complete envelope
+checksum, and the CSPACK offset table. It does not interpret the opaque image.
+For CellPack payloads, Cellerator owns the inner plan/order/tile section layout,
+semantic validation, and pointer relocation. Fetch owns one contiguous host
+allocation; CUDA staging owns one contiguous device allocation and enqueues one
+caller-stream H2D copy without synchronization.
+
+The envelope is a versioned CSPACK payload family, not a change to the
+top-level `CSPACK01` container and not permission to move optimized layout
+policy into CellShard.
 
 ### Bucketed Blocked-ELL Execution Partition
 
@@ -175,7 +202,8 @@ A valid current CSPACK v1 file must:
 5. Have partition payloads that decode successfully under the expected raw
    packfile or execution-partition codec.
 6. Be paired with external runtime metadata when generation-aware delivery is
-   required.
+   required, unless the selected payload family is the in-band `CPEXEC01`
+   execution envelope.
 
 ## Important Clarification
 
@@ -194,5 +222,7 @@ The current implementation is simpler:
 
 - CSPACK files use a concrete `CSPACK01` header and partition offsets
 - runtime/generation metadata is external
+- `CPEXEC01` is the narrow in-band generation/identity exception for opaque
+  execution images
 - raw partition payload metadata is carried inline by the shared raw payload
   format in `io/common/raw_format.hh`

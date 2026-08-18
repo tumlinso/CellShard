@@ -97,6 +97,10 @@ Useful public/runtime waypoints:
 - `include/CellShard/io/csh5/api.cuh`, `src/io/csh5/create.cc`, `src/io/csh5/metadata.cc`, `src/io/csh5/finalize_preprocess.cc`, `src/io/csh5/write.cc`, and `src/io/csh5/runtime/`: the `.csh5` container backend plus shard `.cspack` runtime caches
 - `include/CellShard/io/cshard.hh` and `include/CellShard/io/cshard/spec.hh`: the standby `.cshard` archive API and fixed v1 POD records
 - `include/CellShard/io/pack/packfile.cuh` and `src/io/pack/packfile.cu`: the per-partition packed payload codec used inside shard `.cspack` cache files
+- `include/CellShard/io/pack/execution_payload.cuh` and
+  `src/io/pack/execution_payload.cu`: atomic CSPACK publication, exact
+  compatibility/checksum validation, contiguous fetch ownership, and one-copy
+  CUDA staging for opaque caller-owned execution images
 - `include/CellShard/access/adapter.cuh` and
   `include/CellShard/access/fallback_adapters.cuh`: compile-time adapter
   handles and dense/compressed fallback adapters

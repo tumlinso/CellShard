@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-21T13:05:54Z",
+  "generated_at": "2026-08-21T13:15:43Z",
   "project": {
     "configuration": {
       "busy_timeout_ms": 5000,
@@ -18,7 +18,7 @@
     "project_uuid": "a52537a5-20db-4aeb-a126-dd0128c71fda",
     "schema_version": 2
   },
-  "project_revision": 80,
+  "project_revision": 87,
   "schema_version": 2,
   "tables": {
     "barrier_requirements": [
@@ -1229,6 +1229,76 @@
         "revision": 80,
         "seq": 80,
         "timestamp": "2026-08-21T13:05:54Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-03",
+        "entity_type": "claim",
+        "event_type": "continue.completed",
+        "payload_json": "{\"requested_task_id\": \"CS-FOUND-03\"}",
+        "revision": 81,
+        "seq": 81,
+        "timestamp": "2026-08-21T13:11:59Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-03",
+        "entity_type": "claim",
+        "event_type": "claim.pulsed",
+        "payload_json": "{}",
+        "revision": 82,
+        "seq": 82,
+        "timestamp": "2026-08-21T13:14:16Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-03-CPU",
+        "entity_type": "gate",
+        "event_type": "gate.started",
+        "payload_json": "{\"gate_id\": \"CS-FOUND-03-CPU\"}",
+        "revision": 83,
+        "seq": 83,
+        "timestamp": "2026-08-21T13:14:26Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-03-CPU",
+        "entity_type": "gate",
+        "event_type": "gate.completed",
+        "payload_json": "{\"evidence_id\": \"0484e897-c0b3-4a51-88e2-ab7293b34edb\", \"status\": \"passed\", \"valid\": true}",
+        "revision": 84,
+        "seq": 84,
+        "timestamp": "2026-08-21T13:14:26Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-03-CPU",
+        "entity_type": "gate",
+        "event_type": "gate.started",
+        "payload_json": "{\"gate_id\": \"CS-FOUND-03-CPU\"}",
+        "revision": 85,
+        "seq": 85,
+        "timestamp": "2026-08-21T13:15:37Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-03-CPU",
+        "entity_type": "gate",
+        "event_type": "gate.completed",
+        "payload_json": "{\"evidence_id\": \"66154e9a-a4c9-4fdb-98f8-08f4195b37eb\", \"status\": \"passed\", \"valid\": true}",
+        "revision": 86,
+        "seq": 86,
+        "timestamp": "2026-08-21T13:15:37Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-I1",
+        "entity_type": "interface",
+        "event_type": "interface.revise",
+        "payload_json": "{\"version\": \"1\"}",
+        "revision": 87,
+        "seq": 87,
+        "timestamp": "2026-08-21T13:15:43Z"
       }
     ],
     "evidence": [
@@ -1243,6 +1313,19 @@
         "metadata_json": "{\"argv\": [\"./build-cs-found-baseline/cellShardAccessAdapterTest\"], \"environment\": {}, \"expected_exit_code\": 0, \"inputs\": {\"command_contract\": {\"argv\": [\"./build-cs-found-baseline/cellShardAccessAdapterTest\"], \"locks\": [\"build:cellshard\"]}, \"diff_fingerprint\": \"c2de955c4f2cb1f5dc49b2201cf25d85ec518e55eb8b5451d782c4fb1fed3f02\", \"dirty_paths\": [\".todo-orchestrator/cs-found-plan.json\", \".todo-orchestrator/project.json\", \".todo-orchestrator/state.snapshot.json\", \"docs/CS_FOUND_TRANSITION_MAP.md\", \"todo-status.md\", \"todos.md\", \"todos/cellshard-cpp-access-adapter-refactor.md\", \"todos/cs-found-00.md\", \"todos/cs-found-01.md\", \"todos/cs-found-02.md\", \"todos/cs-found-03.md\", \"todos/cs-found-04.md\", \"todos/cs-found-05.md\", \"todos/cs-found-06.md\", \"todos/cs-found-07.md\", \"todos/cs-found-08.md\", \"todos/cs-found-09.md\", \"todos/cs-found-10.md\", \"todos/cs-found-11.md\", \"todos/cs-found-12.md\", \"todos/cs-found-13.md\", \"todos/cs-found-14.md\", \"todos/cs-found-15.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"bbe5917bab88ffca2d16bc86166a8de368a4abbe\"}, \"locks\": [{\"expires_at\": \"2026-08-21T13:03:17Z\", \"lease_id\": \"433a00c9-28e8-4cfd-9a70-b7ac6e9a5cb3\", \"name\": \"build:cellshard\"}], \"resources\": [], \"returncode\": 0, \"started_revision\": 14}",
         "path": "/home/tumlinson/CellStack/.git/modules/CellShard/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/006d4024-ae22-4184-89ba-33540a3dd20d",
         "revision": 15,
+        "status": "passed"
+      },
+      {
+        "checkpoint_id": null,
+        "claim_id": null,
+        "content_hash": null,
+        "created_at": "2026-08-21T13:14:26Z",
+        "gate_id": "CS-FOUND-03-CPU",
+        "id": "0484e897-c0b3-4a51-88e2-ab7293b34edb",
+        "kind": "command",
+        "metadata_json": "{\"argv\": [\"./build-cs-found-cpu/cellShardFoundationIdentityTest\"], \"environment\": {}, \"expected_exit_code\": 0, \"inputs\": {\"command_contract\": {\"argv\": [\"./build-cs-found-cpu/cellShardFoundationIdentityTest\"], \"locks\": [\"build:cellshard\"]}, \"diff_fingerprint\": \"d8757f596fec6be23e121fc3281b611d378648ccf2fb24a54126772b6ba767a0\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"include/CellShard/identity.hh\", \"include/CellShard/identity/array_view.hh\", \"include/CellShard/identity/digest.hh\", \"include/CellShard/identity/status.hh\", \"include/CellShard/identity/strong_id.hh\", \"tests/foundation_identity_test.cc\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-03.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"65b227369ec24eff784d9ed85656c373a78ccca2\"}, \"locks\": [{\"expires_at\": \"2026-08-21T13:19:26Z\", \"lease_id\": \"38729ffd-da2e-409b-83fe-240d3690335c\", \"name\": \"build:cellshard\"}], \"resources\": [], \"returncode\": 0, \"started_revision\": 83}",
+        "path": "/home/tumlinson/CellStack/.git/modules/CellShard/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/0484e897-c0b3-4a51-88e2-ab7293b34edb",
+        "revision": 84,
         "status": "passed"
       },
       {
@@ -1387,6 +1470,19 @@
         "path": "/home/tumlinson/CellStack/.git/modules/CellShard/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/597e6f9a-bc6d-4612-940c-87fc7494be26",
         "revision": 40,
         "status": "failed"
+      },
+      {
+        "checkpoint_id": null,
+        "claim_id": null,
+        "content_hash": null,
+        "created_at": "2026-08-21T13:15:37Z",
+        "gate_id": "CS-FOUND-03-CPU",
+        "id": "66154e9a-a4c9-4fdb-98f8-08f4195b37eb",
+        "kind": "command",
+        "metadata_json": "{\"argv\": [\"./build-cs-found-cpu/cellShardFoundationIdentityTest\"], \"environment\": {}, \"expected_exit_code\": 0, \"inputs\": {\"command_contract\": {\"argv\": [\"./build-cs-found-cpu/cellShardFoundationIdentityTest\"], \"locks\": [\"build:cellshard\"]}, \"diff_fingerprint\": \"013d111dbba3fd10fd53b20dfa3e87d142e2279c9f89884242b05144ee6609d5\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"include/CellShard/identity.hh\", \"include/CellShard/identity/digest.hh\", \"include/CellShard/identity/strong_id.hh\", \"tests/foundation_identity_test.cc\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-03.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"65b227369ec24eff784d9ed85656c373a78ccca2\"}, \"locks\": [{\"expires_at\": \"2026-08-21T13:20:37Z\", \"lease_id\": \"d4884c3e-639c-4bab-b2fb-16d5cc4923e4\", \"name\": \"build:cellshard\"}], \"resources\": [], \"returncode\": 0, \"started_revision\": 85}",
+        "path": "/home/tumlinson/CellStack/.git/modules/CellShard/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/66154e9a-a4c9-4fdb-98f8-08f4195b37eb",
+        "revision": 86,
+        "status": "passed"
       },
       {
         "checkpoint_id": null,
@@ -1849,14 +1945,14 @@
         "checkpoint_id": null,
         "config_json": "{\"argv\": [\"./build-cs-found-cpu/cellShardFoundationIdentityTest\"], \"locks\": [\"build:cellshard\"]}",
         "id": "CS-FOUND-03-CPU",
-        "input_fingerprint": null,
-        "last_run_at": null,
+        "input_fingerprint": "4c9c223d4ee6e50653ddade9ac86be2b1e62780ed6045fb42de07302af7fe4b1",
+        "last_run_at": "2026-08-21T13:15:37Z",
         "required": 1,
-        "revision": 62,
-        "status": "pending",
+        "revision": 86,
+        "status": "passed",
         "task_id": "CS-FOUND-03",
         "type": "command",
-        "valid": 0
+        "valid": 1
       },
       {
         "checkpoint_id": null,
@@ -2443,14 +2539,14 @@
     ],
     "interfaces": [
       {
-        "content_hash": null,
+        "content_hash": "7ecf116c9568d646b180e28a59ddf1ab9adbd10017a29b2a26a12255842adb30",
         "contract_paths_json": "[\"include/CellShard/identity.hh\", \"include/CellShard/identity/strong_id.hh\", \"include/CellShard/identity/digest.hh\"]",
         "frozen_at": null,
         "id": "CS-FOUND-I1",
         "owner_task_id": "CS-FOUND-03",
-        "revised_at": null,
-        "revision": 62,
-        "state": "draft",
+        "revised_at": "2026-08-21T13:15:43Z",
+        "revision": 87,
+        "state": "revised",
         "version": "1"
       },
       {
@@ -4240,12 +4336,12 @@
         "priority": 90,
         "result": null,
         "result_policy_json": "{\"allowed_dispositions\": [\"implemented\", \"validated\"]}",
-        "revision": 62,
-        "status": "planned",
+        "revision": 81,
+        "status": "in_progress",
         "tags_json": "[]",
         "title": "Strong identity, digest, and status primitives",
-        "updated_at": "2026-08-21T13:04:15Z",
-        "version": 8
+        "updated_at": "2026-08-21T13:11:59Z",
+        "version": 9
       },
       {
         "attention_reason": null,

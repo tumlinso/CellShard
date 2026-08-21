@@ -96,9 +96,16 @@ int main() {
     cudaStream_t stream = nullptr;
     require(cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking) == cudaSuccess,
         "create stream");
+    cs::execution_payload_device invalid_device;
+    require(cs::upload_execution_payload_async(loaded, -1, stream, &invalid_device)
+        == cudaErrorInvalidValue, "invalid device rejection");
+    require(invalid_device.storage == nullptr && invalid_device.payload == nullptr,
+        "invalid upload leaves no allocation");
     cs::execution_payload_device device;
     require(cs::upload_execution_payload_async(loaded, 0, stream, &device)
         == cudaSuccess, "async payload upload");
+    require(cs::upload_execution_payload_async(loaded, 0, stream, &device)
+        == cudaErrorInvalidValue, "occupied device output rejection");
     unsigned char round_trip[sizeof(second)]{};
     require(cudaMemcpyAsync(round_trip, device.payload, sizeof(round_trip),
         cudaMemcpyDeviceToHost, stream) == cudaSuccess, "download staged payload");
@@ -107,6 +114,11 @@ int main() {
         "device payload bytes");
     require(cs::clear_execution_payload_device(&device) == cudaSuccess,
         "release device payload");
+    require(device.storage == nullptr && device.payload == nullptr
+        && device.payload_bytes == 0u && device.device_id == -1,
+        "device cleanup clears ownership state");
+    require(cs::clear_execution_payload_device(&device) == cudaSuccess,
+        "repeat device cleanup");
     require(cudaStreamDestroy(stream) == cudaSuccess, "destroy stream");
     cs::clear_execution_payload_host(&loaded);
 

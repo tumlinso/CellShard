@@ -726,6 +726,25 @@ if(CELLSHARD_BUILD_TESTS AND CELLSHARD_BUILD_EXPORT)
         CXX_STANDARD_REQUIRED YES
     )
 
+    # CS-FOUND-02: protect CSPACK01 and native CPEXEC01 behavior even when the
+    # CUDA staging path is not part of the build.
+    add_executable(cellShardExecutionPayloadCpuTest
+        tests/execution_payload_cpu_test.cc
+        src/io/pack/execution_payload.cu
+    )
+    target_include_directories(cellShardExecutionPayloadCpuTest PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+    target_compile_definitions(cellShardExecutionPayloadCpuTest PRIVATE
+        CELLSHARD_ENABLE_CUDA=0
+    )
+    set_target_properties(cellShardExecutionPayloadCpuTest PROPERTIES
+        CXX_STANDARD 17
+        CXX_STANDARD_REQUIRED YES
+    )
+
     if(CELLSHARD_ENABLE_CUDA)
         # CP-BP-13: envelope identity/checksum/fetch and contiguous async upload.
         add_executable(cellShardExecutionPayloadTest

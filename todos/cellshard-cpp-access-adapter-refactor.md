@@ -78,3 +78,27 @@ _None recorded yet._
 - CellShard exposes a documented header-only C++ adapter API with dense/compressed fallback adapters and a fake external adapter test.
 - Public docs no longer imply CellShard owns Cellerator optimized sparse matrix layouts.
 - Current CellShard and Cellerator build/test gates pass or failures are classified with exact commands.
+
+<!-- todo-orchestrator:v2-managed:start -->
+# cellshard-cpp-access-adapter-refactor: Implement max-performance C++ access adapters so CellShard owns biological delivery and dense/compressed fallbacks while Cellerator owns optimized sparse bindings.
+
+Task revision: `2`; current project revision is in `todo-status.md`.
+
+## Objective
+Implement max-performance C++ access adapters so CellShard owns biological delivery and dense/compressed fallbacks while Cellerator owns optimized sparse bindings.
+
+## State
+- Lifecycle: `closed`
+- Execution: `idle`
+- Parallel policy: `serial`
+- Result: `-`
+
+## Next Action
+closed; reopen only for compatibility-header removal or broader external policy injection.
+
+## Ownership
+_No structured ownership._
+
+## Dependencies
+_None._
+<!-- todo-orchestrator:v2-managed:end -->

@@ -3,7 +3,7 @@
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-FOUND-07: Artifact catalog and snapshot validation
 
-Task revision: `62`; current project revision is in `todo-status.md`.
+Task revision: `89`; current project revision is in `todo-status.md`.
 
 ## Objective
 Freeze the descriptor ABI checkpoint, then implement separate in-memory artifact/source catalogs and snapshot validation as CS-FOUND-I3A.

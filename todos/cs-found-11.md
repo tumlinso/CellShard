@@ -3,7 +3,7 @@
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-FOUND-11: Caller-owned CUDA allocator and device residency
 
-Task revision: `62`; current project revision is in `todo-status.md`.
+Task revision: `89`; current project revision is in `todo-status.md`.
 
 ## Objective
 Stage a validated host image through a caller allocator with one asynchronous H2D copy and move-only device residency as CS-FOUND-I5B.

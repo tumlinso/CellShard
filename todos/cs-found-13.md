@@ -3,7 +3,7 @@
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-FOUND-13: End-to-end opaque image vertical slice
 
-Task revision: `62`; current project revision is in `todo-status.md`.
+Task revision: `89`; current project revision is in `todo-status.md`.
 
 ## Objective
 Freeze the image/residency checkpoint and prove the specified fake producer to host/device fake consumer pipeline with exact identity and byte preservation.

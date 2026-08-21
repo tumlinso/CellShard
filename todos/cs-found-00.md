@@ -3,7 +3,7 @@
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-FOUND-00: CellShard Identity, Artifact, Source, and Residency Foundations
 
-Task revision: `62`; current project revision is in `todo-status.md`.
+Task revision: `89`; current project revision is in `todo-status.md`.
 
 ## Objective
 Establish stable CellShard identity, domain, partition, image, extent, source, snapshot, host-residency, and device-residency contracts before placement, streaming, routing, or multi-node work.

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-21T13:05:09Z",
+  "generated_at": "2026-08-21T13:05:54Z",
   "project": {
     "configuration": {
       "busy_timeout_ms": 5000,
@@ -18,7 +18,7 @@
     "project_uuid": "a52537a5-20db-4aeb-a126-dd0128c71fda",
     "schema_version": 2
   },
-  "project_revision": 78,
+  "project_revision": 80,
   "schema_version": 2,
   "tables": {
     "barrier_requirements": [
@@ -360,10 +360,10 @@
       {
         "id": "CS-FOUND-G1",
         "metadata_json": "{}",
-        "reached_at": null,
-        "revision": 62,
+        "reached_at": "2026-08-21T13:05:54Z",
+        "revision": 79,
         "revoked_at": null,
-        "state": "pending",
+        "state": "reached",
         "task_id": "CS-FOUND-02",
         "title": "G1 Legacy baseline protected"
       },
@@ -1209,6 +1209,26 @@
         "revision": 78,
         "seq": 78,
         "timestamp": "2026-08-21T13:05:09Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-G1",
+        "entity_type": "checkpoint",
+        "event_type": "checkpoint.reach",
+        "payload_json": "{}",
+        "revision": 79,
+        "seq": 79,
+        "timestamp": "2026-08-21T13:05:54Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-02",
+        "entity_type": "task",
+        "event_type": "task.completed",
+        "payload_json": "{\"disposition\": \"implemented\"}",
+        "revision": 80,
+        "seq": 80,
+        "timestamp": "2026-08-21T13:05:54Z"
       }
     ],
     "evidence": [
@@ -2317,6 +2337,16 @@
         "payload_json": "{\"changed_owned_paths\": [\"docs/CS_FOUND_TRANSITION_MAP.md\"], \"checkpoints\": [{\"id\": \"CS-FOUND-G0\", \"reached_at\": \"2026-08-21T12:58:57Z\", \"state\": \"reached\"}], \"gates\": [{\"id\": \"G0-TRANSITION-MAP\", \"last_run_at\": \"2026-08-21T12:58:57Z\", \"status\": \"passed\", \"valid\": 1}, {\"id\": \"CS-FOUND-01-CONFIGURE\", \"last_run_at\": \"2026-08-21T12:58:16Z\", \"status\": \"passed\", \"valid\": 1}, {\"id\": \"CS-FOUND-01-BUILD\", \"last_run_at\": \"2026-08-21T12:58:17Z\", \"status\": \"passed\", \"valid\": 1}, {\"id\": \"CS-FOUND-01-ACCESS\", \"last_run_at\": \"2026-08-21T12:58:17Z\", \"status\": \"passed\", \"valid\": 1}, {\"id\": \"CS-FOUND-01-EXEC\", \"last_run_at\": \"2026-08-21T12:58:34Z\", \"status\": \"passed\", \"valid\": 1}, {\"id\": \"CS-FOUND-01-EXPORT\", \"last_run_at\": \"2026-08-21T12:58:18Z\", \"status\": \"passed\", \"valid\": 1}, {\"id\": \"CS-FOUND-01-CSHARD\", \"last_run_at\": \"2026-08-21T12:58:18Z\", \"status\": \"passed\", \"valid\": 1}, {\"id\": \"CS-FOUND-01-PACKAGE\", \"last_run_at\": \"2026-08-21T12:58:26Z\", \"status\": \"passed\", \"valid\": 1}, {\"id\": \"CS-FOUND-01-DENSE\", \"last_run_at\": \"2026-08-21T12:58:35Z\", \"status\": \"passed\", \"valid\": 1}, {\"id\": \"CS-FOUND-01-SLICED\", \"last_run_at\": \"2026-08-21T12:58:35Z\", \"status\": \"passed\", \"valid\": 1}, {\"id\": \"CS-FOUND-01-MASK-KNOWN\", \"last_run_at\": \"2026-08-21T12:58:36Z\", \"status\": \"passed\", \"valid\": 1}], \"git_diffstat\": \"todo-status.md                                 | 25 +++++++++++++++++++++++++\\n todos.md                                       | 25 +++++++++++++++++++++++++\\n todos/cellshard-cpp-access-adapter-refactor.md | 24 ++++++++++++++++++++++++\\n 3 files changed, 74 insertions(+)\", \"git_head\": \"bbe5917bab88ffca2d16bc86166a8de368a4abbe\", \"interfaces\": [], \"note\": \"Source archaeology and closed access-adapter reconciliation complete. Transition map records preserve/transitional/planned/delete-later classifications. CUDA baseline passed with committed Cellerator 72f3012 archive and NCCL disabled; mask-groups exit 14 remained the explicit pre-existing result. No architecture implementation introduced.\", \"resources\": [{\"acquired_at\": \"2026-08-21T12:58:34Z\", \"instance_id\": \"gpu:0\", \"released_at\": \"2026-08-21T12:58:34Z\", \"state\": \"released\"}, {\"acquired_at\": \"2026-08-21T12:58:34Z\", \"instance_id\": \"gpu:0\", \"released_at\": \"2026-08-21T12:58:35Z\", \"state\": \"released\"}, {\"acquired_at\": \"2026-08-21T12:58:35Z\", \"instance_id\": \"gpu:0\", \"released_at\": \"2026-08-21T12:58:35Z\", \"state\": \"released\"}, {\"acquired_at\": \"2026-08-21T12:58:35Z\", \"instance_id\": \"gpu:0\", \"released_at\": \"2026-08-21T12:58:36Z\", \"state\": \"released\"}], \"task_id\": \"CS-FOUND-01\"}",
         "revision": 33,
         "task_id": "CS-FOUND-01"
+      },
+      {
+        "claim_id": null,
+        "created_at": "2026-08-21T13:05:54Z",
+        "id": "9aea186b-3282-4db0-9f45-fddc99cffedf",
+        "kind": "complete",
+        "note": "Commit 4d85ca0 adds only legacy CSPACK01/CPEXEC01 baseline coverage: a focused CPU-buildable codec test, malformed top-level offset/magic/truncation checks, exact identity/checksum/duplicate/publication/host cleanup checks, and CUDA invalid-output/cleanup checks. Final CPU focused and CUDA gates pass; feasible suite passes except the unchanged expected mask-groups exit 14. Full CPU all-target build remains pre-existing blocked by CUDA compatibility/Cellerator header collisions and is outside this narrow task.",
+        "payload_json": "{\"changed_owned_paths\": [], \"checkpoints\": [{\"id\": \"CS-FOUND-G1\", \"reached_at\": \"2026-08-21T13:05:54Z\", \"state\": \"reached\"}], \"gates\": [{\"id\": \"G1-CPU-CONFIGURE\", \"last_run_at\": \"2026-08-21T13:04:17Z\", \"status\": \"passed\", \"valid\": 1}, {\"id\": \"G1-CPU-BUILD\", \"last_run_at\": \"2026-08-21T13:04:29Z\", \"status\": \"passed\", \"valid\": 1}, {\"id\": \"G1-CPU-CSPACK\", \"last_run_at\": \"2026-08-21T13:04:29Z\", \"status\": \"passed\", \"valid\": 1}, {\"id\": \"G1-CUDA-BUILD\", \"last_run_at\": \"2026-08-21T13:04:32Z\", \"status\": \"passed\", \"valid\": 1}, {\"id\": \"G1-CUDA-CSPACK\", \"last_run_at\": \"2026-08-21T13:04:32Z\", \"status\": \"passed\", \"valid\": 1}, {\"id\": \"G1-DIFF-CHECK\", \"last_run_at\": \"2026-08-21T13:04:33Z\", \"status\": \"passed\", \"valid\": 1}], \"git_diffstat\": \".todo-orchestrator/state.snapshot.json | 20 +++++++++++++++-----\\n todo-status.md                         |  2 +-\\n todos.md                               |  2 +-\\n 3 files changed, 17 insertions(+), 7 deletions(-)\", \"git_head\": \"4d85ca0cfdaa6ff7e2d72a954316dc51c3d6f948\", \"interfaces\": [], \"note\": \"Commit 4d85ca0 adds only legacy CSPACK01/CPEXEC01 baseline coverage: a focused CPU-buildable codec test, malformed top-level offset/magic/truncation checks, exact identity/checksum/duplicate/publication/host cleanup checks, and CUDA invalid-output/cleanup checks. Final CPU focused and CUDA gates pass; feasible suite passes except the unchanged expected mask-groups exit 14. Full CPU all-target build remains pre-existing blocked by CUDA compatibility/Cellerator header collisions and is outside this narrow task.\", \"resources\": [{\"acquired_at\": \"2026-08-21T13:04:32Z\", \"instance_id\": \"gpu:0\", \"released_at\": \"2026-08-21T13:04:32Z\", \"state\": \"released\"}, {\"acquired_at\": \"2026-08-21T13:04:52Z\", \"instance_id\": \"gpu:0\", \"released_at\": \"2026-08-21T13:05:09Z\", \"state\": \"released\"}], \"task_id\": \"CS-FOUND-02\"}",
+        "revision": 80,
+        "task_id": "CS-FOUND-02"
       }
     ],
     "interface_consumers": [
@@ -4186,14 +4216,14 @@
         "parallel_policy": "serial",
         "parent_id": "CS-FOUND-00",
         "priority": 98,
-        "result": null,
+        "result": "implemented",
         "result_policy_json": "{\"allowed_dispositions\": [\"implemented\", \"validated\"]}",
-        "revision": 62,
-        "status": "in_progress",
+        "revision": 80,
+        "status": "done",
         "tags_json": "[]",
         "title": "Legacy contract and validation baseline",
-        "updated_at": "2026-08-21T13:04:15Z",
-        "version": 9
+        "updated_at": "2026-08-21T13:05:54Z",
+        "version": 10
       },
       {
         "attention_reason": null,

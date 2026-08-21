@@ -20,12 +20,12 @@ _No staleness review recorded yet._
 <!-- todo-orchestrator:v2-managed:start -->
 # Todo Status v2 Projection
 
-Project revision: `78`
+Project revision: `80`
 
 ## Workstreams
 - `CS-FOUND-00` | status: in_progress | execution: inactive | next: Complete CS-FOUND-01 and CS-FOUND-02 during bootstrap; later workers continue transactionally from CS-FOUND-03.
 - `CS-FOUND-01` | status: done | execution: closed | next: Create the source-backed transition map, run the baseline gates, reach G0, and complete with evidence without architecture implementation.
-- `CS-FOUND-02` | status: in_progress | execution: claimed | next: Add only the legacy codec/container baseline tests, run G1 gates, record results, reach G1, and stop without claiming CS-FOUND-03.
+- `CS-FOUND-02` | status: done | execution: closed | next: Add only the legacy codec/container baseline tests, run G1 gates, record results, reach G1, and stop without claiming CS-FOUND-03.
 - `CS-FOUND-03` | status: planned | execution: ready | next: Implement and validate CS-FOUND-I1 only; do not modify legacy identities.
 - `CS-FOUND-04` | status: planned | execution: ready | next: Implement only I2A in its exclusive files and complete positive/negative validation.
 - `CS-FOUND-05` | status: planned | execution: ready | next: Implement only I2B without paths, runtime placement, or payload interpretation.

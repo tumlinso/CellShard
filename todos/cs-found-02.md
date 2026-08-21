@@ -3,16 +3,16 @@
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-FOUND-02: Legacy contract and validation baseline
 
-Task revision: `62`; current project revision is in `todo-status.md`.
+Task revision: `80`; current project revision is in `todo-status.md`.
 
 ## Objective
 Protect current CSPACK01 and native CPEXEC01 behavior with focused positive, malformed-input, ownership, publication, and CUDA upload tests.
 
 ## State
-- Lifecycle: `in_progress`
-- Execution: `claimed`
+- Lifecycle: `done`
+- Execution: `closed`
 - Parallel policy: `serial`
-- Result: `-`
+- Result: `implemented`
 
 ## Next Action
 Add only the legacy codec/container baseline tests, run G1 gates, record results, reach G1, and stop without claiming CS-FOUND-03.

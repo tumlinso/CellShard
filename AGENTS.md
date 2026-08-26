@@ -2,7 +2,7 @@
 
 ## Scope And Ownership
 
-CellShard is the CellStack storage, pack-delivery, and runtime-staging layer for
+CellShard is the storage, pack-delivery, and runtime-staging layer for
 large sharded sparse omics matrices. It owns:
 
 - persisted dataset, partition, shard, and pack layout metadata
@@ -177,9 +177,8 @@ produces it and record the regeneration command.
 
 ## Git Hygiene
 
-Keep CellShard changes inside the CellShard submodule. Do not use the CellStack
-root to hide uncommitted submodule work. Before committing a CellStack root
-submodule pointer update, check both root status and CellShard status.
+Keep CellShard changes inside the CellShard repository. Do not hide
+uncommitted CellShard work in another checkout or coordination repository.
 
 Useful checks:
 
@@ -189,5 +188,5 @@ git diff --stat
 ```
 
 For cross-repo work, land and verify the CellShard implementation first, then
-update the CellStack submodule pointer as a separate coordination step unless
-the task explicitly asks for both.
+update each consuming repository independently when the task explicitly asks
+for that integration.

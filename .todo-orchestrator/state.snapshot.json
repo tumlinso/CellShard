@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-21T13:17:28Z",
+  "generated_at": "2026-08-26T10:34:01Z",
   "project": {
     "configuration": {
       "busy_timeout_ms": 5000,
@@ -18,7 +18,7 @@
     "project_uuid": "a52537a5-20db-4aeb-a126-dd0128c71fda",
     "schema_version": 2
   },
-  "project_revision": 89,
+  "project_revision": 90,
   "schema_version": 2,
   "tables": {
     "barrier_requirements": [
@@ -1319,6 +1319,16 @@
         "revision": 89,
         "seq": 89,
         "timestamp": "2026-08-21T13:17:28Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "a52537a5-20db-4aeb-a126-dd0128c71fda",
+        "entity_type": "project",
+        "event_type": "snapshot.restored",
+        "payload_json": "{\"snapshot_revision\": 89}",
+        "revision": 90,
+        "seq": 90,
+        "timestamp": "2026-08-26T10:34:01Z"
       }
     ],
     "evidence": [

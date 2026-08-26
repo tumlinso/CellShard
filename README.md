@@ -19,6 +19,12 @@ Its scope is narrow:
 
 CellShard is the storage, pack-delivery, and distributed execution base layer. It is not the analysis toolkit, model layer, or Torch integration layer. Those live on the Cellerator side.
 
+CellShard is independently buildable and packageable. It interoperates with
+[Cellerator](https://github.com/tumlinso/Cellerator) and may transport payloads
+that use [Baseplane](https://github.com/tumlinso/Baseplane) primitives, but it
+does not require the former CellStack wrapper or either sibling checkout for
+its normal standalone build.
+
 ## What CellShard Owns
 
 - biological annotation and metadata formatting for cells, features, assays,

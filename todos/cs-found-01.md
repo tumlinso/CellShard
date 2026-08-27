@@ -3,7 +3,7 @@
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-FOUND-01: Repository archaeology, reconciliation, and transition map
 
-Task revision: `162`; current project revision is in `todo-status.md`.
+Task revision: `166`; current project revision is in `todo-status.md`.
 
 ## Objective
 Reconstruct current CellShard implementation and reconcile it with the architecture review before introducing new architecture code.

@@ -3,7 +3,7 @@
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-FOUND-10: Local-file source and host residency
 
-Task revision: `162`; current project revision is in `todo-status.md`.
+Task revision: `166`; current project revision is in `todo-status.md`.
 
 ## Objective
 Reach G3, then resolve one image extent through LocalFileSource into one move-only host residency allocation as CS-FOUND-I5A.

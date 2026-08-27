@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-27T08:38:04Z",
+  "generated_at": "2026-08-27T08:41:22Z",
   "project": {
     "configuration": {
       "busy_timeout_ms": 5000,
@@ -18,7 +18,7 @@
     "project_uuid": "a52537a5-20db-4aeb-a126-dd0128c71fda",
     "schema_version": 2
   },
-  "project_revision": 123,
+  "project_revision": 149,
   "schema_version": 2,
   "tables": {
     "barrier_requirements": [
@@ -330,10 +330,10 @@
       {
         "id": "CS-FOUND-C1",
         "metadata_json": "{}",
-        "reached_at": null,
-        "revision": 92,
+        "reached_at": "2026-08-27T08:38:49Z",
+        "revision": 133,
         "revoked_at": null,
-        "state": "pending",
+        "state": "reached",
         "task_id": "CS-FOUND-07",
         "title": "Descriptor ABI checkpoint"
       },
@@ -370,10 +370,10 @@
       {
         "id": "CS-FOUND-G2",
         "metadata_json": "{}",
-        "reached_at": null,
-        "revision": 92,
+        "reached_at": "2026-08-27T08:38:58Z",
+        "revision": 142,
         "revoked_at": null,
-        "state": "pending",
+        "state": "reached",
         "task_id": "CS-FOUND-07",
         "title": "G2 Descriptor ABI frozen"
       },
@@ -1659,6 +1659,266 @@
         "revision": 123,
         "seq": 123,
         "timestamp": "2026-08-27T08:38:04Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-07",
+        "entity_type": "claim",
+        "event_type": "continue.completed",
+        "payload_json": "{\"requested_task_id\": \"CS-FOUND-07\"}",
+        "revision": 124,
+        "seq": 124,
+        "timestamp": "2026-08-27T08:38:35Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "C1-T03",
+        "entity_type": "gate",
+        "event_type": "gate.started",
+        "payload_json": "{\"gate_id\": \"C1-T03\"}",
+        "revision": 125,
+        "seq": 125,
+        "timestamp": "2026-08-27T08:38:48Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "C1-T03",
+        "entity_type": "gate",
+        "event_type": "gate.completed",
+        "payload_json": "{\"evidence_id\": \"3aa56c34-ce8f-4523-8674-7efb45b2cd8b\", \"status\": \"passed\", \"valid\": true}",
+        "revision": 126,
+        "seq": 126,
+        "timestamp": "2026-08-27T08:38:48Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "C1-T04",
+        "entity_type": "gate",
+        "event_type": "gate.started",
+        "payload_json": "{\"gate_id\": \"C1-T04\"}",
+        "revision": 127,
+        "seq": 127,
+        "timestamp": "2026-08-27T08:38:48Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "C1-T04",
+        "entity_type": "gate",
+        "event_type": "gate.completed",
+        "payload_json": "{\"evidence_id\": \"b5d257ce-610d-478d-848d-697a7da4a6ca\", \"status\": \"passed\", \"valid\": true}",
+        "revision": 128,
+        "seq": 128,
+        "timestamp": "2026-08-27T08:38:48Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "C1-T05",
+        "entity_type": "gate",
+        "event_type": "gate.started",
+        "payload_json": "{\"gate_id\": \"C1-T05\"}",
+        "revision": 129,
+        "seq": 129,
+        "timestamp": "2026-08-27T08:38:49Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "C1-T05",
+        "entity_type": "gate",
+        "event_type": "gate.completed",
+        "payload_json": "{\"evidence_id\": \"e5b25c99-9013-47b5-a811-6bd0f6c45123\", \"status\": \"passed\", \"valid\": true}",
+        "revision": 130,
+        "seq": 130,
+        "timestamp": "2026-08-27T08:38:49Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "C1-T06",
+        "entity_type": "gate",
+        "event_type": "gate.started",
+        "payload_json": "{\"gate_id\": \"C1-T06\"}",
+        "revision": 131,
+        "seq": 131,
+        "timestamp": "2026-08-27T08:38:49Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "C1-T06",
+        "entity_type": "gate",
+        "event_type": "gate.completed",
+        "payload_json": "{\"evidence_id\": \"48c4da63-043e-4fe3-908f-31b4064dad31\", \"status\": \"passed\", \"valid\": true}",
+        "revision": 132,
+        "seq": 132,
+        "timestamp": "2026-08-27T08:38:49Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-C1",
+        "entity_type": "checkpoint",
+        "event_type": "checkpoint.reach",
+        "payload_json": "{}",
+        "revision": 133,
+        "seq": 133,
+        "timestamp": "2026-08-27T08:38:49Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "G2-I1",
+        "entity_type": "gate",
+        "event_type": "gate.started",
+        "payload_json": "{\"gate_id\": \"G2-I1\"}",
+        "revision": 134,
+        "seq": 134,
+        "timestamp": "2026-08-27T08:38:57Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "G2-I1",
+        "entity_type": "gate",
+        "event_type": "gate.completed",
+        "payload_json": "{\"evidence_id\": \"da1f2acd-5c32-4d1c-90b8-ef5d04a7fdd8\", \"status\": \"passed\", \"valid\": true}",
+        "revision": 135,
+        "seq": 135,
+        "timestamp": "2026-08-27T08:38:57Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "G2-I2A",
+        "entity_type": "gate",
+        "event_type": "gate.started",
+        "payload_json": "{\"gate_id\": \"G2-I2A\"}",
+        "revision": 136,
+        "seq": 136,
+        "timestamp": "2026-08-27T08:38:57Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "G2-I2A",
+        "entity_type": "gate",
+        "event_type": "gate.completed",
+        "payload_json": "{\"evidence_id\": \"54244136-8470-4fab-abb7-1332bbb9024f\", \"status\": \"passed\", \"valid\": true}",
+        "revision": 137,
+        "seq": 137,
+        "timestamp": "2026-08-27T08:38:57Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "G2-I2B",
+        "entity_type": "gate",
+        "event_type": "gate.started",
+        "payload_json": "{\"gate_id\": \"G2-I2B\"}",
+        "revision": 138,
+        "seq": 138,
+        "timestamp": "2026-08-27T08:38:57Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "G2-I2B",
+        "entity_type": "gate",
+        "event_type": "gate.completed",
+        "payload_json": "{\"evidence_id\": \"ada593d1-27cd-4689-b715-fedbc77be434\", \"status\": \"passed\", \"valid\": true}",
+        "revision": 139,
+        "seq": 139,
+        "timestamp": "2026-08-27T08:38:57Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "G2-I2C",
+        "entity_type": "gate",
+        "event_type": "gate.started",
+        "payload_json": "{\"gate_id\": \"G2-I2C\"}",
+        "revision": 140,
+        "seq": 140,
+        "timestamp": "2026-08-27T08:38:58Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "G2-I2C",
+        "entity_type": "gate",
+        "event_type": "gate.completed",
+        "payload_json": "{\"evidence_id\": \"b2de68bc-f68d-4e62-836f-a6c60487a33e\", \"status\": \"passed\", \"valid\": true}",
+        "revision": 141,
+        "seq": 141,
+        "timestamp": "2026-08-27T08:38:58Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-G2",
+        "entity_type": "checkpoint",
+        "event_type": "checkpoint.reach",
+        "payload_json": "{}",
+        "revision": 142,
+        "seq": 142,
+        "timestamp": "2026-08-27T08:38:58Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "build:cellshard",
+        "entity_type": "lock",
+        "event_type": "lock.acquired",
+        "payload_json": "{\"names\": [\"build:cellshard\"]}",
+        "revision": 143,
+        "seq": 143,
+        "timestamp": "2026-08-27T08:41:08Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "build:cellshard",
+        "entity_type": "lock",
+        "event_type": "lock.released",
+        "payload_json": "{}",
+        "revision": 144,
+        "seq": 144,
+        "timestamp": "2026-08-27T08:41:09Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "build:cellshard",
+        "entity_type": "lock",
+        "event_type": "lock.acquired",
+        "payload_json": "{\"names\": [\"build:cellshard\"]}",
+        "revision": 145,
+        "seq": 145,
+        "timestamp": "2026-08-27T08:41:09Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "build:cellshard",
+        "entity_type": "lock",
+        "event_type": "lock.released",
+        "payload_json": "{}",
+        "revision": 146,
+        "seq": 146,
+        "timestamp": "2026-08-27T08:41:11Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-07-CPU",
+        "entity_type": "gate",
+        "event_type": "gate.started",
+        "payload_json": "{\"gate_id\": \"CS-FOUND-07-CPU\"}",
+        "revision": 147,
+        "seq": 147,
+        "timestamp": "2026-08-27T08:41:17Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-07-CPU",
+        "entity_type": "gate",
+        "event_type": "gate.completed",
+        "payload_json": "{\"evidence_id\": \"1a3a07ec-f2e7-4bc6-bdb0-36b20e7a4513\", \"status\": \"passed\", \"valid\": true}",
+        "revision": 148,
+        "seq": 148,
+        "timestamp": "2026-08-27T08:41:17Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-I3A",
+        "entity_type": "interface",
+        "event_type": "interface.revise",
+        "payload_json": "{\"version\": \"1\"}",
+        "revision": 149,
+        "seq": 149,
+        "timestamp": "2026-08-27T08:41:22Z"
       }
     ],
     "evidence": [
@@ -1712,6 +1972,19 @@
         "metadata_json": "{\"argv\": [\"./build-cs-found-cpu/cellShardFoundationArtifactTest\"], \"environment\": {}, \"expected_exit_code\": 0, \"input_fingerprint\": \"09891b2b6f7b403797416c69d3d0f9df240622be11804fc5b4cb4c13709dc2bf\", \"inputs\": {\"command_contract\": {\"argv\": [\"./build-cs-found-cpu/cellShardFoundationArtifactTest\"], \"locks\": [\"build:cellshard\"]}, \"diff_fingerprint\": \"d72f1b68303f4d566e8cd357c8489b06570099d485a0bb027dc803c6f82439fa\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"CMakeLists.txt\", \"include/CellShard/artifact/image.hh\", \"tests/foundation_artifact_test.cc\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-05.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"1067ab2c3272b40a8f61bbad99c0c7379a779d0b\"}, \"locks\": [{\"expires_at\": \"2026-08-27T08:40:31Z\", \"lease_id\": \"4727b5db-9a5e-49a6-b160-c062a138fe0e\", \"name\": \"build:cellshard\"}], \"resources\": [], \"returncode\": 0, \"started_revision\": 111}",
         "path": "/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/07cb3f47-f16e-45cf-ace5-c05536b60ade",
         "revision": 112,
+        "status": "passed"
+      },
+      {
+        "checkpoint_id": null,
+        "claim_id": null,
+        "content_hash": null,
+        "created_at": "2026-08-27T08:41:17Z",
+        "gate_id": "CS-FOUND-07-CPU",
+        "id": "1a3a07ec-f2e7-4bc6-bdb0-36b20e7a4513",
+        "kind": "command",
+        "metadata_json": "{\"argv\": [\"./build-cs-found-cpu/cellShardFoundationSnapshotTest\"], \"environment\": {}, \"expected_exit_code\": 0, \"input_fingerprint\": \"383518d55a02072c44847ab00470650e3e03b1ec9ad358588b79f63063a271fe\", \"inputs\": {\"command_contract\": {\"argv\": [\"./build-cs-found-cpu/cellShardFoundationSnapshotTest\"], \"locks\": [\"build:cellshard\"]}, \"diff_fingerprint\": \"c34afe3efbab2179ac0479dbf726052418e11de39e534eed7b215203d7a4c169\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"CMakeLists.txt\", \"include/CellShard/artifact/catalog.hh\", \"include/CellShard/artifact/snapshot.hh\", \"tests/foundation_snapshot_test.cc\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-07.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"ea7cc10b9d2c1a61444420ac2515e6f4c1424449\"}, \"locks\": [{\"expires_at\": \"2026-08-27T08:46:17Z\", \"lease_id\": \"000af55c-4743-4c14-bf3a-3fbb8ae8c4ac\", \"name\": \"build:cellshard\"}], \"resources\": [], \"returncode\": 0, \"started_revision\": 147}",
+        "path": "/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/1a3a07ec-f2e7-4bc6-bdb0-36b20e7a4513",
+        "revision": 148,
         "status": "passed"
       },
       {
@@ -1822,6 +2095,19 @@
         "checkpoint_id": null,
         "claim_id": null,
         "content_hash": null,
+        "created_at": "2026-08-27T08:38:48Z",
+        "gate_id": "C1-T03",
+        "id": "3aa56c34-ce8f-4523-8674-7efb45b2cd8b",
+        "kind": "task_state",
+        "metadata_json": "{\"input_fingerprint\": \"e4dfcd7d00f33c8be99c268f075a6612f74bf4e5234ad8b95eadd9a243f1926e\", \"inputs\": {\"command_contract\": {\"status\": \"done\", \"task_id\": \"CS-FOUND-03\"}, \"diff_fingerprint\": \"5305cc793ecafcf0d9cd775f7ac8cbde8a7ba904db353405be7b7e316c69e6c9\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-07.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"ea7cc10b9d2c1a61444420ac2515e6f4c1424449\"}, \"locks\": [], \"resources\": [], \"result\": \"implemented\", \"started_revision\": 125, \"status\": \"done\"}",
+        "path": "/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/3aa56c34-ce8f-4523-8674-7efb45b2cd8b",
+        "revision": 126,
+        "status": "passed"
+      },
+      {
+        "checkpoint_id": null,
+        "claim_id": null,
+        "content_hash": null,
         "created_at": "2026-08-21T13:01:57Z",
         "gate_id": "G1-CPU-CONFIGURE",
         "id": "3db725d7-ca2e-4832-b91f-b8bb9e077653",
@@ -1835,6 +2121,19 @@
         "checkpoint_id": null,
         "claim_id": null,
         "content_hash": null,
+        "created_at": "2026-08-27T08:38:49Z",
+        "gate_id": "C1-T06",
+        "id": "48c4da63-043e-4fe3-908f-31b4064dad31",
+        "kind": "task_state",
+        "metadata_json": "{\"input_fingerprint\": \"47b7c766e72c026ebe5d4b628dd5808b54d7c2e2379d80d6ae2a79832122618b\", \"inputs\": {\"command_contract\": {\"status\": \"done\", \"task_id\": \"CS-FOUND-06\"}, \"diff_fingerprint\": \"5305cc793ecafcf0d9cd775f7ac8cbde8a7ba904db353405be7b7e316c69e6c9\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-07.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"ea7cc10b9d2c1a61444420ac2515e6f4c1424449\"}, \"locks\": [], \"resources\": [], \"result\": \"implemented\", \"started_revision\": 131, \"status\": \"done\"}",
+        "path": "/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/48c4da63-043e-4fe3-908f-31b4064dad31",
+        "revision": 132,
+        "status": "passed"
+      },
+      {
+        "checkpoint_id": null,
+        "claim_id": null,
+        "content_hash": null,
         "created_at": "2026-08-21T13:01:58Z",
         "gate_id": "G1-CPU-BUILD",
         "id": "4d841f87-d3c3-4fd2-8530-9fa7ce35d8f5",
@@ -1843,6 +2142,19 @@
         "path": "/home/tumlinson/CellStack/.git/modules/CellShard/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/4d841f87-d3c3-4fd2-8530-9fa7ce35d8f5",
         "revision": 45,
         "status": "failed"
+      },
+      {
+        "checkpoint_id": null,
+        "claim_id": null,
+        "content_hash": null,
+        "created_at": "2026-08-27T08:38:57Z",
+        "gate_id": "G2-I2A",
+        "id": "54244136-8470-4fab-abb7-1332bbb9024f",
+        "kind": "interface",
+        "metadata_json": "{\"content_hash\": \"217a095db360a5ff8ac6fbc9edc9e20acbf2833463c7c988be124c6ef4efe4f3\", \"input_fingerprint\": \"f30e6484f45f9f26759b57127c06489fa2877c2ca6eaeea36af73c428b077229\", \"inputs\": {\"command_contract\": {\"interface_id\": \"CS-FOUND-I2A\", \"state\": \"frozen\", \"version\": \"1\"}, \"diff_fingerprint\": \"5305cc793ecafcf0d9cd775f7ac8cbde8a7ba904db353405be7b7e316c69e6c9\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-07.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"ea7cc10b9d2c1a61444420ac2515e6f4c1424449\"}, \"locks\": [], \"resources\": [], \"started_revision\": 136, \"state\": \"frozen\", \"version\": \"1\"}",
+        "path": "/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/54244136-8470-4fab-abb7-1332bbb9024f",
+        "revision": 137,
+        "status": "passed"
       },
       {
         "checkpoint_id": null,
@@ -2017,6 +2329,19 @@
         "checkpoint_id": null,
         "claim_id": null,
         "content_hash": null,
+        "created_at": "2026-08-27T08:38:57Z",
+        "gate_id": "G2-I2B",
+        "id": "ada593d1-27cd-4689-b715-fedbc77be434",
+        "kind": "interface",
+        "metadata_json": "{\"content_hash\": \"7c86e72818699a566787ed1561d97f8448ce199974b827a81712f4ff5777696a\", \"input_fingerprint\": \"7dc81eac714ba13d24c8400f25de21e3ea67e7f0319c5d5a2b2f15b4e5c6ee9e\", \"inputs\": {\"command_contract\": {\"interface_id\": \"CS-FOUND-I2B\", \"state\": \"frozen\", \"version\": \"1\"}, \"diff_fingerprint\": \"5305cc793ecafcf0d9cd775f7ac8cbde8a7ba904db353405be7b7e316c69e6c9\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-07.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"ea7cc10b9d2c1a61444420ac2515e6f4c1424449\"}, \"locks\": [], \"resources\": [], \"started_revision\": 138, \"state\": \"frozen\", \"version\": \"1\"}",
+        "path": "/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/ada593d1-27cd-4689-b715-fedbc77be434",
+        "revision": 139,
+        "status": "passed"
+      },
+      {
+        "checkpoint_id": null,
+        "claim_id": null,
+        "content_hash": null,
         "created_at": "2026-08-21T13:04:17Z",
         "gate_id": "G1-CPU-CONFIGURE",
         "id": "b16e57e5-0dc7-4b8e-8a80-a86e1c7a0733",
@@ -2024,6 +2349,19 @@
         "metadata_json": "{\"argv\": [\"cmake\", \"-S\", \".\", \"-B\", \"build-cs-found-cpu\", \"-DCELLSHARD_ENABLE_CUDA=OFF\", \"-DCELLSHARD_BUILD_TESTS=ON\", \"-DCELLSHARD_BUILD_EXPORT=ON\", \"-DCELLSHARD_ENABLE_CELLERATOR_QUANTIZED=ON\", \"-DCELLSHARD_CELLERATOR_SOURCE_DIR=\"], \"environment\": {}, \"expected_exit_code\": 0, \"inputs\": {\"command_contract\": {\"argv\": [\"cmake\", \"-S\", \".\", \"-B\", \"build-cs-found-cpu\", \"-DCELLSHARD_ENABLE_CUDA=OFF\", \"-DCELLSHARD_BUILD_TESTS=ON\", \"-DCELLSHARD_BUILD_EXPORT=ON\", \"-DCELLSHARD_ENABLE_CELLERATOR_QUANTIZED=ON\", \"-DCELLSHARD_CELLERATOR_SOURCE_DIR=\"], \"locks\": [\"build:cellshard\"], \"timeout\": 1200}, \"diff_fingerprint\": \"abee6df3f0a0fcd6fa4355a8852905dbf7118977440bfc71981da7b9535ffe31\", \"dirty_paths\": [\".todo-orchestrator/cs-found-plan.json\", \".todo-orchestrator/project.json\", \".todo-orchestrator/state.snapshot.json\", \"CMakeLists.txt\", \"docs/CS_FOUND_TRANSITION_MAP.md\", \"tests/execution_payload_cpu_test.cc\", \"tests/execution_payload_test.cu\", \"todo-status.md\", \"todos.md\", \"todos/cellshard-cpp-access-adapter-refactor.md\", \"todos/cs-found-00.md\", \"todos/cs-found-01.md\", \"todos/cs-found-02.md\", \"todos/cs-found-03.md\", \"todos/cs-found-04.md\", \"todos/cs-found-05.md\", \"todos/cs-found-06.md\", \"todos/cs-found-07.md\", \"todos/cs-found-08.md\", \"todos/cs-found-09.md\", \"todos/cs-found-10.md\", \"todos/cs-found-11.md\", \"todos/cs-found-12.md\", \"todos/cs-found-13.md\", \"todos/cs-found-14.md\", \"todos/cs-found-15.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"bbe5917bab88ffca2d16bc86166a8de368a4abbe\"}, \"locks\": [{\"expires_at\": \"2026-08-21T13:09:15Z\", \"lease_id\": \"dc64655b-8994-4144-834f-bf4cc2899c61\", \"name\": \"build:cellshard\"}], \"resources\": [], \"returncode\": 0, \"started_revision\": 63}",
         "path": "/home/tumlinson/CellStack/.git/modules/CellShard/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/b16e57e5-0dc7-4b8e-8a80-a86e1c7a0733",
         "revision": 64,
+        "status": "passed"
+      },
+      {
+        "checkpoint_id": null,
+        "claim_id": null,
+        "content_hash": null,
+        "created_at": "2026-08-27T08:38:58Z",
+        "gate_id": "G2-I2C",
+        "id": "b2de68bc-f68d-4e62-836f-a6c60487a33e",
+        "kind": "interface",
+        "metadata_json": "{\"content_hash\": \"840ba657df09cfac3a186d23f088da5bfa99a1df5bbcf66c11cf6dae8052330c\", \"input_fingerprint\": \"cf1eed48ffae4da53ce6a9d597554753bd3810c04283e1e5aadb8c95e93d11a4\", \"inputs\": {\"command_contract\": {\"interface_id\": \"CS-FOUND-I2C\", \"state\": \"frozen\", \"version\": \"1\"}, \"diff_fingerprint\": \"5305cc793ecafcf0d9cd775f7ac8cbde8a7ba904db353405be7b7e316c69e6c9\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-07.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"ea7cc10b9d2c1a61444420ac2515e6f4c1424449\"}, \"locks\": [], \"resources\": [], \"started_revision\": 140, \"state\": \"frozen\", \"version\": \"1\"}",
+        "path": "/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/b2de68bc-f68d-4e62-836f-a6c60487a33e",
+        "revision": 141,
         "status": "passed"
       },
       {
@@ -2043,6 +2381,19 @@
         "checkpoint_id": null,
         "claim_id": null,
         "content_hash": null,
+        "created_at": "2026-08-27T08:38:48Z",
+        "gate_id": "C1-T04",
+        "id": "b5d257ce-610d-478d-848d-697a7da4a6ca",
+        "kind": "task_state",
+        "metadata_json": "{\"input_fingerprint\": \"a904a9d8bae3df5b61b00fda74f2f6fa8593c1e2f348af9637773c7fcbc6f7bc\", \"inputs\": {\"command_contract\": {\"status\": \"done\", \"task_id\": \"CS-FOUND-04\"}, \"diff_fingerprint\": \"5305cc793ecafcf0d9cd775f7ac8cbde8a7ba904db353405be7b7e316c69e6c9\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-07.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"ea7cc10b9d2c1a61444420ac2515e6f4c1424449\"}, \"locks\": [], \"resources\": [], \"result\": \"implemented\", \"started_revision\": 127, \"status\": \"done\"}",
+        "path": "/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/b5d257ce-610d-478d-848d-697a7da4a6ca",
+        "revision": 128,
+        "status": "passed"
+      },
+      {
+        "checkpoint_id": null,
+        "claim_id": null,
+        "content_hash": null,
         "created_at": "2026-08-21T13:04:29Z",
         "gate_id": "G1-CPU-BUILD",
         "id": "d9c766fc-6a27-43b5-8ae9-083cd66ab505",
@@ -2056,6 +2407,19 @@
         "checkpoint_id": null,
         "claim_id": null,
         "content_hash": null,
+        "created_at": "2026-08-27T08:38:57Z",
+        "gate_id": "G2-I1",
+        "id": "da1f2acd-5c32-4d1c-90b8-ef5d04a7fdd8",
+        "kind": "interface",
+        "metadata_json": "{\"content_hash\": \"7ecf116c9568d646b180e28a59ddf1ab9adbd10017a29b2a26a12255842adb30\", \"input_fingerprint\": \"fa00ceface6871cd63a972915b540bcc18339a2b110b0ded6dc24b7a964d0b8d\", \"inputs\": {\"command_contract\": {\"interface_id\": \"CS-FOUND-I1\", \"state\": \"frozen\", \"version\": \"1\"}, \"diff_fingerprint\": \"5305cc793ecafcf0d9cd775f7ac8cbde8a7ba904db353405be7b7e316c69e6c9\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-07.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"ea7cc10b9d2c1a61444420ac2515e6f4c1424449\"}, \"locks\": [], \"resources\": [], \"started_revision\": 134, \"state\": \"frozen\", \"version\": \"1\"}",
+        "path": "/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/da1f2acd-5c32-4d1c-90b8-ef5d04a7fdd8",
+        "revision": 135,
+        "status": "passed"
+      },
+      {
+        "checkpoint_id": null,
+        "claim_id": null,
+        "content_hash": null,
         "created_at": "2026-08-21T12:58:57Z",
         "gate_id": "G0-TRANSITION-MAP",
         "id": "e26e1afb-3e5e-472f-951d-664bc276344b",
@@ -2063,6 +2427,19 @@
         "metadata_json": "{\"exists\": true, \"inputs\": {\"command_contract\": {\"path\": \"docs/CS_FOUND_TRANSITION_MAP.md\"}, \"diff_fingerprint\": \"c2de955c4f2cb1f5dc49b2201cf25d85ec518e55eb8b5451d782c4fb1fed3f02\", \"dirty_paths\": [\".todo-orchestrator/cs-found-plan.json\", \".todo-orchestrator/project.json\", \".todo-orchestrator/state.snapshot.json\", \"docs/CS_FOUND_TRANSITION_MAP.md\", \"todo-status.md\", \"todos.md\", \"todos/cellshard-cpp-access-adapter-refactor.md\", \"todos/cs-found-00.md\", \"todos/cs-found-01.md\", \"todos/cs-found-02.md\", \"todos/cs-found-03.md\", \"todos/cs-found-04.md\", \"todos/cs-found-05.md\", \"todos/cs-found-06.md\", \"todos/cs-found-07.md\", \"todos/cs-found-08.md\", \"todos/cs-found-09.md\", \"todos/cs-found-10.md\", \"todos/cs-found-11.md\", \"todos/cs-found-12.md\", \"todos/cs-found-13.md\", \"todos/cs-found-14.md\", \"todos/cs-found-15.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"bbe5917bab88ffca2d16bc86166a8de368a4abbe\"}, \"locks\": [], \"path\": \"docs/CS_FOUND_TRANSITION_MAP.md\", \"resources\": [], \"started_revision\": 30}",
         "path": "/home/tumlinson/CellStack/.git/modules/CellShard/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/e26e1afb-3e5e-472f-951d-664bc276344b",
         "revision": 31,
+        "status": "passed"
+      },
+      {
+        "checkpoint_id": null,
+        "claim_id": null,
+        "content_hash": null,
+        "created_at": "2026-08-27T08:38:49Z",
+        "gate_id": "C1-T05",
+        "id": "e5b25c99-9013-47b5-a811-6bd0f6c45123",
+        "kind": "task_state",
+        "metadata_json": "{\"input_fingerprint\": \"a8443720de4224f6a4eb55ce5c3638874abe82f4e6897274d2d9e9083030a888\", \"inputs\": {\"command_contract\": {\"status\": \"done\", \"task_id\": \"CS-FOUND-05\"}, \"diff_fingerprint\": \"5305cc793ecafcf0d9cd775f7ac8cbde8a7ba904db353405be7b7e316c69e6c9\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-07.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"ea7cc10b9d2c1a61444420ac2515e6f4c1424449\"}, \"locks\": [], \"resources\": [], \"result\": \"implemented\", \"started_revision\": 129, \"status\": \"done\"}",
+        "path": "/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/e5b25c99-9013-47b5-a811-6bd0f6c45123",
+        "revision": 130,
         "status": "passed"
       },
       {
@@ -2110,53 +2487,53 @@
         "checkpoint_id": "CS-FOUND-C1",
         "config_json": "{\"status\": \"done\", \"task_id\": \"CS-FOUND-03\"}",
         "id": "C1-T03",
-        "input_fingerprint": null,
-        "last_run_at": null,
+        "input_fingerprint": "e4dfcd7d00f33c8be99c268f075a6612f74bf4e5234ad8b95eadd9a243f1926e",
+        "last_run_at": "2026-08-27T08:38:48Z",
         "required": 1,
-        "revision": 92,
-        "status": "pending",
+        "revision": 126,
+        "status": "passed",
         "task_id": "CS-FOUND-07",
         "type": "task_state",
-        "valid": 0
+        "valid": 1
       },
       {
         "checkpoint_id": "CS-FOUND-C1",
         "config_json": "{\"status\": \"done\", \"task_id\": \"CS-FOUND-04\"}",
         "id": "C1-T04",
-        "input_fingerprint": null,
-        "last_run_at": null,
+        "input_fingerprint": "a904a9d8bae3df5b61b00fda74f2f6fa8593c1e2f348af9637773c7fcbc6f7bc",
+        "last_run_at": "2026-08-27T08:38:48Z",
         "required": 1,
-        "revision": 92,
-        "status": "pending",
+        "revision": 128,
+        "status": "passed",
         "task_id": "CS-FOUND-07",
         "type": "task_state",
-        "valid": 0
+        "valid": 1
       },
       {
         "checkpoint_id": "CS-FOUND-C1",
         "config_json": "{\"status\": \"done\", \"task_id\": \"CS-FOUND-05\"}",
         "id": "C1-T05",
-        "input_fingerprint": null,
-        "last_run_at": null,
+        "input_fingerprint": "a8443720de4224f6a4eb55ce5c3638874abe82f4e6897274d2d9e9083030a888",
+        "last_run_at": "2026-08-27T08:38:49Z",
         "required": 1,
-        "revision": 92,
-        "status": "pending",
+        "revision": 130,
+        "status": "passed",
         "task_id": "CS-FOUND-07",
         "type": "task_state",
-        "valid": 0
+        "valid": 1
       },
       {
         "checkpoint_id": "CS-FOUND-C1",
         "config_json": "{\"status\": \"done\", \"task_id\": \"CS-FOUND-06\"}",
         "id": "C1-T06",
-        "input_fingerprint": null,
-        "last_run_at": null,
+        "input_fingerprint": "47b7c766e72c026ebe5d4b628dd5808b54d7c2e2379d80d6ae2a79832122618b",
+        "last_run_at": "2026-08-27T08:38:49Z",
         "required": 1,
-        "revision": 92,
-        "status": "pending",
+        "revision": 132,
+        "status": "passed",
         "task_id": "CS-FOUND-07",
         "type": "task_state",
-        "valid": 0
+        "valid": 1
       },
       {
         "checkpoint_id": "CS-FOUND-C2",
@@ -2396,14 +2773,14 @@
         "checkpoint_id": null,
         "config_json": "{\"argv\": [\"./build-cs-found-cpu/cellShardFoundationSnapshotTest\"], \"locks\": [\"build:cellshard\"]}",
         "id": "CS-FOUND-07-CPU",
-        "input_fingerprint": null,
-        "last_run_at": null,
+        "input_fingerprint": "383518d55a02072c44847ab00470650e3e03b1ec9ad358588b79f63063a271fe",
+        "last_run_at": "2026-08-27T08:41:17Z",
         "required": 1,
-        "revision": 92,
-        "status": "pending",
+        "revision": 148,
+        "status": "passed",
         "task_id": "CS-FOUND-07",
         "type": "command",
-        "valid": 0
+        "valid": 1
       },
       {
         "checkpoint_id": null,
@@ -2578,53 +2955,53 @@
         "checkpoint_id": "CS-FOUND-G2",
         "config_json": "{\"interface_id\": \"CS-FOUND-I1\", \"state\": \"frozen\", \"version\": \"1\"}",
         "id": "G2-I1",
-        "input_fingerprint": null,
-        "last_run_at": null,
+        "input_fingerprint": "fa00ceface6871cd63a972915b540bcc18339a2b110b0ded6dc24b7a964d0b8d",
+        "last_run_at": "2026-08-27T08:38:57Z",
         "required": 1,
-        "revision": 92,
-        "status": "pending",
+        "revision": 135,
+        "status": "passed",
         "task_id": "CS-FOUND-07",
         "type": "interface",
-        "valid": 0
+        "valid": 1
       },
       {
         "checkpoint_id": "CS-FOUND-G2",
         "config_json": "{\"interface_id\": \"CS-FOUND-I2A\", \"state\": \"frozen\", \"version\": \"1\"}",
         "id": "G2-I2A",
-        "input_fingerprint": null,
-        "last_run_at": null,
+        "input_fingerprint": "f30e6484f45f9f26759b57127c06489fa2877c2ca6eaeea36af73c428b077229",
+        "last_run_at": "2026-08-27T08:38:57Z",
         "required": 1,
-        "revision": 92,
-        "status": "pending",
+        "revision": 137,
+        "status": "passed",
         "task_id": "CS-FOUND-07",
         "type": "interface",
-        "valid": 0
+        "valid": 1
       },
       {
         "checkpoint_id": "CS-FOUND-G2",
         "config_json": "{\"interface_id\": \"CS-FOUND-I2B\", \"state\": \"frozen\", \"version\": \"1\"}",
         "id": "G2-I2B",
-        "input_fingerprint": null,
-        "last_run_at": null,
+        "input_fingerprint": "7dc81eac714ba13d24c8400f25de21e3ea67e7f0319c5d5a2b2f15b4e5c6ee9e",
+        "last_run_at": "2026-08-27T08:38:57Z",
         "required": 1,
-        "revision": 92,
-        "status": "pending",
+        "revision": 139,
+        "status": "passed",
         "task_id": "CS-FOUND-07",
         "type": "interface",
-        "valid": 0
+        "valid": 1
       },
       {
         "checkpoint_id": "CS-FOUND-G2",
         "config_json": "{\"interface_id\": \"CS-FOUND-I2C\", \"state\": \"frozen\", \"version\": \"1\"}",
         "id": "G2-I2C",
-        "input_fingerprint": null,
-        "last_run_at": null,
+        "input_fingerprint": "cf1eed48ffae4da53ce6a9d597554753bd3810c04283e1e5aadb8c95e93d11a4",
+        "last_run_at": "2026-08-27T08:38:58Z",
         "required": 1,
-        "revision": 92,
-        "status": "pending",
+        "revision": 141,
+        "status": "passed",
         "task_id": "CS-FOUND-07",
         "type": "interface",
-        "valid": 0
+        "valid": 1
       },
       {
         "checkpoint_id": "CS-FOUND-G3",
@@ -2980,56 +3357,56 @@
       {
         "content_hash": "7ecf116c9568d646b180e28a59ddf1ab9adbd10017a29b2a26a12255842adb30",
         "contract_paths_json": "[\"include/CellShard/identity.hh\", \"include/CellShard/identity/strong_id.hh\", \"include/CellShard/identity/digest.hh\"]",
-        "frozen_at": null,
+        "frozen_at": "2026-08-27T08:38:49Z",
         "id": "CS-FOUND-I1",
         "owner_task_id": "CS-FOUND-03",
         "revised_at": "2026-08-21T13:15:43Z",
-        "revision": 92,
-        "state": "draft",
+        "revision": 133,
+        "state": "frozen",
         "version": "1"
       },
       {
         "content_hash": "217a095db360a5ff8ac6fbc9edc9e20acbf2833463c7c988be124c6ef4efe4f3",
         "contract_paths_json": "[\"include/CellShard/domain.hh\", \"include/CellShard/domain/descriptor.hh\", \"include/CellShard/domain/partition.hh\"]",
-        "frozen_at": null,
+        "frozen_at": "2026-08-27T08:38:49Z",
         "id": "CS-FOUND-I2A",
         "owner_task_id": "CS-FOUND-04",
         "revised_at": "2026-08-27T08:32:57Z",
-        "revision": 104,
-        "state": "revised",
+        "revision": 133,
+        "state": "frozen",
         "version": "1"
       },
       {
         "content_hash": "7c86e72818699a566787ed1561d97f8448ce199974b827a81712f4ff5777696a",
         "contract_paths_json": "[\"include/CellShard/artifact/image.hh\"]",
-        "frozen_at": null,
+        "frozen_at": "2026-08-27T08:38:49Z",
         "id": "CS-FOUND-I2B",
         "owner_task_id": "CS-FOUND-05",
         "revised_at": "2026-08-27T08:35:38Z",
-        "revision": 113,
-        "state": "revised",
+        "revision": 133,
+        "state": "frozen",
         "version": "1"
       },
       {
         "content_hash": "840ba657df09cfac3a186d23f088da5bfa99a1df5bbcf66c11cf6dae8052330c",
         "contract_paths_json": "[\"include/CellShard/artifact/extent.hh\", \"include/CellShard/runtime/source/payload_source.hh\"]",
-        "frozen_at": null,
+        "frozen_at": "2026-08-27T08:38:49Z",
         "id": "CS-FOUND-I2C",
         "owner_task_id": "CS-FOUND-06",
         "revised_at": "2026-08-27T08:37:53Z",
-        "revision": 122,
-        "state": "revised",
+        "revision": 133,
+        "state": "frozen",
         "version": "1"
       },
       {
-        "content_hash": null,
+        "content_hash": "b09fd2ca65112edfea3739199be618a0b2b547550733b0d01ce771ba658b0914",
         "contract_paths_json": "[\"include/CellShard/artifact/catalog.hh\", \"include/CellShard/artifact/snapshot.hh\"]",
         "frozen_at": null,
         "id": "CS-FOUND-I3A",
         "owner_task_id": "CS-FOUND-07",
-        "revised_at": null,
-        "revision": 92,
-        "state": "draft",
+        "revised_at": "2026-08-27T08:41:22Z",
+        "revision": 149,
+        "state": "revised",
         "version": "1"
       },
       {
@@ -5024,12 +5401,12 @@
         "priority": 70,
         "result": null,
         "result_policy_json": "{\"allowed_dispositions\": [\"implemented\", \"validated\"]}",
-        "revision": 92,
-        "status": "planned",
+        "revision": 124,
+        "status": "in_progress",
         "tags_json": "[]",
         "title": "Artifact catalog and snapshot validation",
-        "updated_at": "2026-08-27T08:28:44Z",
-        "version": 11
+        "updated_at": "2026-08-27T08:38:35Z",
+        "version": 12
       },
       {
         "attention_reason": null,

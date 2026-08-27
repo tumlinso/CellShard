@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-27T09:01:28Z",
+  "generated_at": "2026-08-27T09:04:17Z",
   "project": {
     "configuration": {
       "busy_timeout_ms": 5000,
@@ -18,7 +18,7 @@
     "project_uuid": "a52537a5-20db-4aeb-a126-dd0128c71fda",
     "schema_version": 2
   },
-  "project_revision": 186,
+  "project_revision": 203,
   "schema_version": 2,
   "tables": {
     "barrier_requirements": [
@@ -91,12 +91,12 @@
         "title": "Descriptor implementation fan-in"
       },
       {
-        "explanation": "2/4 requirements satisfied; target=4",
+        "explanation": "3/4 requirements satisfied; target=4",
         "id": "CS-FOUND-IMAGE-RESIDENCY-FANIN",
         "mode": "all",
         "opened_at": null,
         "quorum": null,
-        "revision": 186,
+        "revision": 203,
         "state": "closed",
         "title": "Image and residency implementation fan-in"
       }
@@ -2289,6 +2289,176 @@
         "revision": 186,
         "seq": 186,
         "timestamp": "2026-08-27T09:01:28Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-11",
+        "entity_type": "claim",
+        "event_type": "continue.completed",
+        "payload_json": "{\"requested_task_id\": \"CS-FOUND-11\"}",
+        "revision": 187,
+        "seq": 187,
+        "timestamp": "2026-08-27T09:01:58Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "build:cellshard",
+        "entity_type": "lock",
+        "event_type": "lock.acquired",
+        "payload_json": "{\"names\": [\"build:cellshard\"]}",
+        "revision": 188,
+        "seq": 188,
+        "timestamp": "2026-08-27T09:03:11Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "build:cellshard",
+        "entity_type": "lock",
+        "event_type": "lock.released",
+        "payload_json": "{}",
+        "revision": 189,
+        "seq": 189,
+        "timestamp": "2026-08-27T09:03:14Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "build:cellshard",
+        "entity_type": "lock",
+        "event_type": "lock.acquired",
+        "payload_json": "{\"names\": [\"build:cellshard\"]}",
+        "revision": 190,
+        "seq": 190,
+        "timestamp": "2026-08-27T09:03:14Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "build:cellshard",
+        "entity_type": "lock",
+        "event_type": "lock.released",
+        "payload_json": "{}",
+        "revision": 191,
+        "seq": 191,
+        "timestamp": "2026-08-27T09:03:31Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-11-NOSYNC",
+        "entity_type": "gate",
+        "event_type": "gate.started",
+        "payload_json": "{\"gate_id\": \"CS-FOUND-11-NOSYNC\"}",
+        "revision": 192,
+        "seq": 192,
+        "timestamp": "2026-08-27T09:03:39Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-11-NOSYNC",
+        "entity_type": "gate",
+        "event_type": "gate.completed",
+        "payload_json": "{\"evidence_id\": \"85cc68c9-d557-4073-8e53-f7fb9ce5c165\", \"status\": \"passed\", \"valid\": true}",
+        "revision": 193,
+        "seq": 193,
+        "timestamp": "2026-08-27T09:03:39Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-11-CUDA",
+        "entity_type": "gate",
+        "event_type": "gate.started",
+        "payload_json": "{\"gate_id\": \"CS-FOUND-11-CUDA\"}",
+        "revision": 194,
+        "seq": 194,
+        "timestamp": "2026-08-27T09:03:39Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-11-CUDA",
+        "entity_type": "gate",
+        "event_type": "gate.completed",
+        "payload_json": "{\"evidence_id\": \"55bd4417-2e77-4fb1-bb5e-fdb4f556c069\", \"status\": \"passed\", \"valid\": true}",
+        "revision": 195,
+        "seq": 195,
+        "timestamp": "2026-08-27T09:03:40Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "build:cellshard",
+        "entity_type": "lock",
+        "event_type": "lock.acquired",
+        "payload_json": "{\"names\": [\"build:cellshard\"]}",
+        "revision": 196,
+        "seq": 196,
+        "timestamp": "2026-08-27T09:04:04Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "build:cellshard",
+        "entity_type": "lock",
+        "event_type": "lock.released",
+        "payload_json": "{}",
+        "revision": 197,
+        "seq": 197,
+        "timestamp": "2026-08-27T09:04:07Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-11-NOSYNC",
+        "entity_type": "gate",
+        "event_type": "gate.started",
+        "payload_json": "{\"gate_id\": \"CS-FOUND-11-NOSYNC\"}",
+        "revision": 198,
+        "seq": 198,
+        "timestamp": "2026-08-27T09:04:07Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-11-NOSYNC",
+        "entity_type": "gate",
+        "event_type": "gate.completed",
+        "payload_json": "{\"evidence_id\": \"dbdbde18-3cdb-4651-b0c3-e63a8cb3b194\", \"status\": \"passed\", \"valid\": true}",
+        "revision": 199,
+        "seq": 199,
+        "timestamp": "2026-08-27T09:04:07Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-11-CUDA",
+        "entity_type": "gate",
+        "event_type": "gate.started",
+        "payload_json": "{\"gate_id\": \"CS-FOUND-11-CUDA\"}",
+        "revision": 200,
+        "seq": 200,
+        "timestamp": "2026-08-27T09:04:07Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-11-CUDA",
+        "entity_type": "gate",
+        "event_type": "gate.completed",
+        "payload_json": "{\"evidence_id\": \"69a66ac4-c83e-4eae-8c00-fc8f777f8534\", \"status\": \"passed\", \"valid\": true}",
+        "revision": 201,
+        "seq": 201,
+        "timestamp": "2026-08-27T09:04:08Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-I5B",
+        "entity_type": "interface",
+        "event_type": "interface.revise",
+        "payload_json": "{\"version\": \"1\"}",
+        "revision": 202,
+        "seq": 202,
+        "timestamp": "2026-08-27T09:04:17Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-11",
+        "entity_type": "task",
+        "event_type": "task.completed",
+        "payload_json": "{\"completion_revision\": 203, \"disposition\": \"implemented\", \"reached_checkpoints\": []}",
+        "revision": 203,
+        "seq": 203,
+        "timestamp": "2026-08-27T09:04:17Z"
       }
     ],
     "evidence": [
@@ -2582,6 +2752,19 @@
         "checkpoint_id": null,
         "claim_id": null,
         "content_hash": null,
+        "created_at": "2026-08-27T09:03:40Z",
+        "gate_id": "CS-FOUND-11-CUDA",
+        "id": "55bd4417-2e77-4fb1-bb5e-fdb4f556c069",
+        "kind": "command",
+        "metadata_json": "{\"argv\": [\"./build-cs-found-baseline/cellShardDeviceResidencyTest\"], \"environment\": {}, \"expected_exit_code\": 0, \"input_fingerprint\": \"1116bda4d951453983a09749dd9d60075c4c26f408fa44f9bcd5ade2de7bbaeb\", \"inputs\": {\"command_contract\": {\"argv\": [\"./build-cs-found-baseline/cellShardDeviceResidencyTest\"], \"locks\": [\"build:cellshard\"], \"resources\": [\"gpu:any\"]}, \"diff_fingerprint\": \"fd5ec260efe176a905b1876b2e7f28a86657e512c6ef9effa0b21cbde67c328d\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"CMakeLists.txt\", \"include/CellShard/runtime/residency/device.cuh\", \"src/runtime/residency/device.cu\", \"tests/device_residency_test.cu\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-11.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"3d328899bc39e1dbe86810e71f3f67920b3f70af\"}, \"locks\": [{\"expires_at\": \"2026-08-27T09:08:39Z\", \"lease_id\": \"6dba1732-5837-4490-99cd-d933a123ced8\", \"name\": \"build:cellshard\"}], \"resources\": [{\"class_id\": \"gpu\", \"expires_at\": \"2026-08-27T09:08:39Z\", \"instance_id\": \"gpu:0\", \"lease_id\": \"a5a00e57-6705-4e42-a79a-f97dceca1f4b\", \"metadata\": {\"compute_capability\": \"7.0\", \"model\": \"Tesla V100-SXM2-16GB\"}}], \"returncode\": 0, \"started_revision\": 194}",
+        "path": "/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/55bd4417-2e77-4fb1-bb5e-fdb4f556c069",
+        "revision": 195,
+        "status": "passed"
+      },
+      {
+        "checkpoint_id": null,
+        "claim_id": null,
+        "content_hash": null,
         "created_at": "2026-08-21T12:58:18Z",
         "gate_id": "CS-FOUND-01-EXPORT",
         "id": "5711b415-b7b1-4c58-8cf8-71b56c4b4221",
@@ -2634,6 +2817,19 @@
         "checkpoint_id": null,
         "claim_id": null,
         "content_hash": null,
+        "created_at": "2026-08-27T09:04:08Z",
+        "gate_id": "CS-FOUND-11-CUDA",
+        "id": "69a66ac4-c83e-4eae-8c00-fc8f777f8534",
+        "kind": "command",
+        "metadata_json": "{\"argv\": [\"./build-cs-found-baseline/cellShardDeviceResidencyTest\"], \"environment\": {}, \"expected_exit_code\": 0, \"input_fingerprint\": \"1116bda4d951453983a09749dd9d60075c4c26f408fa44f9bcd5ade2de7bbaeb\", \"inputs\": {\"command_contract\": {\"argv\": [\"./build-cs-found-baseline/cellShardDeviceResidencyTest\"], \"locks\": [\"build:cellshard\"], \"resources\": [\"gpu:any\"]}, \"diff_fingerprint\": \"fd5ec260efe176a905b1876b2e7f28a86657e512c6ef9effa0b21cbde67c328d\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"CMakeLists.txt\", \"include/CellShard/runtime/residency/device.cuh\", \"src/runtime/residency/device.cu\", \"tests/device_residency_test.cu\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-11.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"3d328899bc39e1dbe86810e71f3f67920b3f70af\"}, \"locks\": [{\"expires_at\": \"2026-08-27T09:09:07Z\", \"lease_id\": \"a2e59401-d859-4b5e-afee-837209b57416\", \"name\": \"build:cellshard\"}], \"resources\": [{\"class_id\": \"gpu\", \"expires_at\": \"2026-08-27T09:09:07Z\", \"instance_id\": \"gpu:0\", \"lease_id\": \"99ea094c-9612-4b83-b18c-8c055b287ae9\", \"metadata\": {\"compute_capability\": \"7.0\", \"model\": \"Tesla V100-SXM2-16GB\"}}], \"returncode\": 0, \"started_revision\": 200}",
+        "path": "/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/69a66ac4-c83e-4eae-8c00-fc8f777f8534",
+        "revision": 201,
+        "status": "passed"
+      },
+      {
+        "checkpoint_id": null,
+        "claim_id": null,
+        "content_hash": null,
         "created_at": "2026-08-21T13:04:32Z",
         "gate_id": "G1-CUDA-BUILD",
         "id": "6e3fa7b8-e813-4078-9915-504bf0b803c4",
@@ -2680,6 +2876,19 @@
         "metadata_json": "{\"argv\": [\"./build-cs-found-baseline/cellShardDenseRuntimeTest\"], \"environment\": {}, \"expected_exit_code\": 0, \"inputs\": {\"command_contract\": {\"argv\": [\"./build-cs-found-baseline/cellShardDenseRuntimeTest\"], \"locks\": [\"build:cellshard\"], \"resources\": [\"gpu:any\"]}, \"diff_fingerprint\": \"c2de955c4f2cb1f5dc49b2201cf25d85ec518e55eb8b5451d782c4fb1fed3f02\", \"dirty_paths\": [\".todo-orchestrator/cs-found-plan.json\", \".todo-orchestrator/project.json\", \".todo-orchestrator/state.snapshot.json\", \"docs/CS_FOUND_TRANSITION_MAP.md\", \"todo-status.md\", \"todos.md\", \"todos/cellshard-cpp-access-adapter-refactor.md\", \"todos/cs-found-00.md\", \"todos/cs-found-01.md\", \"todos/cs-found-02.md\", \"todos/cs-found-03.md\", \"todos/cs-found-04.md\", \"todos/cs-found-05.md\", \"todos/cs-found-06.md\", \"todos/cs-found-07.md\", \"todos/cs-found-08.md\", \"todos/cs-found-09.md\", \"todos/cs-found-10.md\", \"todos/cs-found-11.md\", \"todos/cs-found-12.md\", \"todos/cs-found-13.md\", \"todos/cs-found-14.md\", \"todos/cs-found-15.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"bbe5917bab88ffca2d16bc86166a8de368a4abbe\"}, \"locks\": [{\"expires_at\": \"2026-08-21T13:03:34Z\", \"lease_id\": \"0f53a66d-0dad-43e1-a2d3-7ea7bd6105b7\", \"name\": \"build:cellshard\"}], \"resources\": [{\"class_id\": \"gpu\", \"expires_at\": \"2026-08-21T13:03:34Z\", \"instance_id\": \"gpu:0\", \"lease_id\": \"38f56db7-7fed-4f18-a61a-ef03ca990398\", \"metadata\": {\"compute_capability\": \"7.0\", \"model\": \"Tesla V100-SXM2-16GB\"}}], \"returncode\": 0, \"started_revision\": 24}",
         "path": "/home/tumlinson/CellStack/.git/modules/CellShard/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/7efcf4d8-ba26-40f4-871a-0efed0818cee",
         "revision": 25,
+        "status": "passed"
+      },
+      {
+        "checkpoint_id": null,
+        "claim_id": null,
+        "content_hash": null,
+        "created_at": "2026-08-27T09:03:39Z",
+        "gate_id": "CS-FOUND-11-NOSYNC",
+        "id": "85cc68c9-d557-4073-8e53-f7fb9ce5c165",
+        "kind": "pattern",
+        "metadata_json": "{\"found\": true, \"input_fingerprint\": \"f843007f2868848995a67b5ad698be97675685b8b29cbf21a74bf3b9527768a8\", \"inputs\": {\"command_contract\": {\"path\": \"src/runtime/residency/device.cu\", \"pattern\": \"^(?!.*cuda(Device|Stream)Synchronize).*$\"}, \"diff_fingerprint\": \"fd5ec260efe176a905b1876b2e7f28a86657e512c6ef9effa0b21cbde67c328d\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"CMakeLists.txt\", \"include/CellShard/runtime/residency/device.cuh\", \"src/runtime/residency/device.cu\", \"tests/device_residency_test.cu\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-11.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"3d328899bc39e1dbe86810e71f3f67920b3f70af\"}, \"locks\": [], \"path\": \"src/runtime/residency/device.cu\", \"resources\": [], \"started_revision\": 192}",
+        "path": "/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/85cc68c9-d557-4073-8e53-f7fb9ce5c165",
+        "revision": 193,
         "status": "passed"
       },
       {
@@ -2849,6 +3058,19 @@
         "metadata_json": "{\"content_hash\": \"7ecf116c9568d646b180e28a59ddf1ab9adbd10017a29b2a26a12255842adb30\", \"input_fingerprint\": \"fa00ceface6871cd63a972915b540bcc18339a2b110b0ded6dc24b7a964d0b8d\", \"inputs\": {\"command_contract\": {\"interface_id\": \"CS-FOUND-I1\", \"state\": \"frozen\", \"version\": \"1\"}, \"diff_fingerprint\": \"5305cc793ecafcf0d9cd775f7ac8cbde8a7ba904db353405be7b7e316c69e6c9\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-07.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"ea7cc10b9d2c1a61444420ac2515e6f4c1424449\"}, \"locks\": [], \"resources\": [], \"started_revision\": 134, \"state\": \"frozen\", \"version\": \"1\"}",
         "path": "/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/da1f2acd-5c32-4d1c-90b8-ef5d04a7fdd8",
         "revision": 135,
+        "status": "passed"
+      },
+      {
+        "checkpoint_id": null,
+        "claim_id": null,
+        "content_hash": null,
+        "created_at": "2026-08-27T09:04:07Z",
+        "gate_id": "CS-FOUND-11-NOSYNC",
+        "id": "dbdbde18-3cdb-4651-b0c3-e63a8cb3b194",
+        "kind": "pattern",
+        "metadata_json": "{\"found\": true, \"input_fingerprint\": \"f843007f2868848995a67b5ad698be97675685b8b29cbf21a74bf3b9527768a8\", \"inputs\": {\"command_contract\": {\"path\": \"src/runtime/residency/device.cu\", \"pattern\": \"^(?!.*cuda(Device|Stream)Synchronize).*$\"}, \"diff_fingerprint\": \"fd5ec260efe176a905b1876b2e7f28a86657e512c6ef9effa0b21cbde67c328d\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"CMakeLists.txt\", \"include/CellShard/runtime/residency/device.cuh\", \"src/runtime/residency/device.cu\", \"tests/device_residency_test.cu\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-11.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"3d328899bc39e1dbe86810e71f3f67920b3f70af\"}, \"locks\": [], \"path\": \"src/runtime/residency/device.cu\", \"resources\": [], \"started_revision\": 198}",
+        "path": "/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/dbdbde18-3cdb-4651-b0c3-e63a8cb3b194",
+        "revision": 199,
         "status": "passed"
       },
       {
@@ -3260,27 +3482,27 @@
         "checkpoint_id": null,
         "config_json": "{\"argv\": [\"./build-cs-found-baseline/cellShardDeviceResidencyTest\"], \"locks\": [\"build:cellshard\"], \"resources\": [\"gpu:any\"]}",
         "id": "CS-FOUND-11-CUDA",
-        "input_fingerprint": null,
-        "last_run_at": null,
+        "input_fingerprint": "1116bda4d951453983a09749dd9d60075c4c26f408fa44f9bcd5ade2de7bbaeb",
+        "last_run_at": "2026-08-27T09:04:08Z",
         "required": 1,
-        "revision": 166,
-        "status": "pending",
+        "revision": 201,
+        "status": "passed",
         "task_id": "CS-FOUND-11",
         "type": "command",
-        "valid": 0
+        "valid": 1
       },
       {
         "checkpoint_id": null,
         "config_json": "{\"path\": \"src/runtime/residency/device.cu\", \"pattern\": \"^(?!.*cuda(Device|Stream)Synchronize).*$\"}",
         "id": "CS-FOUND-11-NOSYNC",
-        "input_fingerprint": null,
-        "last_run_at": null,
+        "input_fingerprint": "f843007f2868848995a67b5ad698be97675685b8b29cbf21a74bf3b9527768a8",
+        "last_run_at": "2026-08-27T09:04:07Z",
         "required": 1,
-        "revision": 166,
-        "status": "pending",
+        "revision": 199,
+        "status": "passed",
         "task_id": "CS-FOUND-11",
         "type": "pattern",
-        "valid": 0
+        "valid": 1
       },
       {
         "checkpoint_id": null,
@@ -3670,6 +3892,16 @@
       },
       {
         "claim_id": null,
+        "created_at": "2026-08-27T09:04:17Z",
+        "id": "2c454dbf-0afc-40ba-ba8d-f772901ce15b",
+        "kind": "complete",
+        "note": "Added caller-allocator device residency with one cudaMemcpyAsync, move-only ownership, device guard/restore, failure cleanup, and explicit transitional cudaMalloc wrapper. CUDA and no-sync gates passed on V100.",
+        "payload_json": "{\"changed_owned_paths\": [], \"checkpoints\": [], \"completion_commit\": \"17a3a50d113ef7cc75c2ffbcfcde9bd7f48fb4a3\", \"completion_gates\": [{\"evidence_id\": \"69a66ac4-c83e-4eae-8c00-fc8f777f8534\", \"evidence_revision\": 201, \"id\": \"CS-FOUND-11-CUDA\", \"input_fingerprint\": \"1116bda4d951453983a09749dd9d60075c4c26f408fa44f9bcd5ade2de7bbaeb\", \"status\": \"passed\", \"valid\": true, \"validation_git_head\": \"3d328899bc39e1dbe86810e71f3f67920b3f70af\"}, {\"evidence_id\": \"dbdbde18-3cdb-4651-b0c3-e63a8cb3b194\", \"evidence_revision\": 199, \"id\": \"CS-FOUND-11-NOSYNC\", \"input_fingerprint\": \"f843007f2868848995a67b5ad698be97675685b8b29cbf21a74bf3b9527768a8\", \"status\": \"passed\", \"valid\": true, \"validation_git_head\": \"3d328899bc39e1dbe86810e71f3f67920b3f70af\"}], \"completion_revision\": 203, \"finalized_checkpoints\": [], \"gates\": [{\"id\": \"CS-FOUND-11-CUDA\", \"input_fingerprint\": \"1116bda4d951453983a09749dd9d60075c4c26f408fa44f9bcd5ade2de7bbaeb\", \"last_run_at\": \"2026-08-27T09:04:08Z\", \"revision\": 201, \"status\": \"passed\", \"valid\": 1}, {\"id\": \"CS-FOUND-11-NOSYNC\", \"input_fingerprint\": \"f843007f2868848995a67b5ad698be97675685b8b29cbf21a74bf3b9527768a8\", \"last_run_at\": \"2026-08-27T09:04:07Z\", \"revision\": 199, \"status\": \"passed\", \"valid\": 1}], \"git_diffstat\": \".todo-orchestrator/state.snapshot.json | 252 ++++++++++++++++++++++++++++++---\\n todo-status.md                         |   4 +-\\n todos.md                               |   4 +-\\n todos/cs-found-11.md                   |   6 +-\\n 4 files changed, 239 insertions(+), 27 deletions(-)\", \"git_head\": \"17a3a50d113ef7cc75c2ffbcfcde9bd7f48fb4a3\", \"interfaces\": [{\"content_hash\": \"e5a76d38652886e16a8b7b06c3068c0fac5b1736b2216465d7e82d1386210b24\", \"id\": \"CS-FOUND-I5B\", \"state\": \"revised\", \"version\": \"1\"}], \"note\": \"Added caller-allocator device residency with one cudaMemcpyAsync, move-only ownership, device guard/restore, failure cleanup, and explicit transitional cudaMalloc wrapper. CUDA and no-sync gates passed on V100.\", \"resources\": [{\"acquired_at\": \"2026-08-27T09:03:39Z\", \"instance_id\": \"gpu:0\", \"released_at\": \"2026-08-27T09:03:40Z\", \"state\": \"released\"}, {\"acquired_at\": \"2026-08-27T09:04:07Z\", \"instance_id\": \"gpu:0\", \"released_at\": \"2026-08-27T09:04:08Z\", \"state\": \"released\"}], \"task_id\": \"CS-FOUND-11\"}",
+        "revision": 203,
+        "task_id": "CS-FOUND-11"
+      },
+      {
+        "claim_id": null,
         "created_at": "2026-08-27T08:41:38Z",
         "id": "2ca055dd-538c-4d4a-9adf-ec447fd4b932",
         "kind": "complete",
@@ -3931,14 +4163,14 @@
         "version": "1"
       },
       {
-        "content_hash": null,
+        "content_hash": "e5a76d38652886e16a8b7b06c3068c0fac5b1736b2216465d7e82d1386210b24",
         "contract_paths_json": "[\"include/CellShard/runtime/residency/device.cuh\"]",
         "frozen_at": null,
         "id": "CS-FOUND-I5B",
         "owner_task_id": "CS-FOUND-11",
-        "revised_at": null,
-        "revision": 166,
-        "state": "draft",
+        "revised_at": "2026-08-27T09:04:17Z",
+        "revision": 202,
+        "state": "revised",
         "version": "1"
       }
     ],
@@ -4979,6 +5211,32 @@
         "task_id": "CS-FOUND-10",
         "valid": 1,
         "validation_git_head": "baf5f71dbfd7a21cf28df2d12362ec0c0432ce53"
+      },
+      {
+        "completion_git_head": "17a3a50d113ef7cc75c2ffbcfcde9bd7f48fb4a3",
+        "completion_revision": 203,
+        "evidence_id": "69a66ac4-c83e-4eae-8c00-fc8f777f8534",
+        "evidence_revision": 201,
+        "gate_id": "CS-FOUND-11-CUDA",
+        "input_fingerprint": "1116bda4d951453983a09749dd9d60075c4c26f408fa44f9bcd5ade2de7bbaeb",
+        "provenance_json": "{\"claim_id\": \"4edee624-5604-49e2-9689-81cedea00290\", \"evidence_content_hash\": null, \"evidence_kind\": \"command\", \"evidence_metadata\": {\"argv\": [\"./build-cs-found-baseline/cellShardDeviceResidencyTest\"], \"environment\": {}, \"expected_exit_code\": 0, \"input_fingerprint\": \"1116bda4d951453983a09749dd9d60075c4c26f408fa44f9bcd5ade2de7bbaeb\", \"inputs\": {\"command_contract\": {\"argv\": [\"./build-cs-found-baseline/cellShardDeviceResidencyTest\"], \"locks\": [\"build:cellshard\"], \"resources\": [\"gpu:any\"]}, \"diff_fingerprint\": \"fd5ec260efe176a905b1876b2e7f28a86657e512c6ef9effa0b21cbde67c328d\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"CMakeLists.txt\", \"include/CellShard/runtime/residency/device.cuh\", \"src/runtime/residency/device.cu\", \"tests/device_residency_test.cu\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-11.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"3d328899bc39e1dbe86810e71f3f67920b3f70af\"}, \"locks\": [{\"expires_at\": \"2026-08-27T09:09:07Z\", \"lease_id\": \"a2e59401-d859-4b5e-afee-837209b57416\", \"name\": \"build:cellshard\"}], \"resources\": [{\"class_id\": \"gpu\", \"expires_at\": \"2026-08-27T09:09:07Z\", \"instance_id\": \"gpu:0\", \"lease_id\": \"99ea094c-9612-4b83-b18c-8c055b287ae9\", \"metadata\": {\"compute_capability\": \"7.0\", \"model\": \"Tesla V100-SXM2-16GB\"}}], \"returncode\": 0, \"started_revision\": 200}, \"evidence_path\": \"/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/69a66ac4-c83e-4eae-8c00-fc8f777f8534\", \"source\": \"completion_transaction\"}",
+        "status": "passed",
+        "task_id": "CS-FOUND-11",
+        "valid": 1,
+        "validation_git_head": "3d328899bc39e1dbe86810e71f3f67920b3f70af"
+      },
+      {
+        "completion_git_head": "17a3a50d113ef7cc75c2ffbcfcde9bd7f48fb4a3",
+        "completion_revision": 203,
+        "evidence_id": "dbdbde18-3cdb-4651-b0c3-e63a8cb3b194",
+        "evidence_revision": 199,
+        "gate_id": "CS-FOUND-11-NOSYNC",
+        "input_fingerprint": "f843007f2868848995a67b5ad698be97675685b8b29cbf21a74bf3b9527768a8",
+        "provenance_json": "{\"claim_id\": \"4edee624-5604-49e2-9689-81cedea00290\", \"evidence_content_hash\": null, \"evidence_kind\": \"pattern\", \"evidence_metadata\": {\"found\": true, \"input_fingerprint\": \"f843007f2868848995a67b5ad698be97675685b8b29cbf21a74bf3b9527768a8\", \"inputs\": {\"command_contract\": {\"path\": \"src/runtime/residency/device.cu\", \"pattern\": \"^(?!.*cuda(Device|Stream)Synchronize).*$\"}, \"diff_fingerprint\": \"fd5ec260efe176a905b1876b2e7f28a86657e512c6ef9effa0b21cbde67c328d\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"CMakeLists.txt\", \"include/CellShard/runtime/residency/device.cuh\", \"src/runtime/residency/device.cu\", \"tests/device_residency_test.cu\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-11.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"3d328899bc39e1dbe86810e71f3f67920b3f70af\"}, \"locks\": [], \"path\": \"src/runtime/residency/device.cu\", \"resources\": [], \"started_revision\": 198}, \"evidence_path\": \"/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/dbdbde18-3cdb-4651-b0c3-e63a8cb3b194\", \"source\": \"completion_transaction\"}",
+        "status": "passed",
+        "task_id": "CS-FOUND-11",
+        "valid": 1,
+        "validation_git_head": "3d328899bc39e1dbe86810e71f3f67920b3f70af"
       }
     ],
     "task_dependencies": [
@@ -6155,9 +6413,9 @@
       },
       {
         "attention_reason": null,
-        "completion_commit": null,
-        "completion_git_head": null,
-        "completion_revision": null,
+        "completion_commit": "17a3a50d113ef7cc75c2ffbcfcde9bd7f48fb4a3",
+        "completion_git_head": "17a3a50d113ef7cc75c2ffbcfcde9bd7f48fb4a3",
+        "completion_revision": 203,
         "created_at": "2026-08-21T12:05:03Z",
         "id": "CS-FOUND-11",
         "kind": "task",
@@ -6169,14 +6427,14 @@
         "parallel_policy": "serial",
         "parent_id": "CS-FOUND-00",
         "priority": 40,
-        "result": null,
+        "result": "implemented",
         "result_policy_json": "{\"allowed_dispositions\": [\"implemented\", \"validated\"]}",
-        "revision": 166,
-        "status": "planned",
+        "revision": 203,
+        "status": "done",
         "tags_json": "[]",
         "title": "Caller-owned CUDA allocator and device residency",
-        "updated_at": "2026-08-27T08:56:40Z",
-        "version": 13
+        "updated_at": "2026-08-27T09:04:17Z",
+        "version": 15
       },
       {
         "attention_reason": null,

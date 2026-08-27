@@ -3,16 +3,16 @@
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-FOUND-11: Caller-owned CUDA allocator and device residency
 
-Task revision: `166`; current project revision is in `todo-status.md`.
+Task revision: `203`; current project revision is in `todo-status.md`.
 
 ## Objective
 Stage a validated host image through a caller allocator with one asynchronous H2D copy and move-only device residency as CS-FOUND-I5B.
 
 ## State
-- Lifecycle: `planned`
-- Execution: `ready`
+- Lifecycle: `done`
+- Execution: `closed`
 - Parallel policy: `serial`
-- Result: `-`
+- Result: `implemented`
 
 ## Next Action
 Use the cuda skill, implement external allocator primary path plus transitional cudaMalloc wrapper, and run serialized correctness tests only.

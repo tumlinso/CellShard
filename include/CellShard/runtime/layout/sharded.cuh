@@ -23,6 +23,7 @@
 #endif
 
 #include <cstddef>
+#include <CellShard/domain.hh>
 
 namespace cellshard {
 
@@ -54,6 +55,38 @@ struct alignas(16) sharded {
     // binary-search path in the hot runtime code.
     unsigned long *shard_parts;
 };
+
+// CS-FOUND-LEGACY: this describes a compatibility row partition. The caller
+// supplies semantic IDs explicitly; physical shard grouping remains only
+// legacy locality metadata and is not biological ownership.
+struct legacy_row_partition_binding {
+    domain_binding binding{};
+    std::uint64_t canonical_generation = 0;
+    unsigned long global_row_begin = 0;
+    unsigned long row_count = 0;
+    unsigned long physical_shard_group = 0;
+};
+
+template<typename MatrixT>
+inline bool adapt_legacy_row_partition(
+    const sharded<MatrixT> &matrix, unsigned long partition_index,
+    domain_binding explicit_binding, std::uint64_t canonical_generation,
+    unsigned long physical_shard_group,
+    legacy_row_partition_binding *out) noexcept {
+    if (out == nullptr || partition_index >= matrix.num_partitions
+        || matrix.partition_offsets == nullptr || canonical_generation == 0
+        || !valid_domain_binding_role(explicit_binding.role)
+        || !explicit_binding.domain.valid() || !explicit_binding.map.valid()
+        || !explicit_binding.partition.valid() || !explicit_binding.order.valid()) {
+        return false;
+    }
+    const unsigned long begin = matrix.partition_offsets[partition_index];
+    const unsigned long end = matrix.partition_offsets[partition_index + 1];
+    if (end <= begin) return false;
+    *out = {explicit_binding, canonical_generation, begin, end - begin,
+            physical_shard_group};
+    return true;
+}
 
 // Zero metadata and pointers. No deallocation happens here.
 template<typename MatrixT>

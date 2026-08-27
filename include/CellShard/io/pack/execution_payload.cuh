@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../common/generation.hh"
+#include <CellShard/artifact/image.hh>
 
 #include <cstddef>
 #include <cstdint>
@@ -46,6 +47,27 @@ struct execution_payload_host {
     const unsigned char *payload = nullptr;
     std::size_t payload_bytes = 0u;
 };
+
+// CS-FOUND-LEGACY: explicit bridge context for CPEXEC01. Legacy counters are
+// checked here but never hashed or reinterpreted as foundational identities.
+struct legacy_execution_image_context {
+    std::uint64_t legacy_partition_identity = 0;
+    std::uint64_t legacy_row_domain_identity = 0;
+    std::uint64_t canonical_generation = 0;
+    image_id image{};
+    projection_key projection{};
+    domain_binding binding{};
+    std::uint64_t device_bytes = 0;
+    std::uint32_t required_alignment = 0;
+    image_reuse_class reuse = image_reuse_class::invalid;
+    content_digest payload_digest{};
+};
+
+[[nodiscard]] status_code adapt_legacy_execution_image(
+    const execution_payload_identity &legacy,
+    std::size_t payload_bytes,
+    const legacy_execution_image_context &context,
+    image_descriptor *out);
 
 bool valid_execution_payload_identity(
     const execution_payload_identity &identity) noexcept;

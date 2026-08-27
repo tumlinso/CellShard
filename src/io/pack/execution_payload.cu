@@ -5,6 +5,7 @@
 #include <cstring>
 #include <limits>
 #include <string>
+#include <utility>
 
 #include <sys/stat.h>
 #include <unistd.h>
@@ -119,6 +120,39 @@ bool execution_payload_identity_matches(
         && actual.payload_schema_version == expected.payload_schema_version
         && actual.row_domain_identity == expected.row_domain_identity
         && actual.payload_identity == expected.payload_identity;
+}
+
+status_code adapt_legacy_execution_image(
+    const execution_payload_identity &legacy, std::size_t payload_bytes,
+    const legacy_execution_image_context &context, image_descriptor *out) {
+    if (out == nullptr || payload_bytes == 0
+        || !valid_execution_payload_identity(legacy)
+        || context.legacy_partition_identity != legacy.partition_identity
+        || context.legacy_row_domain_identity != legacy.row_domain_identity
+        || context.canonical_generation != legacy.generation.canonical_generation
+        || !context.image.valid() || !valid_projection_key(context.projection)
+        || !context.binding.domain.valid() || !context.binding.map.valid()
+        || !context.binding.partition.valid() || !context.binding.order.valid()
+        || !valid_domain_binding_role(context.binding.role)
+        || context.device_bytes == 0
+        || !valid_required_alignment(context.required_alignment)
+        || !valid_image_reuse_class(context.reuse)
+        || !valid_content_digest(context.payload_digest)
+        || context.payload_digest.algorithm == digest_algorithm::none) {
+        return status_code::invalid_input;
+    }
+    image_descriptor image{};
+    image.id = context.image;
+    image.projection = context.projection;
+    image.stored_bytes = payload_bytes;
+    image.device_bytes = context.device_bytes;
+    image.required_alignment = context.required_alignment;
+    image.reuse = context.reuse;
+    image.payload_digest = context.payload_digest;
+    image.domains.push_back(context.binding);
+    if (!valid_image_descriptor(image)) return status_code::invalid_input;
+    *out = std::move(image);
+    return status_code::success;
 }
 
 int store_execution_cspack(

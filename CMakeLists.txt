@@ -808,6 +808,23 @@ if(CELLSHARD_BUILD_TESTS AND CELLSHARD_BUILD_EXPORT)
         CXX_STANDARD_REQUIRED YES
     )
 
+    add_executable(cellShardFoundationLegacyAdapterTest
+        tests/foundation_legacy_adapter_test.cc
+        src/io/pack/execution_payload.cu
+    )
+    target_include_directories(cellShardFoundationLegacyAdapterTest PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+    target_link_libraries(cellShardFoundationLegacyAdapterTest PRIVATE
+        CellShard::headers
+    )
+    set_target_properties(cellShardFoundationLegacyAdapterTest PROPERTIES
+        CXX_STANDARD 17
+        CXX_STANDARD_REQUIRED YES
+    )
+
     # CS-FOUND-02: protect CSPACK01 and native CPEXEC01 behavior even when the
     # CUDA staging path is not part of the build.
     add_executable(cellShardExecutionPayloadCpuTest

@@ -812,6 +812,15 @@ if(CELLSHARD_BUILD_TESTS AND CELLSHARD_BUILD_EXPORT)
         tests/foundation_legacy_adapter_test.cc
         src/io/pack/execution_payload.cu
     )
+
+    add_executable(cellShardOpaqueImagePipelineTest
+        tests/opaque_image_pipeline_test.cc
+        src/io/pack/image_envelope.cc
+        src/runtime/source/local_file_source.cc
+        src/runtime/residency/host.cc
+    )
+    target_link_libraries(cellShardOpaqueImagePipelineTest PRIVATE CellShard::headers)
+    set_target_properties(cellShardOpaqueImagePipelineTest PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED YES)
     target_include_directories(cellShardFoundationLegacyAdapterTest PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -845,6 +854,13 @@ if(CELLSHARD_BUILD_TESTS AND CELLSHARD_BUILD_EXPORT)
     )
 
     if(CELLSHARD_ENABLE_CUDA)
+        add_executable(cellShardOpaqueImagePipelineCudaTest
+            tests/opaque_image_pipeline_cuda_test.cu
+            src/runtime/residency/device.cu
+        )
+        target_link_libraries(cellShardOpaqueImagePipelineCudaTest PRIVATE CellShard::headers CUDA::cudart)
+        set_target_properties(cellShardOpaqueImagePipelineCudaTest PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED YES)
+
         add_executable(cellShardDeviceResidencyTest
             tests/device_residency_test.cu
             src/runtime/residency/device.cu

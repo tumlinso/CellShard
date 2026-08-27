@@ -3,16 +3,16 @@
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-FOUND-05: Projection and image descriptors
 
-Task revision: `106`; current project revision is in `todo-status.md`.
+Task revision: `114`; current project revision is in `todo-status.md`.
 
 ## Objective
 Represent producer-owned opaque execution images through producer ABI, target, projection, reuse, owning descriptor, and allocation-free view as CS-FOUND-I2B.
 
 ## State
-- Lifecycle: `in_progress`
-- Execution: `claimed`
+- Lifecycle: `done`
+- Execution: `closed`
 - Parallel policy: `parallel_safe`
-- Result: `-`
+- Result: `implemented`
 
 ## Next Action
 Implement only I2B without paths, runtime placement, or payload interpretation.

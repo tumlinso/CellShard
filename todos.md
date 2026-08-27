@@ -53,7 +53,7 @@ _None recorded yet._
 <!-- todo-orchestrator:v2-managed:start -->
 # Todo Orchestrator v2 Projection
 
-Project revision: `113`
+Project revision: `114`
 
 ## Workstreams
 - `CS-FOUND-00` | kind: epic | status: in_progress | parent: - | objective: Establish stable CellShard identity, domain, partition, image, extent, source, snapshot, host-residency, and device-residency contracts before placement, streaming, routing, or multi-node work.
@@ -61,7 +61,7 @@ Project revision: `113`
 - `CS-FOUND-02` | kind: task | status: done | parent: CS-FOUND-00 | objective: Protect current CSPACK01 and native CPEXEC01 behavior with focused positive, malformed-input, ownership, publication, and CUDA upload tests.
 - `CS-FOUND-03` | kind: task | status: done | parent: CS-FOUND-00 | objective: Implement the specified zero-cost strong IDs, tagged content digest, array view, and typed status primitive as CS-FOUND-I1.
 - `CS-FOUND-04` | kind: task | status: done | parent: CS-FOUND-00 | objective: Implement domain, partition-map, partition-selection, partition-descriptor, and explicit-order domain-binding contracts as CS-FOUND-I2A.
-- `CS-FOUND-05` | kind: task | status: in_progress | parent: CS-FOUND-00 | objective: Represent producer-owned opaque execution images through producer ABI, target, projection, reuse, owning descriptor, and allocation-free view as CS-FOUND-I2B.
+- `CS-FOUND-05` | kind: task | status: done | parent: CS-FOUND-00 | objective: Represent producer-owned opaque execution images through producer ABI, target, projection, reuse, owning descriptor, and allocation-free view as CS-FOUND-I2B.
 - `CS-FOUND-06` | kind: task | status: planned | parent: CS-FOUND-00 | objective: Separate immutable storage objects/extents from mutable source locations and define the non-owning storage-independent exact-read boundary as CS-FOUND-I2C.
 - `CS-FOUND-07` | kind: task | status: planned | parent: CS-FOUND-00 | objective: Freeze the descriptor ABI checkpoint, then implement separate in-memory artifact/source catalogs and snapshot validation as CS-FOUND-I3A.
 - `CS-FOUND-08` | kind: task | status: planned | parent: CS-FOUND-00 | objective: Implement deterministic explicit little-endian CPEXEC02 buffer encoding/decoding as CS-FOUND-I3B without CSPACK file integration.

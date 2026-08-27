@@ -20,7 +20,7 @@ _No staleness review recorded yet._
 <!-- todo-orchestrator:v2-managed:start -->
 # Todo Status v2 Projection
 
-Project revision: `113`
+Project revision: `114`
 
 ## Workstreams
 - `CS-FOUND-00` | status: in_progress | execution: inactive | next: Complete CS-FOUND-01 and CS-FOUND-02 during bootstrap; later workers continue transactionally from CS-FOUND-03.
@@ -28,7 +28,7 @@ Project revision: `113`
 - `CS-FOUND-02` | status: done | execution: closed | next: Add only the legacy codec/container baseline tests, run G1 gates, record results, reach G1, and stop without claiming CS-FOUND-03.
 - `CS-FOUND-03` | status: done | execution: closed | next: Implement and validate CS-FOUND-I1 only; do not modify legacy identities.
 - `CS-FOUND-04` | status: done | execution: closed | next: Implement only I2A in its exclusive files and complete positive/negative validation.
-- `CS-FOUND-05` | status: in_progress | execution: claimed | next: Implement only I2B without paths, runtime placement, or payload interpretation.
+- `CS-FOUND-05` | status: done | execution: closed | next: Implement only I2B without paths, runtime placement, or payload interpretation.
 - `CS-FOUND-06` | status: planned | execution: ready | next: Implement I2C and fake in-memory exact-range source; defer local files unless mechanically inseparable.
 - `CS-FOUND-07` | status: planned | execution: ready | next: Review I1/I2A/I2B/I2C, reach C1 and G2, then implement catalog/snapshot validation without persistent manifest format.
 - `CS-FOUND-08` | status: planned | execution: ready | next: Implement fixed-field/table codec, deterministic padding/checksum, size calculation, and malformed-buffer tests only.

@@ -4,6 +4,13 @@ CellShard `0.1.x` is intentionally narrow.
 
 ## Stable Surface
 
+- CS-FOUND C++ contracts for strong identity, domains/partitions/orders,
+  opaque images and extents, in-memory catalogs/snapshots, exact local sources,
+  and move-only host residency; caller-allocated device residency is available
+  when CUDA is enabled.
+- Deterministic `CPEXEC02` entries inside unchanged `CSPACK01`, alongside the
+  supported legacy `CPEXEC01` path.
+
 - Installed CMake package components:
   - `CellShard::headers`
   - `CellShard::inspect`
@@ -79,6 +86,9 @@ CellShard `0.1.x` is intentionally narrow.
 - Persisted parts and shards remain row-aligned. One cell is not split across parts or shards.
 
 ## Not Promised In `0.1.x`
+
+- Topology-aware placement, disk-array streaming, generalized cache policy,
+  distributed scheduling/collectives, or automatic precision weakening
 
 - Windows or macOS support
 - Broad ABI portability across arbitrary compilers or CUDA toolchains

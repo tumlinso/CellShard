@@ -29,6 +29,18 @@
 #endif
 
 #if CELLSHARD_ENABLE_CUDA
+#define CELLSHARD_USE_NATIVE_CUDA_TYPES 1
+#elif defined(__has_include)
+#if __has_include(<cuda_runtime.h>) && __has_include(<cuda_fp16.h>)
+#define CELLSHARD_USE_NATIVE_CUDA_TYPES 1
+#endif
+#endif
+
+#ifndef CELLSHARD_USE_NATIVE_CUDA_TYPES
+#define CELLSHARD_USE_NATIVE_CUDA_TYPES 0
+#endif
+
+#if CELLSHARD_USE_NATIVE_CUDA_TYPES
 
 #include <cuda_runtime.h>
 #include <cuda_fp16.h>
@@ -183,3 +195,5 @@ inline __half __float2half(float value) {
 }
 
 #endif
+
+#undef CELLSHARD_USE_NATIVE_CUDA_TYPES

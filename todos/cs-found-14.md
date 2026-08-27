@@ -3,14 +3,14 @@
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-FOUND-14: Public API, package, and documentation migration
 
-Task revision: `166`; current project revision is in `todo-status.md`.
+Task revision: `264`; current project revision is in `todo-status.md`.
 
 ## Objective
 Expose and document implemented CS-FOUND contracts honestly while preserving optional CUDA and format-role boundaries.
 
 ## State
-- Lifecycle: `planned`
-- Execution: `ready`
+- Lifecycle: `in_progress`
+- Execution: `claimed`
 - Parallel policy: `integration_exclusive`
 - Result: `-`
 
@@ -28,6 +28,7 @@ Update only implemented package/docs surfaces, add CS_FOUND_CONTRACT, run instal
 - `exclusive`: `docs/SPEC_CSPACK_V1.md`
 - `exclusive`: `include/CellShard/CellShard.hh`
 - `exclusive`: `include/CellShard/artifact.hh`
+- `exclusive`: `include/CellShard/core/cuda_compat.cuh`
 - `exclusive`: `include/CellShard/io/pack.hh`
 - `exclusive`: `include/CellShard/runtime/residency.hh`
 - `exclusive`: `include/CellShard/runtime/source.hh`

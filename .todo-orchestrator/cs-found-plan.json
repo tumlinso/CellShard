@@ -409,7 +409,7 @@
       "priority": 20,
       "parallel_policy": "integration_exclusive",
       "depends_on": [{"type": "task", "task_id": "CS-FOUND-07"}, {"type": "task", "task_id": "CS-FOUND-09"}, {"type": "task", "task_id": "CS-FOUND-12"}, {"type": "task", "task_id": "CS-FOUND-13"}, {"type": "checkpoint", "checkpoint_id": "CS-FOUND-G5", "state": "reached"}],
-      "scope": {"exclusive_paths": ["AGENTS.md", "README.md", "SUPPORT.md", "docs/FORMAT_ROLES.md", "docs/PARKING_LOT.md", "docs/SPEC_CSPACK_V1.md", "docs/CS_FOUND_CONTRACT.md", "include/CellShard/CellShard.hh", "include/CellShard/artifact.hh", "include/CellShard/runtime/source.hh", "include/CellShard/runtime/residency.hh", "include/CellShard/io/pack.hh", "CMakeLists.txt", "tests/package_consumer"], "read_paths": ["CellShard_complete_architecture_review.md", "include/CellShard"]},
+      "scope": {"exclusive_paths": ["AGENTS.md", "README.md", "SUPPORT.md", "docs/FORMAT_ROLES.md", "docs/PARKING_LOT.md", "docs/SPEC_CSPACK_V1.md", "docs/CS_FOUND_CONTRACT.md", "include/CellShard/CellShard.hh", "include/CellShard/artifact.hh", "include/CellShard/core/cuda_compat.cuh", "include/CellShard/runtime/source.hh", "include/CellShard/runtime/residency.hh", "include/CellShard/io/pack.hh", "CMakeLists.txt", "tests/package_consumer"], "read_paths": ["CellShard_complete_architecture_review.md", "include/CellShard"]},
       "claim_locks": ["file:CMakeLists.txt", "surface:public-umbrella-headers", "surface:package-exports", "surface:docs-runtime-contract"],
       "invariants": ["CS-FOUND-SCOPE", "CS-FOUND-COMPAT", "CS-FOUND-NONGOALS"],
       "checkpoints": [{"id": "CS-FOUND-G6", "title": "G6 Public contract honest"}],

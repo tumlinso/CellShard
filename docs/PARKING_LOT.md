@@ -1,5 +1,13 @@
 # Parking Lot
 
+## Post-CS-FOUND physical runtime investigation
+
+Investigate blocked multi-extent disk streaming, bounded working sets,
+representation/precision constraints, residency and reuse, movement versus
+recomputation, storage/memory/accelerator topology, placement, biological
+locality, multi-device execution, and eventual multi-node realization. Do not
+treat placement alone as the whole next problem.
+
 This file holds ideas that may be valuable later but should not distract from the current release target.
 
 The current priority is:

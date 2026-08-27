@@ -137,6 +137,13 @@ The envelope is a versioned CSPACK payload family, not a change to the
 top-level `CSPACK01` container and not permission to move optimized layout
 policy into CellShard.
 
+`store_image_cspack` publishes deterministic little-endian `CPEXEC02` entries
+in the same unchanged top-level container. `CPEXEC02` carries explicit image,
+projection, target, domain/order, dependency, route, digest, alignment, and
+size fields. `inspect_image_cspack_partition` reads only the container table
+and metadata prefix and exposes the payload as a storage extent without loading
+it. Paths and mutable source locations are not part of image identity.
+
 ### Bucketed Blocked-ELL Execution Partition
 
 Blocked execution partition blobs store:

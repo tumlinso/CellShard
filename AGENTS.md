@@ -1,5 +1,18 @@
 # Repository Guidelines
 
+CellShard is performance-first and biology-informed. Its foundations exist to
+make the physical realization of structured biological computation fast, not
+to turn the project into an artifact catalog or generic tensor runtime.
+CellShard may carry operational biological structure useful for organization,
+locality, representation, streaming, residency, and reuse, while producers
+retain biological theory, mathematical semantics, and sparse-kernel policy.
+
+Legacy row shards are compatibility/delivery machinery, not the semantic
+definition of domains or partitions. Preserve opaque producer payload bytes
+while allowing explicit CellShard-relevant operational metadata. Do not put
+paths, replicas, service epochs, or placement epochs into immutable image
+identity.
+
 ## Scope And Ownership
 
 CellShard is the storage, pack-delivery, and runtime-staging layer for

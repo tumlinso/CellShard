@@ -3,7 +3,7 @@
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-FOUND-15: Program validation, audit, and handoff
 
-Task revision: `166`; current project revision is in `todo-status.md`.
+Task revision: `263`; current project revision is in `todo-status.md`.
 
 ## Objective
 Validate the full feasible CS-FOUND program, reconcile ledger and repository, generate final projections, and recommend but do not create the broader next physical-runtime investigation.

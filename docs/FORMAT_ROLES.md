@@ -178,6 +178,11 @@ source -> .cspool -> .csh5 -> .cspack
 
 Execution artifact.
 
+The unchanged `CSPACK01` family supports legacy native `CPEXEC01` compatibility
+entries and portable deterministic `CPEXEC02` opaque-image entries. It is a
+foundation and compatibility vehicle, not a universal archive or artifact
+database.
+
 ### Purpose
 
 `.cspack` is the shard-pack runtime format for CellShard and Cellerator.

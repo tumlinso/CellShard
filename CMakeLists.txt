@@ -352,6 +352,7 @@ target_compile_definitions(cellshard_headers INTERFACE
 
 set(cellshard_inspect_sources
     src/io/pack/packfile.cu
+    src/io/pack/image_envelope.cc
     # CP-BP-13: CellShard-owned generic CSPACK execution envelope and staging.
     src/io/pack/execution_payload.cu
     src/io/csh5/create.cc
@@ -362,11 +363,15 @@ set(cellshard_inspect_sources
     src/io/csh5/runtime/headers.cc
     src/io/csh5/runtime/fetch.cc
     src/io/csh5/runtime/warm.cc
-    src/bucket/blocked_ell_bipartite_optimize_bridge.cu
     src/runtime/storage/shard_storage.cu
+    src/runtime/source/local_file_source.cc
+    src/runtime/residency/host.cc
 )
 set_source_files_properties(${cellshard_inspect_sources} PROPERTIES LANGUAGE CXX)
 if(CELLSHARD_ENABLE_CUDA)
+    list(APPEND cellshard_inspect_sources
+        src/bucket/blocked_ell_bipartite_optimize_bridge.cu
+    )
     set_source_files_properties(src/bucket/blocked_ell_bipartite_optimize_bridge.cu PROPERTIES LANGUAGE CUDA)
     list(APPEND cellshard_inspect_sources
         src/io/csh5/sliced_execution_cuda.cu
@@ -425,6 +430,7 @@ endif()
 if(CELLSHARD_ENABLE_CUDA)
     add_library(cellshard_runtime STATIC
         src/runtime/mask_groups.cu
+        src/runtime/residency/device.cu
     )
     add_library(CellShard::runtime ALIAS cellshard_runtime)
     set_target_properties(cellshard_runtime PROPERTIES EXPORT_NAME runtime)

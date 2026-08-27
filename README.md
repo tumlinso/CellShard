@@ -1,7 +1,16 @@
 # CellShard
 
-CellShard is a low-level, header-first library for biology-centric sharded
-omics archives, metadata, pack generation, and distributed data delivery.
+CellShard is a performance-first, biology-informed scientific runtime library
+for the physical realization of large biological numerical workloads. It is
+currently integrated most deeply with Cellerator, but its storage, delivery,
+residency, and execution-artifact contracts are intended to serve Baseplane,
+GlassHelix, and other biological compute producers without owning their model
+or kernel semantics.
+
+CS-FOUND provides the identity, artifact, source, snapshot, and residency
+foundation described in [docs/CS_FOUND_CONTRACT.md](docs/CS_FOUND_CONTRACT.md).
+It does not yet provide the eventual topology-aware streaming or distributed
+runtime optimizer.
 
 Its scope is narrow:
 
@@ -113,8 +122,9 @@ Useful public/runtime waypoints:
 
 ## Core Concepts
 
-- `partition`: one stored matrix chunk with explicit row bounds
-- `shard`: a group of partitions used as the higher-level fetch/staging unit
+- `partition`: an explicit selection within a logical domain; legacy stored row
+  partitions are compatibility instances, not the semantic definition
+- `shard`: a physical compatibility/delivery grouping, not biological ownership
 - `adapter_view<Binding>`: a typed header-only handle that lets callers bind
   their own archive and pack contexts to CellShard metadata without virtual
   dispatch
@@ -128,7 +138,8 @@ Useful public/runtime waypoints:
 - `compressed`: an explicit row-compressed fallback/interchange path, not the preferred `.csh5` file format
 - `sharded<T>`: metadata plus optional loaded payload pointers for a partitioned matrix collection
 - `shard_storage`: the bound storage backend used for lazy fetch/materialization
-- `.csh5`: the canonical CellShard dataset container and archive format
+- `.csh5`: the current canonical durable CellShard dataset and append source,
+  not necessarily the permanent execution substrate
 - `.cshard`: the experimental standby HDF5-free native archive format
 - `.cspool`: the local ingest-spool part format used before final `.csh5` assembly
 - `.cspack`: the generated execution artifact used for fast multithreaded fetch and delivery

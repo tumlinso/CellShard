@@ -53,7 +53,7 @@ _None recorded yet._
 <!-- todo-orchestrator:v2-managed:start -->
 # Todo Orchestrator v2 Projection
 
-Project revision: `252`
+Project revision: `282`
 
 ## Workstreams
 - `CS-FOUND-00` | kind: epic | status: in_progress | parent: - | objective: Establish stable CellShard identity, domain, partition, image, extent, source, snapshot, host-residency, and device-residency contracts before placement, streaming, routing, or multi-node work.
@@ -70,7 +70,7 @@ Project revision: `252`
 - `CS-FOUND-12` | kind: task | status: done | parent: CS-FOUND-00 | objective: Provide explicit-context legacy CPEXEC01 and sharded adapters without defining new semantics through row shards.
 - `CS-FOUND-11` | kind: task | status: done | parent: CS-FOUND-00 | objective: Stage a validated host image through a caller allocator with one asynchronous H2D copy and move-only device residency as CS-FOUND-I5B.
 - `CS-FOUND-13` | kind: integration_task | status: done | parent: CS-FOUND-00 | objective: Freeze the image/residency checkpoint and prove the specified fake producer to host/device fake consumer pipeline with exact identity and byte preservation.
-- `CS-FOUND-14` | kind: integration_task | status: planned | parent: CS-FOUND-00 | objective: Expose and document implemented CS-FOUND contracts honestly while preserving optional CUDA and format-role boundaries.
+- `CS-FOUND-14` | kind: integration_task | status: in_progress | parent: CS-FOUND-00 | objective: Expose and document implemented CS-FOUND contracts honestly while preserving optional CUDA and format-role boundaries.
 - `CS-FOUND-15` | kind: validation_task | status: planned | parent: CS-FOUND-00 | objective: Validate the full feasible CS-FOUND program, reconcile ledger and repository, generate final projections, and recommend but do not create the broader next physical-runtime investigation.
 - `cellshard-cpp-access-adapter-refactor` | kind: workstream | status: closed | parent: - | objective: Implement max-performance C++ access adapters so CellShard owns biological delivery and dense/compressed fallbacks while Cellerator owns optimized sparse bindings.
 <!-- todo-orchestrator:v2-managed:end -->

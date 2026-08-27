@@ -3,7 +3,7 @@
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-FOUND-03: Strong identity, digest, and status primitives
 
-Task revision: `263`; current project revision is in `todo-status.md`.
+Task revision: `302`; current project revision is in `todo-status.md`.
 
 ## Objective
 Implement the specified zero-cost strong IDs, tagged content digest, array view, and typed status primitive as CS-FOUND-I1.

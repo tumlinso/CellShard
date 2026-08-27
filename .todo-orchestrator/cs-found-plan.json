@@ -59,15 +59,15 @@
     }
   ],
   "interfaces": [
-    {"id": "CS-FOUND-I1", "owner_task_id": "CS-FOUND-03", "state": "draft", "version": "1", "contract_paths": ["include/CellShard/identity.hh", "include/CellShard/identity/strong_id.hh", "include/CellShard/identity/digest.hh"]},
-    {"id": "CS-FOUND-I2A", "owner_task_id": "CS-FOUND-04", "state": "draft", "version": "1", "contract_paths": ["include/CellShard/domain.hh", "include/CellShard/domain/descriptor.hh", "include/CellShard/domain/partition.hh"]},
-    {"id": "CS-FOUND-I2B", "owner_task_id": "CS-FOUND-05", "state": "draft", "version": "1", "contract_paths": ["include/CellShard/artifact/image.hh"]},
-    {"id": "CS-FOUND-I2C", "owner_task_id": "CS-FOUND-06", "state": "draft", "version": "1", "contract_paths": ["include/CellShard/artifact/extent.hh", "include/CellShard/runtime/source/payload_source.hh"]},
-    {"id": "CS-FOUND-I3A", "owner_task_id": "CS-FOUND-07", "state": "draft", "version": "1", "contract_paths": ["include/CellShard/artifact/catalog.hh", "include/CellShard/artifact/snapshot.hh"]},
-    {"id": "CS-FOUND-I3B", "owner_task_id": "CS-FOUND-08", "state": "draft", "version": "1", "contract_paths": ["include/CellShard/io/pack/image_envelope.hh"]},
-    {"id": "CS-FOUND-I4", "owner_task_id": "CS-FOUND-09", "state": "draft", "version": "2", "contract_paths": ["include/CellShard/io/pack/image_envelope.hh"]},
-    {"id": "CS-FOUND-I5A", "owner_task_id": "CS-FOUND-10", "state": "draft", "version": "1", "contract_paths": ["include/CellShard/runtime/source/local_file_source.hh", "include/CellShard/runtime/residency/host.hh"]},
-    {"id": "CS-FOUND-I5B", "owner_task_id": "CS-FOUND-11", "state": "draft", "version": "1", "contract_paths": ["include/CellShard/runtime/residency/device.cuh"]}
+    {"id": "CS-FOUND-I1", "owner_task_id": "CS-FOUND-03", "state": "frozen", "version": "1", "contract_paths": ["include/CellShard/identity.hh", "include/CellShard/identity/strong_id.hh", "include/CellShard/identity/digest.hh"]},
+    {"id": "CS-FOUND-I2A", "owner_task_id": "CS-FOUND-04", "state": "frozen", "version": "1", "contract_paths": ["include/CellShard/domain.hh", "include/CellShard/domain/descriptor.hh", "include/CellShard/domain/partition.hh"]},
+    {"id": "CS-FOUND-I2B", "owner_task_id": "CS-FOUND-05", "state": "frozen", "version": "1", "contract_paths": ["include/CellShard/artifact/image.hh"]},
+    {"id": "CS-FOUND-I2C", "owner_task_id": "CS-FOUND-06", "state": "frozen", "version": "1", "contract_paths": ["include/CellShard/artifact/extent.hh", "include/CellShard/runtime/source/payload_source.hh"]},
+    {"id": "CS-FOUND-I3A", "owner_task_id": "CS-FOUND-07", "state": "frozen", "version": "1", "contract_paths": ["include/CellShard/artifact/catalog.hh", "include/CellShard/artifact/snapshot.hh"]},
+    {"id": "CS-FOUND-I3B", "owner_task_id": "CS-FOUND-08", "state": "frozen", "version": "1", "contract_paths": ["include/CellShard/io/pack/image_envelope.hh"]},
+    {"id": "CS-FOUND-I4", "owner_task_id": "CS-FOUND-09", "state": "frozen", "version": "2", "contract_paths": ["include/CellShard/io/pack/image_envelope.hh"]},
+    {"id": "CS-FOUND-I5A", "owner_task_id": "CS-FOUND-10", "state": "frozen", "version": "1", "contract_paths": ["include/CellShard/runtime/source/local_file_source.hh", "include/CellShard/runtime/residency/host.hh"]},
+    {"id": "CS-FOUND-I5B", "owner_task_id": "CS-FOUND-11", "state": "frozen", "version": "1", "contract_paths": ["include/CellShard/runtime/residency/device.cuh"]}
   ],
   "barriers": [
     {
@@ -98,11 +98,11 @@
       "kind": "epic",
       "title": "CellShard Identity, Artifact, Source, and Residency Foundations",
       "objective": "Establish stable CellShard identity, domain, partition, image, extent, source, snapshot, host-residency, and device-residency contracts before placement, streaming, routing, or multi-node work.",
-      "status": "in_progress",
+      "status": "closed",
       "priority": 100,
       "parallel_policy": "serial",
       "invariants": ["CS-FOUND-SCOPE", "CS-FOUND-OPAQUE", "CS-FOUND-COMPAT", "CS-FOUND-IDENTITY", "CS-FOUND-RUNTIME", "CS-FOUND-NONGOALS"],
-      "next_action": "Complete CS-FOUND-01 and CS-FOUND-02 during bootstrap; later workers continue transactionally from CS-FOUND-03.",
+      "next_action": "Program complete at CS-FOUND-G7; investigate the broader physical-runtime problem without creating a successor program in this handoff.",
       "notes": "Rationale: later physical realization and transport must not freeze the overloaded shard model. Scope: coordinate CS-FOUND-01 through CS-FOUND-15. Non-goals: every later placement, routing, networking, scheduling, collective, streaming, and cache program. Dependencies: none. Interfaces consumed: current CellShard legacy contracts. Interfaces produced: CS-FOUND-I1 through I5B. Likely files: program-wide CellShard files only. Locks: all declared locks are delegated to child tasks. Acceptance: all children complete, opaque local vertical slice passes, CPEXEC01 remains supported, CPEXEC02 exists, docs are honest. Validation: CS-FOUND-15 gates and todo audit. Failure: any external-repo modification or scope expansion. Compatibility: preserve current public APIs and CSPACK01. Migration follow-up: recommend but do not create a broader physical-runtime investigation covering streaming, working sets, representation, residency, topology, and placement. Evidence: commits, gates, checkpoints, audit. Rollback: child changes remain independently revertible; no public format is mutated in place.",
       "result_policy": {"allowed_dispositions": ["implemented", "validated"]}
     },

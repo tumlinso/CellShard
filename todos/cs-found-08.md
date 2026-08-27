@@ -3,7 +3,7 @@
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-FOUND-08: Explicit CPEXEC02 codec
 
-Task revision: `89`; current project revision is in `todo-status.md`.
+Task revision: `92`; current project revision is in `todo-status.md`.
 
 ## Objective
 Implement deterministic explicit little-endian CPEXEC02 buffer encoding/decoding as CS-FOUND-I3B without CSPACK file integration.
@@ -18,6 +18,7 @@ Implement deterministic explicit little-endian CPEXEC02 buffer encoding/decoding
 Implement fixed-field/table codec, deterministic padding/checksum, size calculation, and malformed-buffer tests only.
 
 ## Ownership
+- `exclusive`: `CMakeLists.txt`
 - `exclusive`: `include/CellShard/io/pack/image_envelope.hh`
 - `exclusive`: `src/io/pack/image_envelope.cc`
 - `exclusive`: `tests/image_envelope_test.cc`

@@ -3,10 +3,10 @@
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-FOUND-15: Program validation, audit, and handoff
 
-Task revision: `89`; current project revision is in `todo-status.md`.
+Task revision: `92`; current project revision is in `todo-status.md`.
 
 ## Objective
-Validate the full feasible CS-FOUND program, reconcile ledger and repository, generate final projections, and recommend but do not create CS-PLACE.
+Validate the full feasible CS-FOUND program, reconcile ledger and repository, generate final projections, and recommend but do not create the broader next physical-runtime investigation.
 
 ## State
 - Lifecycle: `planned`
@@ -15,7 +15,7 @@ Validate the full feasible CS-FOUND program, reconcile ledger and repository, ge
 - Result: `-`
 
 ## Next Action
-Run focused/full feasible CPU and CUDA tests, installed package smoke, static architecture scans, todo audit/reconcile/export, reach G7, and hand off with CS-PLACE recommendation only.
+Run focused/full feasible CPU and CUDA tests, installed package smoke, static architecture scans, todo audit/reconcile/export, reach G7, and hand off with a broader physical-runtime investigation recommendation only.
 
 ## Ownership
 - `read`: `AGENTS.md`

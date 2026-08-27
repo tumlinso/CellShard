@@ -26,7 +26,7 @@
     },
     {
       "id": "CS-FOUND-RUNTIME",
-      "rule": "Hot loading, staging, and binding use non-owning views and move-only leases; source to host uses one payload allocation and host to device uses one caller-allocator allocation plus one cudaMemcpyAsync.",
+      "rule": "The CS-FOUND foundational loading, staging, and binding path uses non-owning views and move-only leases; source to host uses one payload allocation and host to device uses one caller-allocator allocation plus one cudaMemcpyAsync. This does not prescribe the copy or allocation count of a later streaming engine.",
       "severity": "error"
     },
     {
@@ -103,7 +103,7 @@
       "parallel_policy": "serial",
       "invariants": ["CS-FOUND-SCOPE", "CS-FOUND-OPAQUE", "CS-FOUND-COMPAT", "CS-FOUND-IDENTITY", "CS-FOUND-RUNTIME", "CS-FOUND-NONGOALS"],
       "next_action": "Complete CS-FOUND-01 and CS-FOUND-02 during bootstrap; later workers continue transactionally from CS-FOUND-03.",
-      "notes": "Rationale: later placement and transport must not freeze the overloaded shard model. Scope: coordinate CS-FOUND-01 through CS-FOUND-15. Non-goals: every later placement, routing, networking, scheduling, collective, and cache program. Dependencies: none. Interfaces consumed: current CellShard legacy contracts. Interfaces produced: CS-FOUND-I1 through I5B. Likely files: program-wide CellShard files only. Locks: all declared locks are delegated to child tasks. Acceptance: all children complete, opaque local vertical slice passes, CPEXEC01 remains supported, CPEXEC02 exists, docs are honest. Validation: CS-FOUND-15 gates and todo audit. Failure: any external-repo modification or scope expansion. Compatibility: preserve current public APIs and CSPACK01. Migration follow-up: recommend but do not create CS-PLACE. Evidence: commits, gates, checkpoints, audit. Rollback: child changes remain independently revertible; no public format is mutated in place.",
+      "notes": "Rationale: later physical realization and transport must not freeze the overloaded shard model. Scope: coordinate CS-FOUND-01 through CS-FOUND-15. Non-goals: every later placement, routing, networking, scheduling, collective, streaming, and cache program. Dependencies: none. Interfaces consumed: current CellShard legacy contracts. Interfaces produced: CS-FOUND-I1 through I5B. Likely files: program-wide CellShard files only. Locks: all declared locks are delegated to child tasks. Acceptance: all children complete, opaque local vertical slice passes, CPEXEC01 remains supported, CPEXEC02 exists, docs are honest. Validation: CS-FOUND-15 gates and todo audit. Failure: any external-repo modification or scope expansion. Compatibility: preserve current public APIs and CSPACK01. Migration follow-up: recommend but do not create a broader physical-runtime investigation covering streaming, working sets, representation, residency, topology, and placement. Evidence: commits, gates, checkpoints, audit. Rollback: child changes remain independently revertible; no public format is mutated in place.",
       "result_policy": {"allowed_dispositions": ["implemented", "validated"]}
     },
     {
@@ -195,11 +195,12 @@
       "parallel_policy": "parallel_safe",
       "depends_on": [{"type": "task", "task_id": "CS-FOUND-03"}],
       "consumes_interfaces": [{"id": "CS-FOUND-I1", "required_state": "draft", "required_version": "1"}],
-      "scope": {"exclusive_paths": ["include/CellShard/domain.hh", "include/CellShard/domain", "tests/foundation_domain_test.cc"], "read_paths": ["include/CellShard/identity"]},
+      "scope": {"exclusive_paths": ["CMakeLists.txt", "include/CellShard/domain.hh", "include/CellShard/domain", "tests/foundation_domain_test.cc"], "read_paths": ["include/CellShard/identity", "tests/foundation_identity_test.cc"]},
+      "claim_locks": ["file:CMakeLists.txt"],
       "invariants": ["CS-FOUND-SCOPE", "CS-FOUND-IDENTITY", "CS-FOUND-NONGOALS"],
       "gates": [{"id": "CS-FOUND-04-CPU", "type": "command", "argv": ["./build-cs-found-cpu/cellShardFoundationDomainTest"], "locks": ["build:cellshard"], "required": true}],
       "next_action": "Implement only I2A in its exclusive files and complete positive/negative validation.",
-      "notes": "Rationale: biological ownership cannot remain row-shard identity. Exact scope: specified domain kinds, multiple maps, contiguous/explicit-extent/opaque selections, bindings with explicit order, generation/domain/count/range validators. Non-goals: halos, replicas, routes, graph IR, placement. Dependencies: CS-FOUND-03/I1. Interface consumed: I1. Interface produced: I2A. Likely files: domain headers and foundation_domain_test. Locks: CMake only for target registration. Acceptance: cells/genes/sequence/opaque and multiple maps validate; all specified cross-domain/generation errors reject. Validation: CPU tests. Failure: row-only assumptions or topology logic. Compatibility: no sharded rewrite. Migration follow-up: CS-FOUND-12 adapter. Evidence: tests and source review. Rollback: isolated new module.",
+      "notes": "Rationale: biological ownership cannot remain row-shard identity. Exact scope: specified domain kinds, multiple maps, contiguous/explicit-extent/opaque selections, bindings with explicit order, generation/domain/count/range validators, plus CMake registration of the completed CS-FOUND-03 identity test and this task's domain test. Non-goals: halos, replicas, routes, graph IR, placement. Dependencies: CS-FOUND-03/I1. Interface consumed: I1. Interface produced: I2A. Likely files: CMake, domain headers, and foundation_domain_test. Locks: CMake only for target registration. Acceptance: cells/genes/sequence/opaque and multiple maps validate; all specified cross-domain/generation errors reject. Validation: CPU tests. Failure: row-only assumptions or topology logic. Compatibility: no sharded rewrite. Migration follow-up: CS-FOUND-12 adapter. Evidence: tests and source review. Rollback: isolated new module.",
       "result_policy": {"allowed_dispositions": ["implemented", "validated"]}
     },
     {
@@ -212,7 +213,8 @@
       "parallel_policy": "parallel_safe",
       "depends_on": [{"type": "task", "task_id": "CS-FOUND-03"}],
       "consumes_interfaces": [{"id": "CS-FOUND-I1", "required_state": "draft", "required_version": "1"}],
-      "scope": {"exclusive_paths": ["include/CellShard/artifact/image.hh", "tests/foundation_artifact_test.cc"], "read_paths": ["include/CellShard/identity", "include/CellShard/domain"]},
+      "scope": {"exclusive_paths": ["CMakeLists.txt", "include/CellShard/artifact/image.hh", "tests/foundation_artifact_test.cc"], "read_paths": ["include/CellShard/identity", "include/CellShard/domain"]},
+      "claim_locks": ["file:CMakeLists.txt"],
       "invariants": ["CS-FOUND-SCOPE", "CS-FOUND-OPAQUE", "CS-FOUND-IDENTITY", "CS-FOUND-NONGOALS"],
       "gates": [{"id": "CS-FOUND-05-CPU", "type": "command", "argv": ["./build-cs-found-cpu/cellShardFoundationArtifactTest"], "locks": ["build:cellshard"], "required": true}],
       "next_action": "Implement only I2B without paths, runtime placement, or payload interpretation.",
@@ -229,7 +231,8 @@
       "parallel_policy": "parallel_safe",
       "depends_on": [{"type": "task", "task_id": "CS-FOUND-03"}],
       "consumes_interfaces": [{"id": "CS-FOUND-I1", "required_state": "draft", "required_version": "1"}],
-      "scope": {"exclusive_paths": ["include/CellShard/artifact/extent.hh", "include/CellShard/runtime/source.hh", "include/CellShard/runtime/source/payload_source.hh", "tests/payload_source_test.cc"], "read_paths": ["include/CellShard/identity"]},
+      "scope": {"exclusive_paths": ["CMakeLists.txt", "include/CellShard/artifact/extent.hh", "include/CellShard/runtime/source.hh", "include/CellShard/runtime/source/payload_source.hh", "tests/payload_source_test.cc"], "read_paths": ["include/CellShard/identity"]},
+      "claim_locks": ["file:CMakeLists.txt"],
       "invariants": ["CS-FOUND-SCOPE", "CS-FOUND-OPAQUE", "CS-FOUND-NONGOALS"],
       "gates": [{"id": "CS-FOUND-06-CPU", "type": "command", "argv": ["./build-cs-found-cpu/cellShardPayloadSourceTest"], "locks": ["build:cellshard"], "required": true}],
       "next_action": "Implement I2C and fake in-memory exact-range source; defer local files unless mechanically inseparable.",
@@ -245,7 +248,8 @@
       "priority": 70,
       "parallel_policy": "parallel_safe",
       "depends_on": [{"type": "barrier", "barrier_id": "CS-FOUND-DESCRIPTOR-FANIN"}],
-      "scope": {"exclusive_paths": ["include/CellShard/artifact/catalog.hh", "include/CellShard/artifact/snapshot.hh", "tests/foundation_snapshot_test.cc"], "read_paths": ["include/CellShard/identity", "include/CellShard/domain", "include/CellShard/artifact/image.hh", "include/CellShard/artifact/extent.hh", "include/CellShard/runtime/source/payload_source.hh"]},
+      "scope": {"exclusive_paths": ["CMakeLists.txt", "include/CellShard/artifact/catalog.hh", "include/CellShard/artifact/snapshot.hh", "tests/foundation_snapshot_test.cc"], "read_paths": ["include/CellShard/identity", "include/CellShard/domain", "include/CellShard/artifact/image.hh", "include/CellShard/artifact/extent.hh", "include/CellShard/runtime/source/payload_source.hh"]},
+      "claim_locks": ["file:CMakeLists.txt"],
       "invariants": ["CS-FOUND-SCOPE", "CS-FOUND-OPAQUE", "CS-FOUND-IDENTITY", "CS-FOUND-NONGOALS"],
       "checkpoints": [
         {"id": "CS-FOUND-C1", "title": "Descriptor ABI checkpoint", "publishes_interfaces": [{"id": "CS-FOUND-I1", "version": "1"}, {"id": "CS-FOUND-I2A", "version": "1"}, {"id": "CS-FOUND-I2B", "version": "1"}, {"id": "CS-FOUND-I2C", "version": "1"}]},
@@ -276,7 +280,8 @@
       "parallel_policy": "parallel_safe",
       "depends_on": [{"type": "checkpoint", "checkpoint_id": "CS-FOUND-C1", "state": "reached"}, {"type": "checkpoint", "checkpoint_id": "CS-FOUND-G2", "state": "reached"}],
       "consumes_interfaces": [{"id": "CS-FOUND-I1", "required_state": "frozen", "required_version": "1"}, {"id": "CS-FOUND-I2A", "required_state": "frozen", "required_version": "1"}, {"id": "CS-FOUND-I2B", "required_state": "frozen", "required_version": "1"}, {"id": "CS-FOUND-I2C", "required_state": "frozen", "required_version": "1"}],
-      "scope": {"exclusive_paths": ["include/CellShard/io/pack/image_envelope.hh", "src/io/pack/image_envelope.cc", "tests/image_envelope_test.cc"], "read_paths": ["include/CellShard/identity", "include/CellShard/domain", "include/CellShard/artifact"], "forbidden_paths": ["include/CellShard/io/pack/execution_payload.cuh", "src/io/pack/execution_payload.cu"]},
+      "scope": {"exclusive_paths": ["CMakeLists.txt", "include/CellShard/io/pack/image_envelope.hh", "src/io/pack/image_envelope.cc", "tests/image_envelope_test.cc"], "read_paths": ["include/CellShard/identity", "include/CellShard/domain", "include/CellShard/artifact"], "forbidden_paths": ["include/CellShard/io/pack/execution_payload.cuh", "src/io/pack/execution_payload.cu"]},
+      "claim_locks": ["file:CMakeLists.txt"],
       "invariants": ["CS-FOUND-SCOPE", "CS-FOUND-OPAQUE", "CS-FOUND-COMPAT", "CS-FOUND-IDENTITY", "CS-FOUND-NONGOALS"],
       "gates": [{"id": "CS-FOUND-08-CPU", "type": "command", "argv": ["./build-cs-found-cpu/cellShardImageEnvelopeTest"], "locks": ["build:cellshard"], "required": true}],
       "next_action": "Implement fixed-field/table codec, deterministic padding/checksum, size calculation, and malformed-buffer tests only.",
@@ -310,7 +315,8 @@
       "parallel_policy": "parallel_safe",
       "depends_on": [{"type": "task", "task_id": "CS-FOUND-07"}, {"type": "task", "task_id": "CS-FOUND-08"}, {"type": "task", "task_id": "CS-FOUND-09"}],
       "consumes_interfaces": [{"id": "CS-FOUND-I4", "required_state": "draft", "required_version": "1"}],
-      "scope": {"exclusive_paths": ["include/CellShard/runtime/source/local_file_source.hh", "include/CellShard/runtime/residency.hh", "include/CellShard/runtime/residency/host.hh", "src/runtime/source/local_file_source.cc", "src/runtime/residency/host.cc", "tests/host_residency_test.cc"], "read_paths": ["include/CellShard/artifact", "include/CellShard/runtime/source/payload_source.hh", "include/CellShard/io/pack/image_envelope.hh"], "forbidden_paths": ["include/CellShard/io/pack/execution_payload.cuh", "src/io/pack/execution_payload.cu"]},
+      "scope": {"exclusive_paths": ["CMakeLists.txt", "include/CellShard/runtime/source/local_file_source.hh", "include/CellShard/runtime/residency.hh", "include/CellShard/runtime/residency/host.hh", "src/runtime/source/local_file_source.cc", "src/runtime/residency/host.cc", "tests/host_residency_test.cc"], "read_paths": ["include/CellShard/artifact", "include/CellShard/runtime/source/payload_source.hh", "include/CellShard/io/pack/image_envelope.hh"], "forbidden_paths": ["include/CellShard/io/pack/execution_payload.cuh", "src/io/pack/execution_payload.cu"]},
+      "claim_locks": ["file:CMakeLists.txt"],
       "invariants": ["CS-FOUND-SCOPE", "CS-FOUND-OPAQUE", "CS-FOUND-RUNTIME", "CS-FOUND-NONGOALS"],
       "checkpoints": [{"id": "CS-FOUND-G3", "title": "G3 Snapshot and image envelope valid", "publishes_interfaces": [{"id": "CS-FOUND-I3A", "version": "1"}, {"id": "CS-FOUND-I3B", "version": "1"}, {"id": "CS-FOUND-I4", "version": "1"}]}],
       "gates": [
@@ -333,7 +339,8 @@
       "parallel_policy": "serial",
       "depends_on": [{"type": "task", "task_id": "CS-FOUND-10"}, {"type": "checkpoint", "checkpoint_id": "CS-FOUND-G3", "state": "reached"}],
       "consumes_interfaces": [{"id": "CS-FOUND-I5A", "required_state": "draft", "required_version": "1"}],
-      "scope": {"exclusive_paths": ["include/CellShard/runtime/residency/device.cuh", "src/runtime/residency/device.cu", "tests/device_residency_test.cu"], "read_paths": ["include/CellShard/runtime/residency/host.hh", "include/CellShard/artifact/image.hh"]},
+      "scope": {"exclusive_paths": ["CMakeLists.txt", "include/CellShard/runtime/residency/device.cuh", "src/runtime/residency/device.cu", "tests/device_residency_test.cu"], "read_paths": ["include/CellShard/runtime/residency/host.hh", "include/CellShard/artifact/image.hh"]},
+      "claim_locks": ["file:CMakeLists.txt"],
       "invariants": ["CS-FOUND-SCOPE", "CS-FOUND-OPAQUE", "CS-FOUND-RUNTIME", "CS-FOUND-NONGOALS"],
       "resource_requests": [{"id": "CS-FOUND-11-GPU-GATE", "phase": "gate", "selector": "gpu:any", "amount": 1, "mode": "exclusive", "required": true}],
       "gates": [
@@ -354,8 +361,8 @@
       "parallel_policy": "parallel_safe",
       "depends_on": [{"type": "task", "task_id": "CS-FOUND-04"}, {"type": "task", "task_id": "CS-FOUND-05"}, {"type": "task", "task_id": "CS-FOUND-06"}, {"type": "task", "task_id": "CS-FOUND-09"}, {"type": "checkpoint", "checkpoint_id": "CS-FOUND-G3", "state": "reached"}],
       "consumes_interfaces": [{"id": "CS-FOUND-I2A", "required_state": "frozen", "required_version": "1"}, {"id": "CS-FOUND-I2B", "required_state": "frozen", "required_version": "1"}, {"id": "CS-FOUND-I2C", "required_state": "frozen", "required_version": "1"}, {"id": "CS-FOUND-I4", "required_state": "frozen", "required_version": "1"}],
-      "scope": {"exclusive_paths": ["include/CellShard/io/pack/execution_payload.cuh", "src/io/pack/execution_payload.cu", "include/CellShard/runtime/layout/sharded.cuh", "tests/execution_payload_test.cu", "tests/foundation_legacy_adapter_test.cc"], "read_paths": ["include/CellShard/domain", "include/CellShard/artifact", "include/CellShard/runtime/host/sharded_host.cuh"], "forbidden_paths": ["include/CellShard/runtime/source/local_file_source.hh", "include/CellShard/runtime/residency/host.hh", "src/runtime/source/local_file_source.cc", "src/runtime/residency/host.cc"]},
-      "claim_locks": ["file:include/CellShard/io/pack/execution_payload.cuh", "file:src/io/pack/execution_payload.cu", "file:tests/execution_payload_test.cu"],
+      "scope": {"exclusive_paths": ["CMakeLists.txt", "include/CellShard/io/pack/execution_payload.cuh", "src/io/pack/execution_payload.cu", "include/CellShard/runtime/layout/sharded.cuh", "tests/execution_payload_test.cu", "tests/foundation_legacy_adapter_test.cc"], "read_paths": ["include/CellShard/domain", "include/CellShard/artifact", "include/CellShard/runtime/host/sharded_host.cuh"], "forbidden_paths": ["include/CellShard/runtime/source/local_file_source.hh", "include/CellShard/runtime/residency/host.hh", "src/runtime/source/local_file_source.cc", "src/runtime/residency/host.cc"]},
+      "claim_locks": ["file:CMakeLists.txt", "file:include/CellShard/io/pack/execution_payload.cuh", "file:src/io/pack/execution_payload.cu", "file:tests/execution_payload_test.cu"],
       "invariants": ["CS-FOUND-SCOPE", "CS-FOUND-COMPAT", "CS-FOUND-IDENTITY", "CS-FOUND-NONGOALS"],
       "gates": [{"id": "CS-FOUND-12-LEGACY", "type": "command", "argv": ["./build-cs-found-baseline/cellShardFoundationLegacyAdapterTest"], "locks": ["build:cellshard"], "required": true}, {"id": "CS-FOUND-12-CPEXEC01", "type": "command", "argv": ["./build-cs-found-baseline/cellShardExecutionPayloadTest"], "locks": ["build:cellshard"], "resources": ["gpu:any"], "required": true}],
       "next_action": "Add explicit legacy context and row-partition adapter, mark CS-FOUND-LEGACY transition points, and preserve every listed public API.",
@@ -371,7 +378,8 @@
       "priority": 30,
       "parallel_policy": "integration_exclusive",
       "depends_on": [{"type": "task", "task_id": "CS-FOUND-07"}, {"type": "task", "task_id": "CS-FOUND-09"}, {"type": "task", "task_id": "CS-FOUND-10"}, {"type": "task", "task_id": "CS-FOUND-11"}, {"type": "task", "task_id": "CS-FOUND-12"}, {"type": "barrier", "barrier_id": "CS-FOUND-IMAGE-RESIDENCY-FANIN"}],
-      "scope": {"exclusive_paths": ["tests/opaque_image_pipeline_test.cc", "tests/opaque_image_pipeline_cuda_test.cu"], "read_paths": ["include/CellShard/identity", "include/CellShard/domain", "include/CellShard/artifact", "include/CellShard/io/pack/image_envelope.hh", "include/CellShard/runtime/source", "include/CellShard/runtime/residency"]},
+      "scope": {"exclusive_paths": ["CMakeLists.txt", "tests/opaque_image_pipeline_test.cc", "tests/opaque_image_pipeline_cuda_test.cu"], "read_paths": ["include/CellShard/identity", "include/CellShard/domain", "include/CellShard/artifact", "include/CellShard/io/pack/image_envelope.hh", "include/CellShard/runtime/source", "include/CellShard/runtime/residency"]},
+      "claim_locks": ["file:CMakeLists.txt"],
       "invariants": ["CS-FOUND-SCOPE", "CS-FOUND-OPAQUE", "CS-FOUND-RUNTIME", "CS-FOUND-NONGOALS"],
       "checkpoints": [
         {"id": "CS-FOUND-C2", "title": "Image and residency integration checkpoint", "publishes_interfaces": [{"id": "CS-FOUND-I5A", "version": "1"}, {"id": "CS-FOUND-I5B", "version": "1"}]},
@@ -411,7 +419,7 @@
         {"id": "G6-DOC-HONESTY", "type": "pattern", "path": "docs/CS_FOUND_CONTRACT.md", "pattern": "Networking.*out of scope|networking.*out of scope", "checkpoint_id": "CS-FOUND-G6", "required": true}
       ],
       "next_action": "Update only implemented package/docs surfaces, add CS_FOUND_CONTRACT, run installed-package smoke, and reach G6 without rewriting the architecture review.",
-      "notes": "Rationale: public surfaces must distinguish foundations from legacy machinery and future systems. Exact scope: listed docs, umbrellas, package exports, installed-header smoke, roles of csh5/cspack/cspool/cshard, CPEXEC01/02, source and allocator ownership, future program names only. Non-goals: claims of multi-node/topology/biology planning/streaming or architecture-review rewrite. Dependencies: tasks07/09/12/13/G5. Interfaces consumed: frozen CS-FOUND public contracts. Interfaces produced: public/package documentation. Likely files: listed docs/CMake/umbrellas/package test. Locks: requested central surfaces. Acceptance: CPU consumers compile without CUDA; optional CUDA headers remain optional; docs match code. Validation: G6 gates. Failure: forbidden dependency or overstated capability. Compatibility: existing API remains documented/supported. Migration follow-up: name CS-PLACE only. Evidence: package build and include scan. Rollback: doc/export commit revert leaves implementation intact.",
+      "notes": "Rationale: public surfaces must distinguish foundations from legacy machinery and future systems. Exact scope: listed docs, umbrellas, package exports, installed-header smoke, roles of csh5/cspack/cspool/cshard, CPEXEC01/02, source and allocator ownership, and the broader direction of later physical-runtime investigation without creating or naming a successor program. Non-goals: claims of multi-node/topology/biology planning/streaming or architecture-review rewrite. Dependencies: tasks07/09/12/13/G5. Interfaces consumed: frozen CS-FOUND public contracts. Interfaces produced: public/package documentation. Likely files: listed docs/CMake/umbrellas/package test. Locks: requested central surfaces. Acceptance: CPU consumers compile without CUDA; optional CUDA headers remain optional; docs match code. Validation: G6 gates. Failure: forbidden dependency or overstated capability. Compatibility: existing API remains documented/supported. Migration follow-up: describe streaming, working-set, representation, residency, topology, and placement questions without creating their program. Evidence: package build and include scan. Rollback: doc/export commit revert leaves implementation intact.",
       "result_policy": {"allowed_dispositions": ["implemented", "validated"]}
     },
     {
@@ -419,7 +427,7 @@
       "parent_id": "CS-FOUND-00",
       "kind": "validation_task",
       "title": "Program validation, audit, and handoff",
-      "objective": "Validate the full feasible CS-FOUND program, reconcile ledger and repository, generate final projections, and recommend but do not create CS-PLACE.",
+      "objective": "Validate the full feasible CS-FOUND program, reconcile ledger and repository, generate final projections, and recommend but do not create the broader next physical-runtime investigation.",
       "priority": 10,
       "parallel_policy": "project_exclusive",
       "depends_on": [{"type": "task", "task_id": "CS-FOUND-01"}, {"type": "task", "task_id": "CS-FOUND-02"}, {"type": "task", "task_id": "CS-FOUND-03"}, {"type": "task", "task_id": "CS-FOUND-04"}, {"type": "task", "task_id": "CS-FOUND-05"}, {"type": "task", "task_id": "CS-FOUND-06"}, {"type": "task", "task_id": "CS-FOUND-07"}, {"type": "task", "task_id": "CS-FOUND-08"}, {"type": "task", "task_id": "CS-FOUND-09"}, {"type": "task", "task_id": "CS-FOUND-10"}, {"type": "task", "task_id": "CS-FOUND-11"}, {"type": "task", "task_id": "CS-FOUND-12"}, {"type": "task", "task_id": "CS-FOUND-13"}, {"type": "task", "task_id": "CS-FOUND-14"}, {"type": "checkpoint", "checkpoint_id": "CS-FOUND-G6", "state": "reached"}],
@@ -434,8 +442,8 @@
         {"id": "G7-NO-SYNC", "type": "pattern", "path": "src/runtime/residency/device.cu", "pattern": "^(?!.*cuda(Device|Stream)Synchronize).*$", "checkpoint_id": "CS-FOUND-G7", "required": true},
         {"id": "G7-NO-EPOCH-IMAGE", "type": "pattern", "path": "include/CellShard/artifact/image.hh", "pattern": "^(?!.*(service_epoch|placement_epoch)).*$", "checkpoint_id": "CS-FOUND-G7", "required": true}
       ],
-      "next_action": "Run focused/full feasible CPU and CUDA tests, installed package smoke, static architecture scans, todo audit/reconcile/export, reach G7, and hand off with CS-PLACE recommendation only.",
-      "notes": "Rationale: later programs need a stable verified substrate. Exact scope: all focused and feasible full tests, CPU/CUDA/package builds, diff/include/sync/epoch/native-codec/copy scans, audit, projections, compatibility classification. Non-goals: fix unrelated pre-existing failures, create/implement CS-PLACE, benchmark, external repo changes. Dependencies: all implementation tasks and G6. Interfaces consumed: all frozen CS-FOUND contracts. Interfaces produced: final validation/handoff evidence. Likely files: no implementation; only generated projections/evidence. Locks: project build/package/docs serialization; gpu only on CUDA runtime gates added as appropriate. Acceptance: ledger/repo agree and all invariants hold or structured blockers exist. Validation: G7 gates plus todo audit. Failure: regression, hidden external modification, forbidden scope. Compatibility: CPEXEC01 and supported APIs pass. Migration follow-up: recommend CS-PLACE without creation. Evidence: exact toolchain/GPU/commands/failures/commits/audit revision. Rollback: no destructive cleanup; incomplete gates block completion.",
+      "next_action": "Run focused/full feasible CPU and CUDA tests, installed package smoke, static architecture scans, todo audit/reconcile/export, reach G7, and hand off with a broader physical-runtime investigation recommendation only.",
+      "notes": "Rationale: later programs need a stable verified substrate. Exact scope: all focused and feasible full tests, CPU/CUDA/package builds, diff/include/sync/epoch/native-codec/copy scans, audit, projections, compatibility classification. Non-goals: fix unrelated pre-existing failures, create or implement a successor runtime program, benchmark, or modify external repositories. Dependencies: all implementation tasks and G6. Interfaces consumed: all frozen CS-FOUND contracts. Interfaces produced: final validation/handoff evidence. Likely files: no implementation; only generated projections/evidence. Locks: project build/package/docs serialization; gpu only on CUDA runtime gates added as appropriate. Acceptance: ledger/repo agree and all invariants hold or structured blockers exist. Validation: G7 gates plus todo audit. Failure: regression, hidden external modification, forbidden scope. Compatibility: CPEXEC01 and supported APIs pass. Migration follow-up: recommend investigation of blocked disk streaming, working-set construction, representation and residency, topology, placement, future biological locality, multi-device, and eventual multi-node realization without creating the program or fixing its name. Evidence: exact toolchain/GPU/commands/failures/commits/audit revision. Rollback: no destructive cleanup; incomplete gates block completion.",
       "result_policy": {"allowed_dispositions": ["validated"]}
     }
   ]

@@ -3,7 +3,7 @@
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-FOUND-14: Public API, package, and documentation migration
 
-Task revision: `89`; current project revision is in `todo-status.md`.
+Task revision: `92`; current project revision is in `todo-status.md`.
 
 ## Objective
 Expose and document implemented CS-FOUND contracts honestly while preserving optional CUDA and format-role boundaries.

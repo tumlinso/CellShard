@@ -3,7 +3,7 @@
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-FOUND-10: Local-file source and host residency
 
-Task revision: `89`; current project revision is in `todo-status.md`.
+Task revision: `92`; current project revision is in `todo-status.md`.
 
 ## Objective
 Reach G3, then resolve one image extent through LocalFileSource into one move-only host residency allocation as CS-FOUND-I5A.
@@ -18,6 +18,7 @@ Reach G3, then resolve one image extent through LocalFileSource into one move-on
 Review and freeze I3A/I3B/I4 at G3, then implement pread-backed local exact reads and one-allocation host residency.
 
 ## Ownership
+- `exclusive`: `CMakeLists.txt`
 - `exclusive`: `include/CellShard/runtime/residency.hh`
 - `exclusive`: `include/CellShard/runtime/residency/host.hh`
 - `exclusive`: `include/CellShard/runtime/source/local_file_source.hh`

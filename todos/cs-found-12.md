@@ -3,7 +3,7 @@
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-FOUND-12: Legacy identity and sharded-runtime adapters
 
-Task revision: `89`; current project revision is in `todo-status.md`.
+Task revision: `92`; current project revision is in `todo-status.md`.
 
 ## Objective
 Provide explicit-context legacy CPEXEC01 and sharded adapters without defining new semantics through row shards.
@@ -18,6 +18,7 @@ Provide explicit-context legacy CPEXEC01 and sharded adapters without defining n
 Add explicit legacy context and row-partition adapter, mark CS-FOUND-LEGACY transition points, and preserve every listed public API.
 
 ## Ownership
+- `exclusive`: `CMakeLists.txt`
 - `exclusive`: `include/CellShard/io/pack/execution_payload.cuh`
 - `exclusive`: `include/CellShard/runtime/layout/sharded.cuh`
 - `exclusive`: `src/io/pack/execution_payload.cu`

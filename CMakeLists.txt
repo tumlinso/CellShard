@@ -726,6 +726,30 @@ if(CELLSHARD_BUILD_TESTS AND CELLSHARD_BUILD_EXPORT)
         CXX_STANDARD_REQUIRED YES
     )
 
+    # CS-FOUND descriptor contracts are header-only; keep their focused tests
+    # available in both CPU-only and CUDA-enabled configurations.
+    add_executable(cellShardFoundationIdentityTest
+        tests/foundation_identity_test.cc
+    )
+    target_link_libraries(cellShardFoundationIdentityTest PRIVATE
+        CellShard::headers
+    )
+    set_target_properties(cellShardFoundationIdentityTest PROPERTIES
+        CXX_STANDARD 17
+        CXX_STANDARD_REQUIRED YES
+    )
+
+    add_executable(cellShardFoundationDomainTest
+        tests/foundation_domain_test.cc
+    )
+    target_link_libraries(cellShardFoundationDomainTest PRIVATE
+        CellShard::headers
+    )
+    set_target_properties(cellShardFoundationDomainTest PROPERTIES
+        CXX_STANDARD 17
+        CXX_STANDARD_REQUIRED YES
+    )
+
     # CS-FOUND-02: protect CSPACK01 and native CPEXEC01 behavior even when the
     # CUDA staging path is not part of the build.
     add_executable(cellShardExecutionPayloadCpuTest

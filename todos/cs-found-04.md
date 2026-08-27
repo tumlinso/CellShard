@@ -3,14 +3,14 @@
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-FOUND-04: Domain and partition descriptors
 
-Task revision: `92`; current project revision is in `todo-status.md`.
+Task revision: `93`; current project revision is in `todo-status.md`.
 
 ## Objective
 Implement domain, partition-map, partition-selection, partition-descriptor, and explicit-order domain-binding contracts as CS-FOUND-I2A.
 
 ## State
-- Lifecycle: `planned`
-- Execution: `ready`
+- Lifecycle: `in_progress`
+- Execution: `claimed`
 - Parallel policy: `parallel_safe`
 - Result: `-`
 

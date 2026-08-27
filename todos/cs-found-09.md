@@ -3,7 +3,7 @@
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-FOUND-09: CSPACK01 image publication and inspection
 
-Task revision: `92`; current project revision is in `todo-status.md`.
+Task revision: `162`; current project revision is in `todo-status.md`.
 
 ## Objective
 Integrate independently inspectable CPEXEC02 entries into unchanged CSPACK01 with atomic publication and expose CS-FOUND-I4.

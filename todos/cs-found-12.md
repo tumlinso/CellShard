@@ -3,7 +3,7 @@
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-FOUND-12: Legacy identity and sharded-runtime adapters
 
-Task revision: `92`; current project revision is in `todo-status.md`.
+Task revision: `162`; current project revision is in `todo-status.md`.
 
 ## Objective
 Provide explicit-context legacy CPEXEC01 and sharded adapters without defining new semantics through row shards.

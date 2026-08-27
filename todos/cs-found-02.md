@@ -3,7 +3,7 @@
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-FOUND-02: Legacy contract and validation baseline
 
-Task revision: `92`; current project revision is in `todo-status.md`.
+Task revision: `162`; current project revision is in `todo-status.md`.
 
 ## Objective
 Protect current CSPACK01 and native CPEXEC01 behavior with focused positive, malformed-input, ownership, publication, and CUDA upload tests.

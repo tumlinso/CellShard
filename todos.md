@@ -53,7 +53,7 @@ _None recorded yet._
 <!-- todo-orchestrator:v2-managed:start -->
 # Todo Orchestrator v2 Projection
 
-Project revision: `161`
+Project revision: `162`
 
 ## Workstreams
 - `CS-FOUND-00` | kind: epic | status: in_progress | parent: - | objective: Establish stable CellShard identity, domain, partition, image, extent, source, snapshot, host-residency, and device-residency contracts before placement, streaming, routing, or multi-node work.

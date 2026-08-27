@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-27T08:35:49Z",
+  "generated_at": "2026-08-27T08:37:53Z",
   "project": {
     "configuration": {
       "busy_timeout_ms": 5000,
@@ -18,7 +18,7 @@
     "project_uuid": "a52537a5-20db-4aeb-a126-dd0128c71fda",
     "schema_version": 2
   },
-  "project_revision": 114,
+  "project_revision": 122,
   "schema_version": 2,
   "tables": {
     "barrier_requirements": [
@@ -1569,6 +1569,86 @@
         "revision": 114,
         "seq": 114,
         "timestamp": "2026-08-27T08:35:49Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-06",
+        "entity_type": "claim",
+        "event_type": "continue.completed",
+        "payload_json": "{\"requested_task_id\": \"CS-FOUND-06\"}",
+        "revision": 115,
+        "seq": 115,
+        "timestamp": "2026-08-27T08:36:22Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "build:cellshard",
+        "entity_type": "lock",
+        "event_type": "lock.acquired",
+        "payload_json": "{\"names\": [\"build:cellshard\"]}",
+        "revision": 116,
+        "seq": 116,
+        "timestamp": "2026-08-27T08:37:38Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "build:cellshard",
+        "entity_type": "lock",
+        "event_type": "lock.released",
+        "payload_json": "{}",
+        "revision": 117,
+        "seq": 117,
+        "timestamp": "2026-08-27T08:37:39Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "build:cellshard",
+        "entity_type": "lock",
+        "event_type": "lock.acquired",
+        "payload_json": "{\"names\": [\"build:cellshard\"]}",
+        "revision": 118,
+        "seq": 118,
+        "timestamp": "2026-08-27T08:37:39Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "build:cellshard",
+        "entity_type": "lock",
+        "event_type": "lock.released",
+        "payload_json": "{}",
+        "revision": 119,
+        "seq": 119,
+        "timestamp": "2026-08-27T08:37:39Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-06-CPU",
+        "entity_type": "gate",
+        "event_type": "gate.started",
+        "payload_json": "{\"gate_id\": \"CS-FOUND-06-CPU\"}",
+        "revision": 120,
+        "seq": 120,
+        "timestamp": "2026-08-27T08:37:47Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-06-CPU",
+        "entity_type": "gate",
+        "event_type": "gate.completed",
+        "payload_json": "{\"evidence_id\": \"1bd99972-816f-463c-a2c5-c377f5b94fbb\", \"status\": \"passed\", \"valid\": true}",
+        "revision": 121,
+        "seq": 121,
+        "timestamp": "2026-08-27T08:37:47Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-I2C",
+        "entity_type": "interface",
+        "event_type": "interface.revise",
+        "payload_json": "{\"version\": \"1\"}",
+        "revision": 122,
+        "seq": 122,
+        "timestamp": "2026-08-27T08:37:53Z"
       }
     ],
     "evidence": [
@@ -1635,6 +1715,19 @@
         "metadata_json": "{\"argv\": [\"cmake\", \"-S\", \".\", \"-B\", \"build-cs-found-cpu\", \"-DCELLSHARD_ENABLE_CUDA=OFF\", \"-DCELLSHARD_BUILD_TESTS=ON\", \"-DCELLSHARD_BUILD_EXPORT=ON\"], \"environment\": {}, \"expected_exit_code\": 0, \"inputs\": {\"command_contract\": {\"argv\": [\"cmake\", \"-S\", \".\", \"-B\", \"build-cs-found-cpu\", \"-DCELLSHARD_ENABLE_CUDA=OFF\", \"-DCELLSHARD_BUILD_TESTS=ON\", \"-DCELLSHARD_BUILD_EXPORT=ON\"], \"locks\": [\"build:cellshard\"], \"timeout\": 1200}, \"diff_fingerprint\": \"abee6df3f0a0fcd6fa4355a8852905dbf7118977440bfc71981da7b9535ffe31\", \"dirty_paths\": [\".todo-orchestrator/cs-found-plan.json\", \".todo-orchestrator/project.json\", \".todo-orchestrator/state.snapshot.json\", \"CMakeLists.txt\", \"docs/CS_FOUND_TRANSITION_MAP.md\", \"tests/execution_payload_cpu_test.cc\", \"tests/execution_payload_test.cu\", \"todo-status.md\", \"todos.md\", \"todos/cellshard-cpp-access-adapter-refactor.md\", \"todos/cs-found-00.md\", \"todos/cs-found-01.md\", \"todos/cs-found-02.md\", \"todos/cs-found-03.md\", \"todos/cs-found-04.md\", \"todos/cs-found-05.md\", \"todos/cs-found-06.md\", \"todos/cs-found-07.md\", \"todos/cs-found-08.md\", \"todos/cs-found-09.md\", \"todos/cs-found-10.md\", \"todos/cs-found-11.md\", \"todos/cs-found-12.md\", \"todos/cs-found-13.md\", \"todos/cs-found-14.md\", \"todos/cs-found-15.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"bbe5917bab88ffca2d16bc86166a8de368a4abbe\"}, \"locks\": [{\"expires_at\": \"2026-08-21T13:06:02Z\", \"lease_id\": \"ae49ad00-7e81-4d8a-9768-009a633ca4ce\", \"name\": \"build:cellshard\"}], \"resources\": [], \"returncode\": 0, \"started_revision\": 35}",
         "path": "/home/tumlinson/CellStack/.git/modules/CellShard/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/1b9b1e9b-301d-4cfe-bef7-f9427fc19b3f",
         "revision": 36,
+        "status": "passed"
+      },
+      {
+        "checkpoint_id": null,
+        "claim_id": null,
+        "content_hash": null,
+        "created_at": "2026-08-27T08:37:47Z",
+        "gate_id": "CS-FOUND-06-CPU",
+        "id": "1bd99972-816f-463c-a2c5-c377f5b94fbb",
+        "kind": "command",
+        "metadata_json": "{\"argv\": [\"./build-cs-found-cpu/cellShardPayloadSourceTest\"], \"environment\": {}, \"expected_exit_code\": 0, \"input_fingerprint\": \"58b89786b9b759e10c9ee68213ba91d7f52789d9507e18716c72b4c94e349e86\", \"inputs\": {\"command_contract\": {\"argv\": [\"./build-cs-found-cpu/cellShardPayloadSourceTest\"], \"locks\": [\"build:cellshard\"]}, \"diff_fingerprint\": \"9b5742a2ce0d57f360ef8f9479d903e8b0a196f7634dbdfa12a22489ce7882e8\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"CMakeLists.txt\", \"include/CellShard/artifact/extent.hh\", \"include/CellShard/runtime/source.hh\", \"include/CellShard/runtime/source/payload_source.hh\", \"tests/payload_source_test.cc\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-06.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"d863df9d78182b94053d75c35a6b213fffb6c13d\"}, \"locks\": [{\"expires_at\": \"2026-08-27T08:42:47Z\", \"lease_id\": \"2b34db5e-f213-4947-a001-ee89835ed1ea\", \"name\": \"build:cellshard\"}], \"resources\": [], \"returncode\": 0, \"started_revision\": 120}",
+        "path": "/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/1bd99972-816f-463c-a2c5-c377f5b94fbb",
+        "revision": 121,
         "status": "passed"
       },
       {
@@ -2280,14 +2373,14 @@
         "checkpoint_id": null,
         "config_json": "{\"argv\": [\"./build-cs-found-cpu/cellShardPayloadSourceTest\"], \"locks\": [\"build:cellshard\"]}",
         "id": "CS-FOUND-06-CPU",
-        "input_fingerprint": null,
-        "last_run_at": null,
+        "input_fingerprint": "58b89786b9b759e10c9ee68213ba91d7f52789d9507e18716c72b4c94e349e86",
+        "last_run_at": "2026-08-27T08:37:47Z",
         "required": 1,
-        "revision": 92,
-        "status": "pending",
+        "revision": 121,
+        "status": "passed",
         "task_id": "CS-FOUND-06",
         "type": "command",
-        "valid": 0
+        "valid": 1
       },
       {
         "checkpoint_id": null,
@@ -2898,14 +2991,14 @@
         "version": "1"
       },
       {
-        "content_hash": null,
+        "content_hash": "840ba657df09cfac3a186d23f088da5bfa99a1df5bbcf66c11cf6dae8052330c",
         "contract_paths_json": "[\"include/CellShard/artifact/extent.hh\", \"include/CellShard/runtime/source/payload_source.hh\"]",
         "frozen_at": null,
         "id": "CS-FOUND-I2C",
         "owner_task_id": "CS-FOUND-06",
-        "revised_at": null,
-        "revision": 92,
-        "state": "draft",
+        "revised_at": "2026-08-27T08:37:53Z",
+        "revision": 122,
+        "state": "revised",
         "version": "1"
       },
       {
@@ -4873,12 +4966,12 @@
         "priority": 80,
         "result": null,
         "result_policy_json": "{\"allowed_dispositions\": [\"implemented\", \"validated\"]}",
-        "revision": 92,
-        "status": "planned",
+        "revision": 115,
+        "status": "in_progress",
         "tags_json": "[]",
         "title": "Extent, storage-object, and source contracts",
-        "updated_at": "2026-08-27T08:28:44Z",
-        "version": 11
+        "updated_at": "2026-08-27T08:36:22Z",
+        "version": 12
       },
       {
         "attention_reason": null,

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-27T08:37:53Z",
+  "generated_at": "2026-08-27T08:38:04Z",
   "project": {
     "configuration": {
       "busy_timeout_ms": 5000,
@@ -18,7 +18,7 @@
     "project_uuid": "a52537a5-20db-4aeb-a126-dd0128c71fda",
     "schema_version": 2
   },
-  "project_revision": 122,
+  "project_revision": 123,
   "schema_version": 2,
   "tables": {
     "barrier_requirements": [
@@ -81,13 +81,13 @@
     ],
     "barriers": [
       {
-        "explanation": "2/3 requirements satisfied; target=3",
+        "explanation": "3/3 requirements satisfied; target=3",
         "id": "CS-FOUND-DESCRIPTOR-FANIN",
         "mode": "all",
-        "opened_at": null,
+        "opened_at": "2026-08-27 08:38:04",
         "quorum": null,
-        "revision": 114,
-        "state": "closed",
+        "revision": 123,
+        "state": "open",
         "title": "Descriptor implementation fan-in"
       },
       {
@@ -1649,6 +1649,16 @@
         "revision": 122,
         "seq": 122,
         "timestamp": "2026-08-27T08:37:53Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-06",
+        "entity_type": "task",
+        "event_type": "task.completed",
+        "payload_json": "{\"completion_revision\": 123, \"disposition\": \"implemented\", \"reached_checkpoints\": []}",
+        "revision": 123,
+        "seq": 123,
+        "timestamp": "2026-08-27T08:38:04Z"
       }
     ],
     "evidence": [
@@ -2815,6 +2825,16 @@
     "handoffs": [
       {
         "claim_id": null,
+        "created_at": "2026-08-27T08:38:04Z",
+        "id": "0e9fa1ca-8ab8-4b13-bf02-3b3747e0b937",
+        "kind": "complete",
+        "note": "",
+        "payload_json": "{\"changed_owned_paths\": [], \"checkpoints\": [], \"completion_commit\": \"ad118173b67f5efd0eeeb78c88366b41064422c9\", \"completion_gates\": [{\"evidence_id\": \"1bd99972-816f-463c-a2c5-c377f5b94fbb\", \"evidence_revision\": 121, \"id\": \"CS-FOUND-06-CPU\", \"input_fingerprint\": \"58b89786b9b759e10c9ee68213ba91d7f52789d9507e18716c72b4c94e349e86\", \"status\": \"passed\", \"valid\": true, \"validation_git_head\": \"d863df9d78182b94053d75c35a6b213fffb6c13d\"}], \"completion_revision\": 123, \"finalized_checkpoints\": [], \"gates\": [{\"id\": \"CS-FOUND-06-CPU\", \"input_fingerprint\": \"58b89786b9b759e10c9ee68213ba91d7f52789d9507e18716c72b4c94e349e86\", \"last_run_at\": \"2026-08-27T08:37:47Z\", \"revision\": 121, \"status\": \"passed\", \"valid\": 1}], \"git_diffstat\": \"\", \"git_head\": \"ad118173b67f5efd0eeeb78c88366b41064422c9\", \"interfaces\": [{\"content_hash\": \"840ba657df09cfac3a186d23f088da5bfa99a1df5bbcf66c11cf6dae8052330c\", \"id\": \"CS-FOUND-I2C\", \"state\": \"revised\", \"version\": \"1\"}], \"note\": \"\", \"resources\": [], \"task_id\": \"CS-FOUND-06\"}",
+        "revision": 123,
+        "task_id": "CS-FOUND-06"
+      },
+      {
+        "claim_id": null,
         "created_at": "2026-08-21T13:16:25Z",
         "id": "2ab501a2-cd17-4876-9e43-9492c22c81de",
         "kind": "complete",
@@ -3899,6 +3919,19 @@
         "task_id": "CS-FOUND-05",
         "valid": 1,
         "validation_git_head": "1067ab2c3272b40a8f61bbad99c0c7379a779d0b"
+      },
+      {
+        "completion_git_head": "ad118173b67f5efd0eeeb78c88366b41064422c9",
+        "completion_revision": 123,
+        "evidence_id": "1bd99972-816f-463c-a2c5-c377f5b94fbb",
+        "evidence_revision": 121,
+        "gate_id": "CS-FOUND-06-CPU",
+        "input_fingerprint": "58b89786b9b759e10c9ee68213ba91d7f52789d9507e18716c72b4c94e349e86",
+        "provenance_json": "{\"claim_id\": \"1850a572-3bde-43ed-a2c2-5641cb4322a3\", \"evidence_content_hash\": null, \"evidence_kind\": \"command\", \"evidence_metadata\": {\"argv\": [\"./build-cs-found-cpu/cellShardPayloadSourceTest\"], \"environment\": {}, \"expected_exit_code\": 0, \"input_fingerprint\": \"58b89786b9b759e10c9ee68213ba91d7f52789d9507e18716c72b4c94e349e86\", \"inputs\": {\"command_contract\": {\"argv\": [\"./build-cs-found-cpu/cellShardPayloadSourceTest\"], \"locks\": [\"build:cellshard\"]}, \"diff_fingerprint\": \"9b5742a2ce0d57f360ef8f9479d903e8b0a196f7634dbdfa12a22489ce7882e8\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"CMakeLists.txt\", \"include/CellShard/artifact/extent.hh\", \"include/CellShard/runtime/source.hh\", \"include/CellShard/runtime/source/payload_source.hh\", \"tests/payload_source_test.cc\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-06.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"d863df9d78182b94053d75c35a6b213fffb6c13d\"}, \"locks\": [{\"expires_at\": \"2026-08-27T08:42:47Z\", \"lease_id\": \"2b34db5e-f213-4947-a001-ee89835ed1ea\", \"name\": \"build:cellshard\"}], \"resources\": [], \"returncode\": 0, \"started_revision\": 120}, \"evidence_path\": \"/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/1bd99972-816f-463c-a2c5-c377f5b94fbb\", \"source\": \"completion_transaction\"}",
+        "status": "passed",
+        "task_id": "CS-FOUND-06",
+        "valid": 1,
+        "validation_git_head": "d863df9d78182b94053d75c35a6b213fffb6c13d"
       }
     ],
     "task_dependencies": [
@@ -4950,9 +4983,9 @@
       },
       {
         "attention_reason": null,
-        "completion_commit": null,
-        "completion_git_head": null,
-        "completion_revision": null,
+        "completion_commit": "ad118173b67f5efd0eeeb78c88366b41064422c9",
+        "completion_git_head": "ad118173b67f5efd0eeeb78c88366b41064422c9",
+        "completion_revision": 123,
         "created_at": "2026-08-21T12:05:03Z",
         "id": "CS-FOUND-06",
         "kind": "task",
@@ -4964,14 +4997,14 @@
         "parallel_policy": "parallel_safe",
         "parent_id": "CS-FOUND-00",
         "priority": 80,
-        "result": null,
+        "result": "implemented",
         "result_policy_json": "{\"allowed_dispositions\": [\"implemented\", \"validated\"]}",
-        "revision": 115,
-        "status": "in_progress",
+        "revision": 123,
+        "status": "done",
         "tags_json": "[]",
         "title": "Extent, storage-object, and source contracts",
-        "updated_at": "2026-08-27T08:36:22Z",
-        "version": 12
+        "updated_at": "2026-08-27T08:38:04Z",
+        "version": 13
       },
       {
         "attention_reason": null,

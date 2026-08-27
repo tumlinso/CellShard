@@ -3,16 +3,16 @@
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-FOUND-06: Extent, storage-object, and source contracts
 
-Task revision: `115`; current project revision is in `todo-status.md`.
+Task revision: `123`; current project revision is in `todo-status.md`.
 
 ## Objective
 Separate immutable storage objects/extents from mutable source locations and define the non-owning storage-independent exact-read boundary as CS-FOUND-I2C.
 
 ## State
-- Lifecycle: `in_progress`
-- Execution: `claimed`
+- Lifecycle: `done`
+- Execution: `closed`
 - Parallel policy: `parallel_safe`
-- Result: `-`
+- Result: `implemented`
 
 ## Next Action
 Implement I2C and fake in-memory exact-range source; defer local files unless mechanically inseparable.

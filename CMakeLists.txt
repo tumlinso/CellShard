@@ -783,6 +783,18 @@ if(CELLSHARD_BUILD_TESTS AND CELLSHARD_BUILD_EXPORT)
         CXX_STANDARD_REQUIRED YES
     )
 
+    add_executable(cellShardImageEnvelopeTest
+        tests/image_envelope_test.cc
+        src/io/pack/image_envelope.cc
+    )
+    target_link_libraries(cellShardImageEnvelopeTest PRIVATE
+        CellShard::headers
+    )
+    set_target_properties(cellShardImageEnvelopeTest PROPERTIES
+        CXX_STANDARD 17
+        CXX_STANDARD_REQUIRED YES
+    )
+
     # CS-FOUND-02: protect CSPACK01 and native CPEXEC01 behavior even when the
     # CUDA staging path is not part of the build.
     add_executable(cellShardExecutionPayloadCpuTest

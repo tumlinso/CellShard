@@ -3,14 +3,14 @@
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-FOUND-08: Explicit CPEXEC02 codec
 
-Task revision: `92`; current project revision is in `todo-status.md`.
+Task revision: `151`; current project revision is in `todo-status.md`.
 
 ## Objective
 Implement deterministic explicit little-endian CPEXEC02 buffer encoding/decoding as CS-FOUND-I3B without CSPACK file integration.
 
 ## State
-- Lifecycle: `planned`
-- Execution: `ready`
+- Lifecycle: `in_progress`
+- Execution: `claimed`
 - Parallel policy: `parallel_safe`
 - Result: `-`
 

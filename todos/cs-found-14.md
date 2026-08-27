@@ -3,16 +3,16 @@
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-FOUND-14: Public API, package, and documentation migration
 
-Task revision: `264`; current project revision is in `todo-status.md`.
+Task revision: `283`; current project revision is in `todo-status.md`.
 
 ## Objective
 Expose and document implemented CS-FOUND contracts honestly while preserving optional CUDA and format-role boundaries.
 
 ## State
-- Lifecycle: `in_progress`
-- Execution: `claimed`
+- Lifecycle: `done`
+- Execution: `closed`
 - Parallel policy: `integration_exclusive`
-- Result: `-`
+- Result: `implemented`
 
 ## Next Action
 Update only implemented package/docs surfaces, add CS_FOUND_CONTRACT, run installed-package smoke, and reach G6 without rewriting the architecture review.

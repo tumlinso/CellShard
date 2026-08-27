@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-27T09:17:56Z",
+  "generated_at": "2026-08-27T09:19:34Z",
   "project": {
     "configuration": {
       "busy_timeout_ms": 5000,
@@ -18,7 +18,7 @@
     "project_uuid": "a52537a5-20db-4aeb-a126-dd0128c71fda",
     "schema_version": 2
   },
-  "project_revision": 282,
+  "project_revision": 283,
   "schema_version": 2,
   "tables": {
     "barrier_requirements": [
@@ -3249,6 +3249,16 @@
         "revision": 282,
         "seq": 282,
         "timestamp": "2026-08-27T09:17:56Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-14",
+        "entity_type": "task",
+        "event_type": "task.completed",
+        "payload_json": "{\"completion_revision\": 283, \"disposition\": \"implemented\", \"reached_checkpoints\": []}",
+        "revision": 283,
+        "seq": 283,
+        "timestamp": "2026-08-27T09:19:34Z"
       }
     ],
     "evidence": [
@@ -4841,6 +4851,16 @@
       },
       {
         "claim_id": null,
+        "created_at": "2026-08-27T09:19:34Z",
+        "id": "1a16cb3f-3ca7-4b0f-9ff9-ea24ba9b57f9",
+        "kind": "complete",
+        "note": "Published CS-FOUND public API, package surface, and honest performance-first biology-informed contract; G6 gates passed including installed inspect package consumer.",
+        "payload_json": "{\"changed_owned_paths\": [], \"checkpoints\": [{\"id\": \"CS-FOUND-G6\", \"reached_at\": \"2026-08-27T09:17:56Z\", \"state\": \"reached\"}], \"completion_commit\": \"bd22109f9bb8b3ed0f1b70c370a74c3b9493db71\", \"completion_gates\": [{\"evidence_id\": \"57a657da-7a6e-4f35-9210-5dd3391cd5fc\", \"evidence_revision\": 257, \"id\": \"G6-CONTRACT-DOC\", \"input_fingerprint\": \"249b5ea022e0659564098e7488737c746557f5fa432db946494da993e83c8a1b\", \"status\": \"passed\", \"valid\": true, \"validation_git_head\": \"ad315b85490e94354c7be5c422969b15d2a58526\"}, {\"evidence_id\": \"46db370d-df98-45bf-bb20-2a8905a63cae\", \"evidence_revision\": 259, \"id\": \"G6-DOC-HONESTY\", \"input_fingerprint\": \"c3d90c0b1e65515482fc6ed878e6040ed8dc934ee0da7c32a19ee984105052ba\", \"status\": \"passed\", \"valid\": true, \"validation_git_head\": \"ad315b85490e94354c7be5c422969b15d2a58526\"}, {\"evidence_id\": \"9104f949-2c8f-4505-9e7f-0f750cebb819\", \"evidence_revision\": 281, \"id\": \"G6-PACKAGE\", \"input_fingerprint\": \"fe66729d11151531ef9e46c79249f5840e405fc138d0e1330836a43d01932fa5\", \"status\": \"passed\", \"valid\": true, \"validation_git_head\": \"ad315b85490e94354c7be5c422969b15d2a58526\"}], \"completion_revision\": 283, \"finalized_checkpoints\": [], \"gates\": [{\"id\": \"G6-CONTRACT-DOC\", \"input_fingerprint\": \"249b5ea022e0659564098e7488737c746557f5fa432db946494da993e83c8a1b\", \"last_run_at\": \"2026-08-27T09:11:11Z\", \"revision\": 263, \"status\": \"passed\", \"valid\": 1}, {\"id\": \"G6-DOC-HONESTY\", \"input_fingerprint\": \"c3d90c0b1e65515482fc6ed878e6040ed8dc934ee0da7c32a19ee984105052ba\", \"last_run_at\": \"2026-08-27T09:11:11Z\", \"revision\": 263, \"status\": \"passed\", \"valid\": 1}, {\"id\": \"G6-PACKAGE\", \"input_fingerprint\": \"fe66729d11151531ef9e46c79249f5840e405fc138d0e1330836a43d01932fa5\", \"last_run_at\": \"2026-08-27T09:17:56Z\", \"revision\": 281, \"status\": \"passed\", \"valid\": 1}], \"git_diffstat\": \"\", \"git_head\": \"bd22109f9bb8b3ed0f1b70c370a74c3b9493db71\", \"interfaces\": [], \"note\": \"Published CS-FOUND public API, package surface, and honest performance-first biology-informed contract; G6 gates passed including installed inspect package consumer.\", \"resources\": [], \"task_id\": \"CS-FOUND-14\"}",
+        "revision": 283,
+        "task_id": "CS-FOUND-14"
+      },
+      {
+        "claim_id": null,
         "created_at": "2026-08-21T13:16:25Z",
         "id": "2ab501a2-cd17-4876-9e43-9492c22c81de",
         "kind": "complete",
@@ -6351,6 +6371,45 @@
         "task_id": "CS-FOUND-13",
         "valid": 1,
         "validation_git_head": "c7ee8eefb7a74cc00279bb029bfa4a1672ffd77a"
+      },
+      {
+        "completion_git_head": "bd22109f9bb8b3ed0f1b70c370a74c3b9493db71",
+        "completion_revision": 283,
+        "evidence_id": "57a657da-7a6e-4f35-9210-5dd3391cd5fc",
+        "evidence_revision": 257,
+        "gate_id": "G6-CONTRACT-DOC",
+        "input_fingerprint": "249b5ea022e0659564098e7488737c746557f5fa432db946494da993e83c8a1b",
+        "provenance_json": "{\"claim_id\": \"05a1ecc6-6ec7-4476-bd78-a64577b205f8\", \"evidence_content_hash\": null, \"evidence_kind\": \"file_exists\", \"evidence_metadata\": {\"exists\": true, \"input_fingerprint\": \"249b5ea022e0659564098e7488737c746557f5fa432db946494da993e83c8a1b\", \"inputs\": {\"command_contract\": {\"path\": \"docs/CS_FOUND_CONTRACT.md\"}, \"diff_fingerprint\": \"f289fd151701da19565eb95adbfabead1d7e94bd1ffee37862c61a9275337c59\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"AGENTS.md\", \"CMakeLists.txt\", \"README.md\", \"SUPPORT.md\", \"docs/CS_FOUND_CONTRACT.md\", \"docs/FORMAT_ROLES.md\", \"docs/PARKING_LOT.md\", \"docs/SPEC_CSPACK_V1.md\", \"include/CellShard/CellShard.hh\", \"include/CellShard/artifact.hh\", \"include/CellShard/io/pack.hh\", \"include/CellShard/runtime/residency.hh\", \"include/CellShard/runtime/source.hh\", \"tests/package_consumer/inspect_consumer.cc\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-14.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"ad315b85490e94354c7be5c422969b15d2a58526\"}, \"locks\": [], \"path\": \"docs/CS_FOUND_CONTRACT.md\", \"resources\": [], \"started_revision\": 256}, \"evidence_path\": \"/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/57a657da-7a6e-4f35-9210-5dd3391cd5fc\", \"source\": \"completion_transaction\"}",
+        "status": "passed",
+        "task_id": "CS-FOUND-14",
+        "valid": 1,
+        "validation_git_head": "ad315b85490e94354c7be5c422969b15d2a58526"
+      },
+      {
+        "completion_git_head": "bd22109f9bb8b3ed0f1b70c370a74c3b9493db71",
+        "completion_revision": 283,
+        "evidence_id": "46db370d-df98-45bf-bb20-2a8905a63cae",
+        "evidence_revision": 259,
+        "gate_id": "G6-DOC-HONESTY",
+        "input_fingerprint": "c3d90c0b1e65515482fc6ed878e6040ed8dc934ee0da7c32a19ee984105052ba",
+        "provenance_json": "{\"claim_id\": \"05a1ecc6-6ec7-4476-bd78-a64577b205f8\", \"evidence_content_hash\": null, \"evidence_kind\": \"pattern\", \"evidence_metadata\": {\"found\": true, \"input_fingerprint\": \"c3d90c0b1e65515482fc6ed878e6040ed8dc934ee0da7c32a19ee984105052ba\", \"inputs\": {\"command_contract\": {\"path\": \"docs/CS_FOUND_CONTRACT.md\", \"pattern\": \"Networking.*out of scope|networking.*out of scope\"}, \"diff_fingerprint\": \"f289fd151701da19565eb95adbfabead1d7e94bd1ffee37862c61a9275337c59\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"AGENTS.md\", \"CMakeLists.txt\", \"README.md\", \"SUPPORT.md\", \"docs/CS_FOUND_CONTRACT.md\", \"docs/FORMAT_ROLES.md\", \"docs/PARKING_LOT.md\", \"docs/SPEC_CSPACK_V1.md\", \"include/CellShard/CellShard.hh\", \"include/CellShard/artifact.hh\", \"include/CellShard/io/pack.hh\", \"include/CellShard/runtime/residency.hh\", \"include/CellShard/runtime/source.hh\", \"tests/package_consumer/inspect_consumer.cc\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-14.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"ad315b85490e94354c7be5c422969b15d2a58526\"}, \"locks\": [], \"path\": \"docs/CS_FOUND_CONTRACT.md\", \"resources\": [], \"started_revision\": 258}, \"evidence_path\": \"/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/46db370d-df98-45bf-bb20-2a8905a63cae\", \"source\": \"completion_transaction\"}",
+        "status": "passed",
+        "task_id": "CS-FOUND-14",
+        "valid": 1,
+        "validation_git_head": "ad315b85490e94354c7be5c422969b15d2a58526"
+      },
+      {
+        "completion_git_head": "bd22109f9bb8b3ed0f1b70c370a74c3b9493db71",
+        "completion_revision": 283,
+        "evidence_id": "9104f949-2c8f-4505-9e7f-0f750cebb819",
+        "evidence_revision": 281,
+        "gate_id": "G6-PACKAGE",
+        "input_fingerprint": "fe66729d11151531ef9e46c79249f5840e405fc138d0e1330836a43d01932fa5",
+        "provenance_json": "{\"claim_id\": \"e4496e3e-db16-4b08-a1cc-9d3b869e3656\", \"evidence_content_hash\": null, \"evidence_kind\": \"command\", \"evidence_metadata\": {\"argv\": [\"cmake\", \"--build\", \"build-cs-found-cpu\", \"--target\", \"cellShardInspectPackageTest\", \"-j\", \"1\"], \"environment\": {}, \"expected_exit_code\": 0, \"input_fingerprint\": \"fe66729d11151531ef9e46c79249f5840e405fc138d0e1330836a43d01932fa5\", \"inputs\": {\"command_contract\": {\"argv\": [\"cmake\", \"--build\", \"build-cs-found-cpu\", \"--target\", \"cellShardInspectPackageTest\", \"-j\", \"1\"], \"locks\": [\"build:cellshard\", \"surface:package-exports\"], \"timeout\": 1800}, \"diff_fingerprint\": \"b28e15fa8e50a5ae3fd078e5b11c237b9cd0ab8193c7bd0e8c97e73d59b81022\", \"dirty_paths\": [\".todo-orchestrator/cs-found-plan.json\", \".todo-orchestrator/state.snapshot.json\", \"AGENTS.md\", \"CMakeLists.txt\", \"README.md\", \"SUPPORT.md\", \"docs/CS_FOUND_CONTRACT.md\", \"docs/FORMAT_ROLES.md\", \"docs/PARKING_LOT.md\", \"docs/SPEC_CSPACK_V1.md\", \"include/CellShard/CellShard.hh\", \"include/CellShard/artifact.hh\", \"include/CellShard/core/cuda_compat.cuh\", \"include/CellShard/io/pack.hh\", \"include/CellShard/runtime/residency.hh\", \"include/CellShard/runtime/source.hh\", \"tests/package_consumer/inspect_consumer.cc\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-00.md\", \"todos/cs-found-01.md\", \"todos/cs-found-02.md\", \"todos/cs-found-03.md\", \"todos/cs-found-04.md\", \"todos/cs-found-05.md\", \"todos/cs-found-06.md\", \"todos/cs-found-07.md\", \"todos/cs-found-08.md\", \"todos/cs-found-09.md\", \"todos/cs-found-10.md\", \"todos/cs-found-11.md\", \"todos/cs-found-12.md\", \"todos/cs-found-13.md\", \"todos/cs-found-14.md\", \"todos/cs-found-15.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"ad315b85490e94354c7be5c422969b15d2a58526\"}, \"locks\": [{\"expires_at\": \"2026-08-27T09:22:55Z\", \"lease_id\": \"6587fb96-eaa4-4aac-8922-ccf20e9f97f9\", \"name\": \"build:cellshard\"}, {\"expires_at\": \"2026-08-27T09:22:55Z\", \"lease_id\": \"182438d6-b620-4b4a-a819-abc3eb6f1fb4\", \"name\": \"surface:package-exports\"}], \"resources\": [], \"returncode\": 0, \"started_revision\": 280}, \"evidence_path\": \"/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/9104f949-2c8f-4505-9e7f-0f750cebb819\", \"source\": \"completion_transaction\"}",
+        "status": "passed",
+        "task_id": "CS-FOUND-14",
+        "valid": 1,
+        "validation_git_head": "ad315b85490e94354c7be5c422969b15d2a58526"
       }
     ],
     "task_dependencies": [
@@ -7602,9 +7661,9 @@
       },
       {
         "attention_reason": null,
-        "completion_commit": null,
-        "completion_git_head": null,
-        "completion_revision": null,
+        "completion_commit": "bd22109f9bb8b3ed0f1b70c370a74c3b9493db71",
+        "completion_git_head": "bd22109f9bb8b3ed0f1b70c370a74c3b9493db71",
+        "completion_revision": 283,
         "created_at": "2026-08-21T12:05:03Z",
         "id": "CS-FOUND-14",
         "kind": "integration_task",
@@ -7616,14 +7675,14 @@
         "parallel_policy": "integration_exclusive",
         "parent_id": "CS-FOUND-00",
         "priority": 20,
-        "result": null,
+        "result": "implemented",
         "result_policy_json": "{\"allowed_dispositions\": [\"implemented\", \"validated\"]}",
-        "revision": 264,
-        "status": "in_progress",
+        "revision": 283,
+        "status": "done",
         "tags_json": "[]",
         "title": "Public API, package, and documentation migration",
-        "updated_at": "2026-08-27T09:14:48Z",
-        "version": 17
+        "updated_at": "2026-08-27T09:19:34Z",
+        "version": 18
       },
       {
         "attention_reason": null,

@@ -20,7 +20,7 @@ _No staleness review recorded yet._
 <!-- todo-orchestrator:v2-managed:start -->
 # Todo Status v2 Projection
 
-Project revision: `282`
+Project revision: `283`
 
 ## Workstreams
 - `CS-FOUND-00` | status: in_progress | execution: inactive | next: Complete CS-FOUND-01 and CS-FOUND-02 during bootstrap; later workers continue transactionally from CS-FOUND-03.
@@ -37,7 +37,7 @@ Project revision: `282`
 - `CS-FOUND-12` | status: done | execution: closed | next: Add explicit legacy context and row-partition adapter, mark CS-FOUND-LEGACY transition points, and preserve every listed public API.
 - `CS-FOUND-11` | status: done | execution: closed | next: Use the cuda skill, implement external allocator primary path plus transitional cudaMalloc wrapper, and run serialized correctness tests only.
 - `CS-FOUND-13` | status: done | execution: closed | next: Review CPEXEC02/I4, source independence, allocation/copy ownership, and legacy isolation; reach C2/G4; then implement only the specified fake vertical-slice tests and reach G5.
-- `CS-FOUND-14` | status: in_progress | execution: claimed | next: Update only implemented package/docs surfaces, add CS_FOUND_CONTRACT, run installed-package smoke, and reach G6 without rewriting the architecture review.
+- `CS-FOUND-14` | status: done | execution: closed | next: Update only implemented package/docs surfaces, add CS_FOUND_CONTRACT, run installed-package smoke, and reach G6 without rewriting the architecture review.
 - `CS-FOUND-15` | status: planned | execution: ready | next: Run focused/full feasible CPU and CUDA tests, installed package smoke, static architecture scans, todo audit/reconcile/export, reach G7, and hand off with a broader physical-runtime investigation recommendation only.
 - `cellshard-cpp-access-adapter-refactor` | status: closed | execution: idle | next: closed; reopen only for compatibility-header removal or broader external policy injection.
 <!-- todo-orchestrator:v2-managed:end -->

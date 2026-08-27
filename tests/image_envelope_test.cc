@@ -6,7 +6,12 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
+#include <string>
 #include <vector>
+
+#include <sys/stat.h>
+#include <unistd.h>
 
 namespace {
 
@@ -73,6 +78,11 @@ void set_u32(std::vector<std::byte> &bytes, std::size_t offset,
     for (unsigned shift = 0; shift < 32; shift += 8) {
         bytes[offset + shift / 8] = std::byte((value >> shift) & 0xffu);
     }
+}
+
+std::string temporary_path(const char *suffix) {
+    return std::string("/tmp/cellshard-image-envelope-")
+        + std::to_string(static_cast<unsigned long long>(::getpid())) + suffix;
 }
 
 } // namespace
@@ -169,6 +179,129 @@ int main() {
                                   first.data(), first.size() - 1)
                 == status_code::invalid_input,
             "wrong output size rejection");
+
+    const std::string pack_path = temporary_path(".cspack");
+    std::remove(pack_path.c_str());
+    std::remove((pack_path + ".tmp").c_str());
+    std::vector<std::byte> large_payload(8192, std::byte{0x5a});
+    auto second_image = descriptor(large_payload.size());
+    second_image.id = image_id{2};
+    second_image.dependencies.clear();
+    const std::array<image_cspack_entry_source, 2> sources{{
+        {extent_id{101}, view_of(image), {payload.data(), payload.size()}},
+        {extent_id{102}, view_of(second_image),
+         {large_payload.data(), large_payload.size()}},
+    }};
+    published_image_cspack published{};
+    require(store_image_cspack(pack_path.c_str(), 77, storage_object_id{88},
+                               sources.data(), sources.size(), &published)
+                == status_code::success,
+            "publish image cspack");
+    require(published.object.id == storage_object_id{88}
+            && published.object.byte_count > large_payload.size()
+            && valid_storage_object_descriptor(published.object)
+            && published.payload_extents.size() == sources.size(),
+            "published object descriptor");
+    require(published.payload_extents[0].id == extent_id{101}
+            && published.payload_extents[1].id == extent_id{102}
+            && valid_extent_descriptor(published.payload_extents[0],
+                                       published.object)
+            && valid_extent_descriptor(published.payload_extents[1],
+                                       published.object),
+            "published payload extents");
+    require(published.payload_extents[0].object_offset
+                    % published.payload_extents[0].required_alignment == 0
+            && published.payload_extents[1].object_offset
+                    % published.payload_extents[1].required_alignment == 0,
+            "absolute payload alignment");
+    require(::access((pack_path + ".tmp").c_str(), F_OK) != 0,
+            "temporary file removed after publication");
+
+    image_cspack_inspection inspection{};
+    require(inspect_image_cspack_partition(
+                pack_path.c_str(), 77, 1, storage_object_id{88}, extent_id{102},
+                &inspection) == status_code::success,
+            "inspect selected CPEXEC02 metadata");
+    require(inspection.shard_id == 77 && inspection.partition_index == 1
+            && inspection.descriptor.id == second_image.id
+            && inspection.descriptor.projection.producer
+                == second_image.projection.producer
+            && inspection.descriptor.projection.structure
+                == second_image.projection.structure
+            && inspection.descriptor.projection.geometry
+                == second_image.projection.geometry
+            && inspection.descriptor.projection.operation
+                == second_image.projection.operation
+            && inspection.descriptor.projection.encoding
+                == second_image.projection.encoding
+            && inspection.descriptor.projection.target.backend
+                == second_image.projection.target.backend
+            && inspection.descriptor.projection.target.capability_major
+                == second_image.projection.target.capability_major
+            && inspection.payload_extent.id == extent_id{102}
+            && inspection.payload_extent.object == storage_object_id{88}
+            && inspection.payload_extent.object_offset
+                == published.payload_extents[1].object_offset
+            && inspection.payload_extent.byte_count == large_payload.size()
+            && inspection.envelope_checksum != 0,
+            "inspection preserves image identity and exposes extent");
+    require(inspection.inspected_bytes < published.object.byte_count
+            && inspection.inspected_bytes
+                < published.object.byte_count - large_payload.size() / 2,
+            "inspection does not load selected payload");
+
+    std::FILE *pack = std::fopen(pack_path.c_str(), "rb");
+    require(pack != nullptr, "open published pack");
+    std::array<unsigned char, 8> top_magic{};
+    std::uint64_t top_shard = 0, top_count = 0;
+    require(std::fread(top_magic.data(), 1, top_magic.size(), pack)
+                    == top_magic.size()
+            && std::memcmp(top_magic.data(), "CSPACK01", top_magic.size()) == 0
+            && std::fread(&top_shard, sizeof(top_shard), 1, pack) == 1
+            && std::fread(&top_count, sizeof(top_count), 1, pack) == 1
+            && top_shard == 77 && top_count == 2,
+            "unchanged CSPACK01 top-level header");
+    std::fclose(pack);
+
+    pack = std::fopen(pack_path.c_str(), "rb+");
+    require(pack != nullptr
+            && std::fseek(pack, 8 + 2 * sizeof(std::uint64_t), SEEK_SET) == 0,
+            "open offset table for corruption case");
+    const std::uint64_t invalid_offset = 1;
+    require(std::fwrite(&invalid_offset, sizeof(invalid_offset), 1, pack) == 1
+            && std::fclose(pack) == 0,
+            "corrupt offset table");
+    require(inspect_image_cspack_partition(
+                pack_path.c_str(), 77, 0, storage_object_id{88}, extent_id{101},
+                &inspection) == status_code::corruption,
+            "invalid top-level offset rejected");
+
+    require(store_image_cspack(pack_path.c_str(), 77, storage_object_id{88},
+                               sources.data(), sources.size(), &published)
+                == status_code::success,
+            "republish after corruption");
+    require(::truncate(pack_path.c_str(),
+                       static_cast<off_t>(published.object.byte_count - 1)) == 0,
+            "truncate published pack");
+    require(inspect_image_cspack_partition(
+                pack_path.c_str(), 77, 1, storage_object_id{88}, extent_id{102},
+                &inspection) == status_code::corruption,
+            "truncated selected envelope rejected");
+    std::remove(pack_path.c_str());
+
+    const std::string blocked_path = temporary_path("-directory");
+    std::remove((blocked_path + ".tmp").c_str());
+    ::rmdir(blocked_path.c_str());
+    require(::mkdir(blocked_path.c_str(), 0700) == 0,
+            "create rename blocker directory");
+    require(store_image_cspack(blocked_path.c_str(), 77, storage_object_id{88},
+                               sources.data(), sources.size(), &published)
+                == status_code::corruption,
+            "rename failure rejects publication");
+    require(::access((blocked_path + ".tmp").c_str(), F_OK) != 0,
+            "temporary file cleaned after publication failure");
+    require(::rmdir(blocked_path.c_str()) == 0,
+            "remove rename blocker directory");
 
     std::puts("cellShardImageEnvelopeTest: passed");
     return 0;

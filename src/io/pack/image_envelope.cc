@@ -2,9 +2,18 @@
 
 #include <algorithm>
 #include <array>
+#include <cerrno>
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
+#include <fcntl.h>
 #include <limits>
 #include <new>
+#include <string>
+#include <vector>
+
+#include <sys/stat.h>
+#include <unistd.h>
 
 namespace cellshard {
 namespace {
@@ -12,6 +21,10 @@ namespace {
 constexpr std::array<std::byte, 8> envelope_magic{{
     std::byte{'C'}, std::byte{'P'}, std::byte{'E'}, std::byte{'X'},
     std::byte{'E'}, std::byte{'C'}, std::byte{'0'}, std::byte{'2'},
+}};
+constexpr std::array<std::byte, 8> cspack_magic{{
+    std::byte{'C'}, std::byte{'S'}, std::byte{'P'}, std::byte{'A'},
+    std::byte{'C'}, std::byte{'K'}, std::byte{'0'}, std::byte{'1'},
 }};
 constexpr std::size_t checksum_offset = 48;
 constexpr std::size_t digest_bytes_offset = 160;
@@ -132,6 +145,204 @@ void put_u64(std::byte *output, std::size_t offset, std::uint64_t value) noexcep
         return status_code::invalid_input;
     }
     *total_bytes = size;
+    return status_code::success;
+}
+
+[[nodiscard]] bool write_exact(std::FILE *file, const void *data,
+                               std::size_t bytes) noexcept {
+    return bytes == 0 || std::fwrite(data, 1, bytes, file) == bytes;
+}
+
+[[nodiscard]] bool read_exact(std::FILE *file, void *data,
+                              std::size_t bytes) noexcept {
+    return bytes == 0 || std::fread(data, 1, bytes, file) == bytes;
+}
+
+[[nodiscard]] bool file_size(std::FILE *file, std::uint64_t *out) noexcept {
+    struct stat value {};
+    if (file == nullptr || out == nullptr || ::fstat(::fileno(file), &value) != 0
+        || value.st_size < 0) {
+        return false;
+    }
+    *out = static_cast<std::uint64_t>(value.st_size);
+    return true;
+}
+
+[[nodiscard]] bool write_zero_padding(std::FILE *file,
+                                      std::size_t bytes) noexcept {
+    const std::array<std::byte, 256> zeros{};
+    while (bytes != 0) {
+        const std::size_t chunk = std::min(bytes, zeros.size());
+        if (!write_exact(file, zeros.data(), chunk)) {
+            return false;
+        }
+        bytes -= chunk;
+    }
+    return true;
+}
+
+[[nodiscard]] bool hash_file(std::FILE *file, std::uint64_t *out) noexcept {
+    if (file == nullptr || out == nullptr || ::fseeko(file, 0, SEEK_SET) != 0) {
+        return false;
+    }
+    std::array<std::byte, 4096> buffer{};
+    std::uint64_t hash = fnv1a_offset;
+    while (true) {
+        const std::size_t count = std::fread(buffer.data(), 1, buffer.size(), file);
+        for (std::size_t index = 0; index < count; ++index) {
+            hash ^= std::to_integer<unsigned char>(buffer[index]);
+            hash *= fnv1a_prime;
+        }
+        if (count != buffer.size()) {
+            if (std::ferror(file) != 0) {
+                return false;
+            }
+            break;
+        }
+    }
+    *out = hash == 0 ? 1 : hash;
+    return true;
+}
+
+[[nodiscard]] content_digest fnv_digest(std::uint64_t hash) noexcept {
+    content_digest result{};
+    result.algorithm = digest_algorithm::legacy_fnv1a64;
+    result.used_bytes = sizeof(hash);
+    for (unsigned shift = 0; shift < 64; shift += 8) {
+        result.bytes[shift / 8] = std::byte((hash >> shift) & 0xffu);
+    }
+    return result;
+}
+
+[[nodiscard]] std::string parent_directory(const std::string &path) {
+    const auto separator = path.find_last_of('/');
+    if (separator == std::string::npos) {
+        return ".";
+    }
+    if (separator == 0) {
+        return "/";
+    }
+    return path.substr(0, separator);
+}
+
+[[nodiscard]] bool sync_parent_directory(const std::string &path) noexcept {
+    const std::string directory = parent_directory(path);
+    const int descriptor = ::open(directory.c_str(), O_RDONLY | O_DIRECTORY);
+    if (descriptor < 0) {
+        return false;
+    }
+    const bool ok = ::fsync(descriptor) == 0;
+    ::close(descriptor);
+    return ok;
+}
+
+[[nodiscard]] status_code decode_metadata_prefix(
+    const std::byte *input,
+    std::size_t prefix_bytes,
+    std::uint64_t total_entry_bytes,
+    image_descriptor *descriptor_out,
+    std::uint64_t *payload_offset_out,
+    std::uint64_t *checksum_out) {
+    if (input == nullptr || descriptor_out == nullptr || payload_offset_out == nullptr
+        || checksum_out == nullptr
+        || prefix_bytes < image_envelope_fixed_header_bytes
+        || !std::equal(envelope_magic.begin(), envelope_magic.end(), input)
+        || get_u32(input, 8) != image_envelope_schema_version
+        || get_u32(input, 12) != image_envelope_fixed_header_bytes
+        || get_u32(input, 16) != image_envelope_endian_marker
+        || get_u32(input, 20) != 0 || get_u64(input, 24) != total_entry_bytes
+        || get_u64(input, checksum_offset) == 0) {
+        return status_code::corruption;
+    }
+    const std::uint64_t payload_offset_u64 = get_u64(input, 32);
+    const std::uint64_t payload_bytes_u64 = get_u64(input, 40);
+    if (payload_offset_u64 != prefix_bytes || payload_offset_u64 > total_entry_bytes
+        || payload_bytes_u64 != total_entry_bytes - payload_offset_u64) {
+        return status_code::corruption;
+    }
+
+    image_descriptor descriptor{};
+    descriptor.id = image_id{get_u64(input, 56)};
+    descriptor.projection.producer = producer_abi_id{get_u64(input, 64)};
+    descriptor.projection.structure = structure_id{get_u64(input, 72)};
+    descriptor.projection.geometry = geometry_id{get_u64(input, 80)};
+    descriptor.projection.operation = operator_class_id{get_u64(input, 88)};
+    descriptor.projection.encoding = scalar_encoding_id{get_u64(input, 96)};
+    descriptor.projection.target.backend =
+        static_cast<execution_backend>(get_u32(input, 104));
+    descriptor.projection.target.capability_major = get_u32(input, 108);
+    descriptor.projection.target.capability_minor = get_u32(input, 112);
+    descriptor.required_alignment = get_u32(input, 116);
+    descriptor.projection.target.capability_flags = get_u64(input, 120);
+    descriptor.stored_bytes = payload_bytes_u64;
+    descriptor.device_bytes = get_u64(input, 128);
+    descriptor.reuse = static_cast<image_reuse_class>(get_u32(input, 136));
+    const std::size_t domain_count = get_u32(input, 140);
+    const std::size_t dependency_count = get_u32(input, 144);
+    const std::size_t route_count = get_u32(input, 148);
+    descriptor.payload_digest.algorithm =
+        static_cast<digest_algorithm>(get_u32(input, 152));
+    descriptor.payload_digest.used_bytes = get_u32(input, 156);
+    std::memcpy(descriptor.payload_digest.bytes.data(), input + digest_bytes_offset,
+                descriptor.payload_digest.bytes.size());
+
+    std::size_t metadata_end = image_envelope_fixed_header_bytes;
+    std::size_t table_bytes = 0;
+    if (!multiply_size(domain_count, domain_record_bytes, &table_bytes)
+        || !add_size(&metadata_end, table_bytes)
+        || !multiply_size(dependency_count, sizeof(std::uint64_t), &table_bytes)
+        || !add_size(&metadata_end, table_bytes)
+        || !multiply_size(route_count, sizeof(std::uint64_t), &table_bytes)
+        || !add_size(&metadata_end, table_bytes)) {
+        return status_code::corruption;
+    }
+    std::size_t expected_payload_offset = 0;
+    if (!align_size(metadata_end, descriptor.required_alignment,
+                    &expected_payload_offset)
+        || expected_payload_offset != prefix_bytes) {
+        return status_code::corruption;
+    }
+    for (std::size_t index = metadata_end; index < prefix_bytes; ++index) {
+        if (input[index] != std::byte{0}) {
+            return status_code::corruption;
+        }
+    }
+
+    try {
+        descriptor.domains.reserve(domain_count);
+        descriptor.dependencies.reserve(dependency_count);
+        descriptor.routes.reserve(route_count);
+    } catch (const std::bad_alloc &) {
+        return status_code::allocation_failure;
+    }
+    std::size_t cursor = image_envelope_fixed_header_bytes;
+    for (std::size_t index = 0; index < domain_count; ++index) {
+        if (get_u32(input, cursor + 4) != 0) {
+            return status_code::corruption;
+        }
+        descriptor.domains.push_back({
+            static_cast<domain_binding_role>(get_u32(input, cursor)),
+            domain_id{get_u64(input, cursor + 8)},
+            partition_map_id{get_u64(input, cursor + 16)},
+            partition_id{get_u64(input, cursor + 24)},
+            order_id{get_u64(input, cursor + 32)},
+        });
+        cursor += domain_record_bytes;
+    }
+    for (std::size_t index = 0; index < dependency_count; ++index) {
+        descriptor.dependencies.push_back(image_id{get_u64(input, cursor)});
+        cursor += sizeof(std::uint64_t);
+    }
+    for (std::size_t index = 0; index < route_count; ++index) {
+        descriptor.routes.push_back(route_table_id{get_u64(input, cursor)});
+        cursor += sizeof(std::uint64_t);
+    }
+    if (cursor != metadata_end || !valid_image_descriptor(descriptor)) {
+        return status_code::corruption;
+    }
+    *descriptor_out = std::move(descriptor);
+    *payload_offset_out = payload_offset_u64;
+    *checksum_out = get_u64(input, checksum_offset);
     return status_code::success;
 }
 
@@ -331,6 +542,258 @@ status_code decode_image_envelope(const std::byte *input, std::size_t input_byte
                     static_cast<std::size_t>(payload_bytes_u64)};
     out->payload_offset = payload_offset_u64;
     out->envelope_checksum = get_u64(input, checksum_offset);
+    return status_code::success;
+}
+
+status_code store_image_cspack(const char *path, std::uint64_t shard_id,
+                               storage_object_id object,
+                               const image_cspack_entry_source *entries,
+                               std::size_t entry_count,
+                               published_image_cspack *out) {
+    if (path == nullptr || path[0] == '\0' || shard_id == 0 || !object.valid()
+        || entries == nullptr || entry_count == 0 || out == nullptr
+        || entry_count > std::numeric_limits<std::uint64_t>::max()
+        || entry_count > (std::numeric_limits<std::size_t>::max()
+                          - cspack_magic.size() - 2 * sizeof(std::uint64_t))
+                / sizeof(std::uint64_t)) {
+        return status_code::invalid_input;
+    }
+    *out = published_image_cspack{};
+    for (std::size_t index = 0; index < entry_count; ++index) {
+        const auto &entry = entries[index];
+        if (!entry.extent.valid() || !valid_image_descriptor(entry.descriptor)
+            || entry.payload.data == nullptr || entry.payload.size == 0
+            || entry.descriptor.stored_bytes != entry.payload.size) {
+            return status_code::invalid_input;
+        }
+        for (std::size_t prior = 0; prior < index; ++prior) {
+            if (entries[prior].extent == entry.extent
+                || entries[prior].descriptor.id == entry.descriptor.id) {
+                return status_code::invalid_input;
+            }
+        }
+    }
+
+    std::vector<std::uint64_t> offsets;
+    std::vector<extent_descriptor> extents;
+    try {
+        offsets.resize(entry_count);
+        extents.reserve(entry_count);
+    } catch (const std::bad_alloc &) {
+        return status_code::allocation_failure;
+    }
+
+    const std::string final_path(path);
+    const std::string temporary_path = final_path + ".tmp";
+    std::remove(temporary_path.c_str());
+    std::FILE *file = std::fopen(temporary_path.c_str(), "wb+");
+    if (file == nullptr) {
+        return status_code::missing_object;
+    }
+    bool ok = write_exact(file, cspack_magic.data(), cspack_magic.size());
+    const std::uint64_t count_u64 = entry_count;
+    if (ok) {
+        ok = write_exact(file, &shard_id, sizeof(shard_id))
+            && write_exact(file, &count_u64, sizeof(count_u64))
+            && write_exact(file, offsets.data(),
+                           offsets.size() * sizeof(std::uint64_t));
+    }
+
+    for (std::size_t index = 0; ok && index < entry_count; ++index) {
+        const auto &entry = entries[index];
+        const off_t raw_position = ::ftello(file);
+        if (raw_position < 0) {
+            ok = false;
+            break;
+        }
+        const std::uint64_t alignment = entry.descriptor.required_alignment;
+        const std::uint64_t raw = static_cast<std::uint64_t>(raw_position);
+        const std::uint64_t padding = (alignment - raw % alignment) % alignment;
+        if (padding > std::numeric_limits<std::size_t>::max()
+            || !write_zero_padding(file, static_cast<std::size_t>(padding))) {
+            ok = false;
+            break;
+        }
+        const off_t aligned_position = ::ftello(file);
+        if (aligned_position < 0) {
+            ok = false;
+            break;
+        }
+        offsets[index] = static_cast<std::uint64_t>(aligned_position);
+
+        std::size_t envelope_bytes = 0;
+        if (encoded_image_envelope_size(entry.descriptor, entry.payload.size,
+                                        &envelope_bytes)
+                != status_code::success) {
+            ok = false;
+            break;
+        }
+        std::vector<std::byte> envelope;
+        try {
+            envelope.resize(envelope_bytes);
+        } catch (const std::bad_alloc &) {
+            std::fclose(file);
+            std::remove(temporary_path.c_str());
+            return status_code::allocation_failure;
+        }
+        if (encode_image_envelope(entry.descriptor, entry.payload,
+                                  envelope.data(), envelope.size())
+                != status_code::success
+            || !write_exact(file, envelope.data(), envelope.size())) {
+            ok = false;
+            break;
+        }
+        const std::uint64_t payload_offset = get_u64(envelope.data(), 32);
+        extents.push_back({entry.extent, object,
+                           offsets[index] + payload_offset,
+                           entry.descriptor.stored_bytes,
+                           entry.descriptor.required_alignment,
+                           entry.descriptor.payload_digest});
+    }
+
+    if (ok) {
+        ok = ::fseeko(file,
+                      static_cast<off_t>(cspack_magic.size()
+                          + 2 * sizeof(std::uint64_t)),
+                      SEEK_SET) == 0
+            && write_exact(file, offsets.data(),
+                           offsets.size() * sizeof(std::uint64_t))
+            && std::fflush(file) == 0;
+    }
+    std::uint64_t object_hash = 0;
+    std::uint64_t object_bytes = 0;
+    if (ok) {
+        ok = hash_file(file, &object_hash) && file_size(file, &object_bytes)
+            && object_bytes != 0 && std::fflush(file) == 0
+            && ::fsync(::fileno(file)) == 0;
+    }
+    if (std::fclose(file) != 0) {
+        ok = false;
+    }
+    if (ok) {
+        ok = std::rename(temporary_path.c_str(), final_path.c_str()) == 0
+            && sync_parent_directory(final_path);
+    }
+    if (!ok) {
+        std::remove(temporary_path.c_str());
+        return status_code::corruption;
+    }
+
+    out->object = {object, object_bytes, fnv_digest(object_hash)};
+    out->payload_extents = std::move(extents);
+    return status_code::success;
+}
+
+status_code inspect_image_cspack_partition(
+    const char *path, std::uint64_t expected_shard_id,
+    std::uint64_t partition_index, storage_object_id object, extent_id extent,
+    image_cspack_inspection *out) {
+    if (path == nullptr || path[0] == '\0' || expected_shard_id == 0
+        || !object.valid() || !extent.valid() || out == nullptr) {
+        return status_code::invalid_input;
+    }
+    *out = image_cspack_inspection{};
+    std::FILE *file = std::fopen(path, "rb");
+    if (file == nullptr) {
+        return status_code::missing_object;
+    }
+    std::uint64_t bytes = 0;
+    std::array<std::byte, 8> magic{};
+    std::uint64_t shard_id = 0;
+    std::uint64_t partition_count = 0;
+    bool ok = file_size(file, &bytes)
+        && read_exact(file, magic.data(), magic.size())
+        && magic == cspack_magic
+        && read_exact(file, &shard_id, sizeof(shard_id))
+        && read_exact(file, &partition_count, sizeof(partition_count))
+        && shard_id == expected_shard_id && partition_count != 0
+        && partition_index < partition_count
+        && partition_count <= std::numeric_limits<std::size_t>::max()
+                                  / sizeof(std::uint64_t)
+        && bytes >= cspack_magic.size() + 2 * sizeof(std::uint64_t)
+        && partition_count
+            <= (bytes - cspack_magic.size() - 2 * sizeof(std::uint64_t))
+                / sizeof(std::uint64_t);
+    std::vector<std::uint64_t> offsets;
+    if (ok) {
+        try {
+            offsets.resize(static_cast<std::size_t>(partition_count));
+        } catch (const std::bad_alloc &) {
+            std::fclose(file);
+            return status_code::allocation_failure;
+        }
+        ok = read_exact(file, offsets.data(),
+                        offsets.size() * sizeof(std::uint64_t));
+    }
+    const std::uint64_t table_end = cspack_magic.size()
+        + sizeof(std::uint64_t) * (2 + partition_count);
+    for (std::size_t index = 0; ok && index < offsets.size(); ++index) {
+        const std::uint64_t end = index + 1 < offsets.size()
+            ? offsets[index + 1] : bytes;
+        if (offsets[index] < table_end || offsets[index] >= end || end > bytes) {
+            ok = false;
+        }
+    }
+    const std::size_t selected = static_cast<std::size_t>(partition_index);
+    const std::uint64_t entry_offset = ok ? offsets[selected] : 0;
+    const std::uint64_t table_entry_end = ok
+        ? (selected + 1 < offsets.size() ? offsets[selected + 1] : bytes) : 0;
+    std::array<std::byte, image_envelope_fixed_header_bytes> header{};
+    if (ok) {
+        ok = entry_offset <= static_cast<std::uint64_t>(std::numeric_limits<off_t>::max())
+            && ::fseeko(file, static_cast<off_t>(entry_offset), SEEK_SET) == 0
+            && read_exact(file, header.data(), header.size())
+            && std::equal(envelope_magic.begin(), envelope_magic.end(),
+                          header.begin());
+    }
+    const std::uint64_t envelope_bytes = ok ? get_u64(header.data(), 24) : 0;
+    const std::uint64_t prefix_bytes_u64 = ok ? get_u64(header.data(), 32) : 0;
+    if (ok) {
+        ok = envelope_bytes >= image_envelope_fixed_header_bytes
+            && envelope_bytes <= table_entry_end - entry_offset
+            && prefix_bytes_u64 >= image_envelope_fixed_header_bytes
+            && prefix_bytes_u64 <= envelope_bytes
+            && prefix_bytes_u64 <= std::numeric_limits<std::size_t>::max();
+    }
+    std::vector<std::byte> prefix;
+    if (ok) {
+        try {
+            prefix.resize(static_cast<std::size_t>(prefix_bytes_u64));
+        } catch (const std::bad_alloc &) {
+            std::fclose(file);
+            return status_code::allocation_failure;
+        }
+        ok = ::fseeko(file, static_cast<off_t>(entry_offset), SEEK_SET) == 0
+            && read_exact(file, prefix.data(), prefix.size());
+    }
+    image_descriptor descriptor{};
+    std::uint64_t payload_offset = 0;
+    std::uint64_t envelope_checksum = 0;
+    status_code decode_status = status_code::corruption;
+    if (ok) {
+        decode_status = decode_metadata_prefix(prefix.data(), prefix.size(),
+                                               envelope_bytes, &descriptor,
+                                               &payload_offset,
+                                               &envelope_checksum);
+        ok = decode_status == status_code::success;
+    }
+    std::fclose(file);
+    if (!ok) {
+        return decode_status == status_code::allocation_failure
+            ? decode_status : status_code::corruption;
+    }
+    out->shard_id = shard_id;
+    out->partition_index = partition_index;
+    out->envelope_offset = entry_offset;
+    out->envelope_bytes = envelope_bytes;
+    out->inspected_bytes = cspack_magic.size() + 2 * sizeof(std::uint64_t)
+        + offsets.size() * sizeof(std::uint64_t) + prefix.size();
+    out->envelope_checksum = envelope_checksum;
+    out->descriptor = std::move(descriptor);
+    out->payload_extent = {extent, object, entry_offset + payload_offset,
+                           out->descriptor.stored_bytes,
+                           out->descriptor.required_alignment,
+                           out->descriptor.payload_digest};
     return status_code::success;
 }
 

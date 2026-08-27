@@ -3,16 +3,16 @@
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-FOUND-07: Artifact catalog and snapshot validation
 
-Task revision: `124`; current project revision is in `todo-status.md`.
+Task revision: `150`; current project revision is in `todo-status.md`.
 
 ## Objective
 Freeze the descriptor ABI checkpoint, then implement separate in-memory artifact/source catalogs and snapshot validation as CS-FOUND-I3A.
 
 ## State
-- Lifecycle: `in_progress`
-- Execution: `claimed`
+- Lifecycle: `done`
+- Execution: `closed`
 - Parallel policy: `parallel_safe`
-- Result: `-`
+- Result: `implemented`
 
 ## Next Action
 Review I1/I2A/I2B/I2C, reach C1 and G2, then implement catalog/snapshot validation without persistent manifest format.

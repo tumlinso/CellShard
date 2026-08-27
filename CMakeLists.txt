@@ -828,6 +828,19 @@ if(CELLSHARD_BUILD_TESTS AND CELLSHARD_BUILD_EXPORT)
     )
 
     if(CELLSHARD_ENABLE_CUDA)
+        add_executable(cellShardDeviceResidencyTest
+            tests/device_residency_test.cu
+            src/runtime/residency/device.cu
+        )
+        target_link_libraries(cellShardDeviceResidencyTest PRIVATE
+            CellShard::headers
+            CUDA::cudart
+        )
+        set_target_properties(cellShardDeviceResidencyTest PROPERTIES
+            CUDA_STANDARD 17
+            CUDA_STANDARD_REQUIRED YES
+        )
+
         # CP-BP-13: envelope identity/checksum/fetch and contiguous async upload.
         add_executable(cellShardExecutionPayloadTest
             tests/execution_payload_test.cu

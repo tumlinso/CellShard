@@ -20,7 +20,7 @@ _No staleness review recorded yet._
 <!-- todo-orchestrator:v2-managed:start -->
 # Todo Status v2 Projection
 
-Project revision: `162`
+Project revision: `166`
 
 ## Workstreams
 - `CS-FOUND-00` | status: in_progress | execution: inactive | next: Complete CS-FOUND-01 and CS-FOUND-02 during bootstrap; later workers continue transactionally from CS-FOUND-03.
@@ -32,7 +32,7 @@ Project revision: `162`
 - `CS-FOUND-06` | status: done | execution: closed | next: Implement I2C and fake in-memory exact-range source; defer local files unless mechanically inseparable.
 - `CS-FOUND-07` | status: done | execution: closed | next: Review I1/I2A/I2B/I2C, reach C1 and G2, then implement catalog/snapshot validation without persistent manifest format.
 - `CS-FOUND-08` | status: done | execution: closed | next: Implement fixed-field/table codec, deterministic padding/checksum, size calculation, and malformed-buffer tests only.
-- `CS-FOUND-09` | status: planned | execution: ready | next: Add new image store/inspect APIs, expose an extent, validate top-level offsets, and preserve the legacy writer.
+- `CS-FOUND-09` | status: done | execution: closed | next: Add new image store/inspect APIs, expose an extent, validate top-level offsets, and preserve the legacy writer.
 - `CS-FOUND-10` | status: planned | execution: ready | next: Review and freeze I3A/I3B/I4 at G3, then implement pread-backed local exact reads and one-allocation host residency.
 - `CS-FOUND-12` | status: planned | execution: ready | next: Add explicit legacy context and row-partition adapter, mark CS-FOUND-LEGACY transition points, and preserve every listed public API.
 - `CS-FOUND-11` | status: planned | execution: ready | next: Use the cuda skill, implement external allocator primary path plus transitional cudaMalloc wrapper, and run serialized correctness tests only.

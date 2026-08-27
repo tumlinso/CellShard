@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-27T09:04:17Z",
+  "generated_at": "2026-08-27T09:07:28Z",
   "project": {
     "configuration": {
       "busy_timeout_ms": 5000,
@@ -18,7 +18,7 @@
     "project_uuid": "a52537a5-20db-4aeb-a126-dd0128c71fda",
     "schema_version": 2
   },
-  "project_revision": 203,
+  "project_revision": 223,
   "schema_version": 2,
   "tables": {
     "barrier_requirements": [
@@ -91,13 +91,13 @@
         "title": "Descriptor implementation fan-in"
       },
       {
-        "explanation": "3/4 requirements satisfied; target=4",
+        "explanation": "4/4 requirements satisfied; target=4",
         "id": "CS-FOUND-IMAGE-RESIDENCY-FANIN",
         "mode": "all",
-        "opened_at": null,
+        "opened_at": "2026-08-27 09:07:28",
         "quorum": null,
-        "revision": 203,
-        "state": "closed",
+        "revision": 223,
+        "state": "open",
         "title": "Image and residency implementation fan-in"
       }
     ],
@@ -2459,6 +2459,206 @@
         "revision": 203,
         "seq": 203,
         "timestamp": "2026-08-27T09:04:17Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-12",
+        "entity_type": "claim",
+        "event_type": "continue.completed",
+        "payload_json": "{\"requested_task_id\": \"CS-FOUND-12\"}",
+        "revision": 204,
+        "seq": 204,
+        "timestamp": "2026-08-27T09:05:01Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "build:cellshard",
+        "entity_type": "lock",
+        "event_type": "lock.acquired",
+        "payload_json": "{\"names\": [\"build:cellshard\"]}",
+        "revision": 205,
+        "seq": 205,
+        "timestamp": "2026-08-27T09:06:06Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "build:cellshard",
+        "entity_type": "lock",
+        "event_type": "lock.released",
+        "payload_json": "{}",
+        "revision": 206,
+        "seq": 206,
+        "timestamp": "2026-08-27T09:06:06Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "build:cellshard",
+        "entity_type": "lock",
+        "event_type": "lock.acquired",
+        "payload_json": "{\"names\": [\"build:cellshard\"]}",
+        "revision": 207,
+        "seq": 207,
+        "timestamp": "2026-08-27T09:06:06Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "build:cellshard",
+        "entity_type": "lock",
+        "event_type": "lock.released",
+        "payload_json": "{}",
+        "revision": 208,
+        "seq": 208,
+        "timestamp": "2026-08-27T09:06:07Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "build:cellshard",
+        "entity_type": "lock",
+        "event_type": "lock.acquired",
+        "payload_json": "{\"names\": [\"build:cellshard\"]}",
+        "revision": 209,
+        "seq": 209,
+        "timestamp": "2026-08-27T09:06:20Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "build:cellshard",
+        "entity_type": "lock",
+        "event_type": "lock.released",
+        "payload_json": "{}",
+        "revision": 210,
+        "seq": 210,
+        "timestamp": "2026-08-27T09:06:20Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "build:cellshard",
+        "entity_type": "lock",
+        "event_type": "lock.acquired",
+        "payload_json": "{\"names\": [\"build:cellshard\"]}",
+        "revision": 211,
+        "seq": 211,
+        "timestamp": "2026-08-27T09:06:20Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "build:cellshard",
+        "entity_type": "lock",
+        "event_type": "lock.released",
+        "payload_json": "{}",
+        "revision": 212,
+        "seq": 212,
+        "timestamp": "2026-08-27T09:06:44Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "build:cellshard",
+        "entity_type": "lock",
+        "event_type": "lock.acquired",
+        "payload_json": "{\"names\": [\"build:cellshard\"]}",
+        "revision": 213,
+        "seq": 213,
+        "timestamp": "2026-08-27T09:07:06Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "build:cellshard",
+        "entity_type": "lock",
+        "event_type": "lock.released",
+        "payload_json": "{}",
+        "revision": 214,
+        "seq": 214,
+        "timestamp": "2026-08-27T09:07:07Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "build:cellshard",
+        "entity_type": "lock",
+        "event_type": "lock.acquired",
+        "payload_json": "{\"names\": [\"build:cellshard\"]}",
+        "revision": 215,
+        "seq": 215,
+        "timestamp": "2026-08-27T09:07:07Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "build:cellshard",
+        "entity_type": "lock",
+        "event_type": "lock.released",
+        "payload_json": "{}",
+        "revision": 216,
+        "seq": 216,
+        "timestamp": "2026-08-27T09:07:08Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-12-LEGACY",
+        "entity_type": "gate",
+        "event_type": "gate.started",
+        "payload_json": "{\"gate_id\": \"CS-FOUND-12-LEGACY\"}",
+        "revision": 217,
+        "seq": 217,
+        "timestamp": "2026-08-27T09:07:08Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-12-LEGACY",
+        "entity_type": "gate",
+        "event_type": "gate.completed",
+        "payload_json": "{\"evidence_id\": \"50d0c4c1-af4e-40fa-9990-98c0537e7391\", \"status\": \"passed\", \"valid\": true}",
+        "revision": 218,
+        "seq": 218,
+        "timestamp": "2026-08-27T09:07:08Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-12-CPEXEC01",
+        "entity_type": "gate",
+        "event_type": "gate.started",
+        "payload_json": "{\"gate_id\": \"CS-FOUND-12-CPEXEC01\"}",
+        "revision": 219,
+        "seq": 219,
+        "timestamp": "2026-08-27T09:07:08Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-12-CPEXEC01",
+        "entity_type": "gate",
+        "event_type": "gate.completed",
+        "payload_json": "{\"evidence_id\": \"28486de2-790a-4746-a806-7a4a9012bf3e\", \"status\": \"passed\", \"valid\": true}",
+        "revision": 220,
+        "seq": 220,
+        "timestamp": "2026-08-27T09:07:09Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "build:cellshard",
+        "entity_type": "lock",
+        "event_type": "lock.acquired",
+        "payload_json": "{\"names\": [\"build:cellshard\"]}",
+        "revision": 221,
+        "seq": 221,
+        "timestamp": "2026-08-27T09:07:17Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "build:cellshard",
+        "entity_type": "lock",
+        "event_type": "lock.released",
+        "payload_json": "{}",
+        "revision": 222,
+        "seq": 222,
+        "timestamp": "2026-08-27T09:07:18Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-12",
+        "entity_type": "task",
+        "event_type": "task.completed",
+        "payload_json": "{\"completion_revision\": 223, \"disposition\": \"implemented\", \"reached_checkpoints\": []}",
+        "revision": 223,
+        "seq": 223,
+        "timestamp": "2026-08-27T09:07:28Z"
       }
     ],
     "evidence": [
@@ -2635,6 +2835,19 @@
         "checkpoint_id": null,
         "claim_id": null,
         "content_hash": null,
+        "created_at": "2026-08-27T09:07:09Z",
+        "gate_id": "CS-FOUND-12-CPEXEC01",
+        "id": "28486de2-790a-4746-a806-7a4a9012bf3e",
+        "kind": "command",
+        "metadata_json": "{\"argv\": [\"./build-cs-found-baseline/cellShardExecutionPayloadTest\"], \"environment\": {}, \"expected_exit_code\": 0, \"input_fingerprint\": \"2ca3d1e1edfa2317f9e21b1efe758390339f26ac24798b9175a4d744b92dccc0\", \"inputs\": {\"command_contract\": {\"argv\": [\"./build-cs-found-baseline/cellShardExecutionPayloadTest\"], \"locks\": [\"build:cellshard\"], \"resources\": [\"gpu:any\"]}, \"diff_fingerprint\": \"06531d7314e9587f9c5d45b7ec68b8ec3cbb13bbf64f536cc42a2ab987ddf823\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"CMakeLists.txt\", \"include/CellShard/io/pack/execution_payload.cuh\", \"include/CellShard/runtime/layout/sharded.cuh\", \"src/io/pack/execution_payload.cu\", \"tests/foundation_legacy_adapter_test.cc\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-12.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"bd84bf0e3c0c2cbd5af1adcc8aabd4062a4e577b\"}, \"locks\": [{\"expires_at\": \"2026-08-27T09:12:08Z\", \"lease_id\": \"bcab8d63-2a27-48b2-b5bd-c5a3522c72af\", \"name\": \"build:cellshard\"}], \"resources\": [{\"class_id\": \"gpu\", \"expires_at\": \"2026-08-27T09:12:08Z\", \"instance_id\": \"gpu:0\", \"lease_id\": \"40c2268b-bf20-4e24-96c0-e79ba4f3d66a\", \"metadata\": {\"compute_capability\": \"7.0\", \"model\": \"Tesla V100-SXM2-16GB\"}}], \"returncode\": 0, \"started_revision\": 219}",
+        "path": "/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/28486de2-790a-4746-a806-7a4a9012bf3e",
+        "revision": 220,
+        "status": "passed"
+      },
+      {
+        "checkpoint_id": null,
+        "claim_id": null,
+        "content_hash": null,
         "created_at": "2026-08-21T13:04:32Z",
         "gate_id": "G1-CUDA-CSPACK",
         "id": "290b28e3-431e-4479-a56c-9b087c842190",
@@ -2721,6 +2934,19 @@
         "path": "/home/tumlinson/CellStack/.git/modules/CellShard/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/4d841f87-d3c3-4fd2-8530-9fa7ce35d8f5",
         "revision": 45,
         "status": "failed"
+      },
+      {
+        "checkpoint_id": null,
+        "claim_id": null,
+        "content_hash": null,
+        "created_at": "2026-08-27T09:07:08Z",
+        "gate_id": "CS-FOUND-12-LEGACY",
+        "id": "50d0c4c1-af4e-40fa-9990-98c0537e7391",
+        "kind": "command",
+        "metadata_json": "{\"argv\": [\"./build-cs-found-baseline/cellShardFoundationLegacyAdapterTest\"], \"environment\": {}, \"expected_exit_code\": 0, \"input_fingerprint\": \"f3c32b67fc58ef6dce66776b33b207baf4ce853dced4fa757089872d4baa1b72\", \"inputs\": {\"command_contract\": {\"argv\": [\"./build-cs-found-baseline/cellShardFoundationLegacyAdapterTest\"], \"locks\": [\"build:cellshard\"]}, \"diff_fingerprint\": \"06531d7314e9587f9c5d45b7ec68b8ec3cbb13bbf64f536cc42a2ab987ddf823\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"CMakeLists.txt\", \"include/CellShard/io/pack/execution_payload.cuh\", \"include/CellShard/runtime/layout/sharded.cuh\", \"src/io/pack/execution_payload.cu\", \"tests/foundation_legacy_adapter_test.cc\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-12.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"bd84bf0e3c0c2cbd5af1adcc8aabd4062a4e577b\"}, \"locks\": [{\"expires_at\": \"2026-08-27T09:12:08Z\", \"lease_id\": \"715be05f-5df0-4b5b-ae31-3a289b56b5d1\", \"name\": \"build:cellshard\"}], \"resources\": [], \"returncode\": 0, \"started_revision\": 217}",
+        "path": "/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/50d0c4c1-af4e-40fa-9990-98c0537e7391",
+        "revision": 218,
+        "status": "passed"
       },
       {
         "checkpoint_id": null,
@@ -3508,27 +3734,27 @@
         "checkpoint_id": null,
         "config_json": "{\"argv\": [\"./build-cs-found-baseline/cellShardExecutionPayloadTest\"], \"locks\": [\"build:cellshard\"], \"resources\": [\"gpu:any\"]}",
         "id": "CS-FOUND-12-CPEXEC01",
-        "input_fingerprint": null,
-        "last_run_at": null,
+        "input_fingerprint": "2ca3d1e1edfa2317f9e21b1efe758390339f26ac24798b9175a4d744b92dccc0",
+        "last_run_at": "2026-08-27T09:07:09Z",
         "required": 1,
-        "revision": 166,
-        "status": "pending",
+        "revision": 220,
+        "status": "passed",
         "task_id": "CS-FOUND-12",
         "type": "command",
-        "valid": 0
+        "valid": 1
       },
       {
         "checkpoint_id": null,
         "config_json": "{\"argv\": [\"./build-cs-found-baseline/cellShardFoundationLegacyAdapterTest\"], \"locks\": [\"build:cellshard\"]}",
         "id": "CS-FOUND-12-LEGACY",
-        "input_fingerprint": null,
-        "last_run_at": null,
+        "input_fingerprint": "f3c32b67fc58ef6dce66776b33b207baf4ce853dced4fa757089872d4baa1b72",
+        "last_run_at": "2026-08-27T09:07:08Z",
         "required": 1,
-        "revision": 166,
-        "status": "pending",
+        "revision": 218,
+        "status": "passed",
         "task_id": "CS-FOUND-12",
         "type": "command",
-        "valid": 0
+        "valid": 1
       },
       {
         "checkpoint_id": "CS-FOUND-G0",
@@ -3979,6 +4205,16 @@
         "payload_json": "{\"changed_owned_paths\": [], \"checkpoints\": [], \"completion_commit\": \"2c33ab598308b911cae58a635bb58203c1397f60\", \"completion_gates\": [{\"evidence_id\": \"274f76d8-22df-4ab8-b1b4-535c816edef4\", \"evidence_revision\": 103, \"id\": \"CS-FOUND-04-CPU\", \"input_fingerprint\": \"87095299ff9d65e66f958cb125ab6cc4164cb7b2bc0aebe958c48d236fa6e9c0\", \"status\": \"passed\", \"valid\": true, \"validation_git_head\": \"74ab5172bc1f03966def570ea7beacb951b926d3\"}], \"completion_revision\": 105, \"finalized_checkpoints\": [], \"gates\": [{\"id\": \"CS-FOUND-04-CPU\", \"input_fingerprint\": \"87095299ff9d65e66f958cb125ab6cc4164cb7b2bc0aebe958c48d236fa6e9c0\", \"last_run_at\": \"2026-08-27T08:32:40Z\", \"revision\": 103, \"status\": \"passed\", \"valid\": 1}], \"git_diffstat\": \"\", \"git_head\": \"2c33ab598308b911cae58a635bb58203c1397f60\", \"interfaces\": [{\"content_hash\": \"217a095db360a5ff8ac6fbc9edc9e20acbf2833463c7c988be124c6ef4efe4f3\", \"id\": \"CS-FOUND-I2A\", \"state\": \"revised\", \"version\": \"1\"}], \"note\": \"\", \"resources\": [], \"task_id\": \"CS-FOUND-04\"}",
         "revision": 105,
         "task_id": "CS-FOUND-04"
+      },
+      {
+        "claim_id": null,
+        "created_at": "2026-08-27T09:07:28Z",
+        "id": "ca546ebd-021f-4c86-8bb7-ecb627990bc3",
+        "kind": "complete",
+        "note": "Added explicit-context CPEXEC01 image and row-partition adapters without deriving foundational IDs from legacy counters. Legacy CUDA gate, adapter gate, and CPU CPEXEC01 test passed.",
+        "payload_json": "{\"changed_owned_paths\": [], \"checkpoints\": [], \"completion_commit\": \"14f9d0020e875726bf5c8ac315b8d998901a33f7\", \"completion_gates\": [{\"evidence_id\": \"28486de2-790a-4746-a806-7a4a9012bf3e\", \"evidence_revision\": 220, \"id\": \"CS-FOUND-12-CPEXEC01\", \"input_fingerprint\": \"2ca3d1e1edfa2317f9e21b1efe758390339f26ac24798b9175a4d744b92dccc0\", \"status\": \"passed\", \"valid\": true, \"validation_git_head\": \"bd84bf0e3c0c2cbd5af1adcc8aabd4062a4e577b\"}, {\"evidence_id\": \"50d0c4c1-af4e-40fa-9990-98c0537e7391\", \"evidence_revision\": 218, \"id\": \"CS-FOUND-12-LEGACY\", \"input_fingerprint\": \"f3c32b67fc58ef6dce66776b33b207baf4ce853dced4fa757089872d4baa1b72\", \"status\": \"passed\", \"valid\": true, \"validation_git_head\": \"bd84bf0e3c0c2cbd5af1adcc8aabd4062a4e577b\"}], \"completion_revision\": 223, \"finalized_checkpoints\": [], \"gates\": [{\"id\": \"CS-FOUND-12-CPEXEC01\", \"input_fingerprint\": \"2ca3d1e1edfa2317f9e21b1efe758390339f26ac24798b9175a4d744b92dccc0\", \"last_run_at\": \"2026-08-27T09:07:09Z\", \"revision\": 220, \"status\": \"passed\", \"valid\": 1}, {\"id\": \"CS-FOUND-12-LEGACY\", \"input_fingerprint\": \"f3c32b67fc58ef6dce66776b33b207baf4ce853dced4fa757089872d4baa1b72\", \"last_run_at\": \"2026-08-27T09:07:08Z\", \"revision\": 218, \"status\": \"passed\", \"valid\": 1}], \"git_diffstat\": \".todo-orchestrator/state.snapshot.json | 248 ++++++++++++++++++++++++++++++---\\n todo-status.md                         |   4 +-\\n todos.md                               |   4 +-\\n todos/cs-found-12.md                   |   6 +-\\n 4 files changed, 239 insertions(+), 23 deletions(-)\", \"git_head\": \"14f9d0020e875726bf5c8ac315b8d998901a33f7\", \"interfaces\": [], \"note\": \"Added explicit-context CPEXEC01 image and row-partition adapters without deriving foundational IDs from legacy counters. Legacy CUDA gate, adapter gate, and CPU CPEXEC01 test passed.\", \"resources\": [{\"acquired_at\": \"2026-08-27T09:07:08Z\", \"instance_id\": \"gpu:0\", \"released_at\": \"2026-08-27T09:07:09Z\", \"state\": \"released\"}], \"task_id\": \"CS-FOUND-12\"}",
+        "revision": 223,
+        "task_id": "CS-FOUND-12"
       }
     ],
     "interface_consumers": [
@@ -5237,6 +5473,32 @@
         "task_id": "CS-FOUND-11",
         "valid": 1,
         "validation_git_head": "3d328899bc39e1dbe86810e71f3f67920b3f70af"
+      },
+      {
+        "completion_git_head": "14f9d0020e875726bf5c8ac315b8d998901a33f7",
+        "completion_revision": 223,
+        "evidence_id": "28486de2-790a-4746-a806-7a4a9012bf3e",
+        "evidence_revision": 220,
+        "gate_id": "CS-FOUND-12-CPEXEC01",
+        "input_fingerprint": "2ca3d1e1edfa2317f9e21b1efe758390339f26ac24798b9175a4d744b92dccc0",
+        "provenance_json": "{\"claim_id\": \"40c851bb-a5e7-4d56-a93c-46a66fc276bb\", \"evidence_content_hash\": null, \"evidence_kind\": \"command\", \"evidence_metadata\": {\"argv\": [\"./build-cs-found-baseline/cellShardExecutionPayloadTest\"], \"environment\": {}, \"expected_exit_code\": 0, \"input_fingerprint\": \"2ca3d1e1edfa2317f9e21b1efe758390339f26ac24798b9175a4d744b92dccc0\", \"inputs\": {\"command_contract\": {\"argv\": [\"./build-cs-found-baseline/cellShardExecutionPayloadTest\"], \"locks\": [\"build:cellshard\"], \"resources\": [\"gpu:any\"]}, \"diff_fingerprint\": \"06531d7314e9587f9c5d45b7ec68b8ec3cbb13bbf64f536cc42a2ab987ddf823\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"CMakeLists.txt\", \"include/CellShard/io/pack/execution_payload.cuh\", \"include/CellShard/runtime/layout/sharded.cuh\", \"src/io/pack/execution_payload.cu\", \"tests/foundation_legacy_adapter_test.cc\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-12.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"bd84bf0e3c0c2cbd5af1adcc8aabd4062a4e577b\"}, \"locks\": [{\"expires_at\": \"2026-08-27T09:12:08Z\", \"lease_id\": \"bcab8d63-2a27-48b2-b5bd-c5a3522c72af\", \"name\": \"build:cellshard\"}], \"resources\": [{\"class_id\": \"gpu\", \"expires_at\": \"2026-08-27T09:12:08Z\", \"instance_id\": \"gpu:0\", \"lease_id\": \"40c2268b-bf20-4e24-96c0-e79ba4f3d66a\", \"metadata\": {\"compute_capability\": \"7.0\", \"model\": \"Tesla V100-SXM2-16GB\"}}], \"returncode\": 0, \"started_revision\": 219}, \"evidence_path\": \"/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/28486de2-790a-4746-a806-7a4a9012bf3e\", \"source\": \"completion_transaction\"}",
+        "status": "passed",
+        "task_id": "CS-FOUND-12",
+        "valid": 1,
+        "validation_git_head": "bd84bf0e3c0c2cbd5af1adcc8aabd4062a4e577b"
+      },
+      {
+        "completion_git_head": "14f9d0020e875726bf5c8ac315b8d998901a33f7",
+        "completion_revision": 223,
+        "evidence_id": "50d0c4c1-af4e-40fa-9990-98c0537e7391",
+        "evidence_revision": 218,
+        "gate_id": "CS-FOUND-12-LEGACY",
+        "input_fingerprint": "f3c32b67fc58ef6dce66776b33b207baf4ce853dced4fa757089872d4baa1b72",
+        "provenance_json": "{\"claim_id\": \"40c851bb-a5e7-4d56-a93c-46a66fc276bb\", \"evidence_content_hash\": null, \"evidence_kind\": \"command\", \"evidence_metadata\": {\"argv\": [\"./build-cs-found-baseline/cellShardFoundationLegacyAdapterTest\"], \"environment\": {}, \"expected_exit_code\": 0, \"input_fingerprint\": \"f3c32b67fc58ef6dce66776b33b207baf4ce853dced4fa757089872d4baa1b72\", \"inputs\": {\"command_contract\": {\"argv\": [\"./build-cs-found-baseline/cellShardFoundationLegacyAdapterTest\"], \"locks\": [\"build:cellshard\"]}, \"diff_fingerprint\": \"06531d7314e9587f9c5d45b7ec68b8ec3cbb13bbf64f536cc42a2ab987ddf823\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"CMakeLists.txt\", \"include/CellShard/io/pack/execution_payload.cuh\", \"include/CellShard/runtime/layout/sharded.cuh\", \"src/io/pack/execution_payload.cu\", \"tests/foundation_legacy_adapter_test.cc\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-12.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"bd84bf0e3c0c2cbd5af1adcc8aabd4062a4e577b\"}, \"locks\": [{\"expires_at\": \"2026-08-27T09:12:08Z\", \"lease_id\": \"715be05f-5df0-4b5b-ae31-3a289b56b5d1\", \"name\": \"build:cellshard\"}], \"resources\": [], \"returncode\": 0, \"started_revision\": 217}, \"evidence_path\": \"/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/50d0c4c1-af4e-40fa-9990-98c0537e7391\", \"source\": \"completion_transaction\"}",
+        "status": "passed",
+        "task_id": "CS-FOUND-12",
+        "valid": 1,
+        "validation_git_head": "bd84bf0e3c0c2cbd5af1adcc8aabd4062a4e577b"
       }
     ],
     "task_dependencies": [
@@ -6438,9 +6700,9 @@
       },
       {
         "attention_reason": null,
-        "completion_commit": null,
-        "completion_git_head": null,
-        "completion_revision": null,
+        "completion_commit": "14f9d0020e875726bf5c8ac315b8d998901a33f7",
+        "completion_git_head": "14f9d0020e875726bf5c8ac315b8d998901a33f7",
+        "completion_revision": 223,
         "created_at": "2026-08-21T12:05:03Z",
         "id": "CS-FOUND-12",
         "kind": "task",
@@ -6452,14 +6714,14 @@
         "parallel_policy": "parallel_safe",
         "parent_id": "CS-FOUND-00",
         "priority": 49,
-        "result": null,
+        "result": "implemented",
         "result_policy_json": "{\"allowed_dispositions\": [\"implemented\", \"validated\"]}",
-        "revision": 166,
-        "status": "planned",
+        "revision": 223,
+        "status": "done",
         "tags_json": "[]",
         "title": "Legacy identity and sharded-runtime adapters",
-        "updated_at": "2026-08-27T08:56:40Z",
-        "version": 13
+        "updated_at": "2026-08-27T09:07:28Z",
+        "version": 15
       },
       {
         "attention_reason": null,

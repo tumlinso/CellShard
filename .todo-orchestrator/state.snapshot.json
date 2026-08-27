@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-27T09:07:28Z",
+  "generated_at": "2026-08-27T09:09:35Z",
   "project": {
     "configuration": {
       "busy_timeout_ms": 5000,
@@ -18,7 +18,7 @@
     "project_uuid": "a52537a5-20db-4aeb-a126-dd0128c71fda",
     "schema_version": 2
   },
-  "project_revision": 223,
+  "project_revision": 252,
   "schema_version": 2,
   "tables": {
     "barrier_requirements": [
@@ -340,10 +340,10 @@
       {
         "id": "CS-FOUND-C2",
         "metadata_json": "{}",
-        "reached_at": null,
-        "revision": 166,
+        "reached_at": "2026-08-27T09:07:59Z",
+        "revision": 233,
         "revoked_at": null,
-        "state": "pending",
+        "state": "reached",
         "task_id": "CS-FOUND-13",
         "title": "Image and residency integration checkpoint"
       },
@@ -390,20 +390,20 @@
       {
         "id": "CS-FOUND-G4",
         "metadata_json": "{}",
-        "reached_at": null,
-        "revision": 166,
+        "reached_at": "2026-08-27T09:07:59Z",
+        "revision": 238,
         "revoked_at": null,
-        "state": "pending",
+        "state": "reached",
         "task_id": "CS-FOUND-13",
         "title": "G4 Residency path valid"
       },
       {
         "id": "CS-FOUND-G5",
         "metadata_json": "{}",
-        "reached_at": null,
-        "revision": 166,
+        "reached_at": "2026-08-27T09:09:27Z",
+        "revision": 251,
         "revoked_at": null,
-        "state": "pending",
+        "state": "reached",
         "task_id": "CS-FOUND-13",
         "title": "G5 Vertical slice valid"
       },
@@ -2659,6 +2659,296 @@
         "revision": 223,
         "seq": 223,
         "timestamp": "2026-08-27T09:07:28Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-13",
+        "entity_type": "claim",
+        "event_type": "continue.completed",
+        "payload_json": "{\"requested_task_id\": \"CS-FOUND-13\"}",
+        "revision": 224,
+        "seq": 224,
+        "timestamp": "2026-08-27T09:07:46Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "C2-T09",
+        "entity_type": "gate",
+        "event_type": "gate.started",
+        "payload_json": "{\"gate_id\": \"C2-T09\"}",
+        "revision": 225,
+        "seq": 225,
+        "timestamp": "2026-08-27T09:07:58Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "C2-T09",
+        "entity_type": "gate",
+        "event_type": "gate.completed",
+        "payload_json": "{\"evidence_id\": \"9e12143b-b9e9-4381-bc14-624629772c98\", \"status\": \"passed\", \"valid\": true}",
+        "revision": 226,
+        "seq": 226,
+        "timestamp": "2026-08-27T09:07:58Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "C2-T10",
+        "entity_type": "gate",
+        "event_type": "gate.started",
+        "payload_json": "{\"gate_id\": \"C2-T10\"}",
+        "revision": 227,
+        "seq": 227,
+        "timestamp": "2026-08-27T09:07:58Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "C2-T10",
+        "entity_type": "gate",
+        "event_type": "gate.completed",
+        "payload_json": "{\"evidence_id\": \"427501ab-f21c-4b53-b98f-e640b55f55a1\", \"status\": \"passed\", \"valid\": true}",
+        "revision": 228,
+        "seq": 228,
+        "timestamp": "2026-08-27T09:07:58Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "C2-T11",
+        "entity_type": "gate",
+        "event_type": "gate.started",
+        "payload_json": "{\"gate_id\": \"C2-T11\"}",
+        "revision": 229,
+        "seq": 229,
+        "timestamp": "2026-08-27T09:07:58Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "C2-T11",
+        "entity_type": "gate",
+        "event_type": "gate.completed",
+        "payload_json": "{\"evidence_id\": \"2fc026c2-a6c0-405c-b027-9610901dcc05\", \"status\": \"passed\", \"valid\": true}",
+        "revision": 230,
+        "seq": 230,
+        "timestamp": "2026-08-27T09:07:58Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "C2-T12",
+        "entity_type": "gate",
+        "event_type": "gate.started",
+        "payload_json": "{\"gate_id\": \"C2-T12\"}",
+        "revision": 231,
+        "seq": 231,
+        "timestamp": "2026-08-27T09:07:58Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "C2-T12",
+        "entity_type": "gate",
+        "event_type": "gate.completed",
+        "payload_json": "{\"evidence_id\": \"22a6ceeb-9635-4c80-b0e1-32336becf2ed\", \"status\": \"passed\", \"valid\": true}",
+        "revision": 232,
+        "seq": 232,
+        "timestamp": "2026-08-27T09:07:58Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-C2",
+        "entity_type": "checkpoint",
+        "event_type": "checkpoint.reach",
+        "payload_json": "{}",
+        "revision": 233,
+        "seq": 233,
+        "timestamp": "2026-08-27T09:07:59Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "G4-I5A",
+        "entity_type": "gate",
+        "event_type": "gate.started",
+        "payload_json": "{\"gate_id\": \"G4-I5A\"}",
+        "revision": 234,
+        "seq": 234,
+        "timestamp": "2026-08-27T09:07:59Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "G4-I5A",
+        "entity_type": "gate",
+        "event_type": "gate.completed",
+        "payload_json": "{\"evidence_id\": \"cbc4f2a7-fee6-4df9-b194-1d52d7dc927c\", \"status\": \"passed\", \"valid\": true}",
+        "revision": 235,
+        "seq": 235,
+        "timestamp": "2026-08-27T09:07:59Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "G4-I5B",
+        "entity_type": "gate",
+        "event_type": "gate.started",
+        "payload_json": "{\"gate_id\": \"G4-I5B\"}",
+        "revision": 236,
+        "seq": 236,
+        "timestamp": "2026-08-27T09:07:59Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "G4-I5B",
+        "entity_type": "gate",
+        "event_type": "gate.completed",
+        "payload_json": "{\"evidence_id\": \"29bfdf53-0d8b-49f7-810d-77f09c9f5299\", \"status\": \"passed\", \"valid\": true}",
+        "revision": 237,
+        "seq": 237,
+        "timestamp": "2026-08-27T09:07:59Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-G4",
+        "entity_type": "checkpoint",
+        "event_type": "checkpoint.reach",
+        "payload_json": "{}",
+        "revision": 238,
+        "seq": 238,
+        "timestamp": "2026-08-27T09:07:59Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "build:cellshard",
+        "entity_type": "lock",
+        "event_type": "lock.acquired",
+        "payload_json": "{\"names\": [\"build:cellshard\"]}",
+        "revision": 239,
+        "seq": 239,
+        "timestamp": "2026-08-27T09:09:13Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "build:cellshard",
+        "entity_type": "lock",
+        "event_type": "lock.released",
+        "payload_json": "{}",
+        "revision": 240,
+        "seq": 240,
+        "timestamp": "2026-08-27T09:09:13Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "build:cellshard",
+        "entity_type": "lock",
+        "event_type": "lock.acquired",
+        "payload_json": "{\"names\": [\"build:cellshard\"]}",
+        "revision": 241,
+        "seq": 241,
+        "timestamp": "2026-08-27T09:09:13Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "build:cellshard",
+        "entity_type": "lock",
+        "event_type": "lock.released",
+        "payload_json": "{}",
+        "revision": 242,
+        "seq": 242,
+        "timestamp": "2026-08-27T09:09:15Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "build:cellshard",
+        "entity_type": "lock",
+        "event_type": "lock.acquired",
+        "payload_json": "{\"names\": [\"build:cellshard\"]}",
+        "revision": 243,
+        "seq": 243,
+        "timestamp": "2026-08-27T09:09:15Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "build:cellshard",
+        "entity_type": "lock",
+        "event_type": "lock.released",
+        "payload_json": "{}",
+        "revision": 244,
+        "seq": 244,
+        "timestamp": "2026-08-27T09:09:15Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "build:cellshard",
+        "entity_type": "lock",
+        "event_type": "lock.acquired",
+        "payload_json": "{\"names\": [\"build:cellshard\"]}",
+        "revision": 245,
+        "seq": 245,
+        "timestamp": "2026-08-27T09:09:16Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "build:cellshard",
+        "entity_type": "lock",
+        "event_type": "lock.released",
+        "payload_json": "{}",
+        "revision": 246,
+        "seq": 246,
+        "timestamp": "2026-08-27T09:09:18Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "G5-CPU-PIPELINE",
+        "entity_type": "gate",
+        "event_type": "gate.started",
+        "payload_json": "{\"gate_id\": \"G5-CPU-PIPELINE\"}",
+        "revision": 247,
+        "seq": 247,
+        "timestamp": "2026-08-27T09:09:26Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "G5-CPU-PIPELINE",
+        "entity_type": "gate",
+        "event_type": "gate.completed",
+        "payload_json": "{\"evidence_id\": \"d974a540-4bf5-4f03-b60d-420fe2ce9d9a\", \"status\": \"passed\", \"valid\": true}",
+        "revision": 248,
+        "seq": 248,
+        "timestamp": "2026-08-27T09:09:26Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "G5-CUDA-PIPELINE",
+        "entity_type": "gate",
+        "event_type": "gate.started",
+        "payload_json": "{\"gate_id\": \"G5-CUDA-PIPELINE\"}",
+        "revision": 249,
+        "seq": 249,
+        "timestamp": "2026-08-27T09:09:26Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "G5-CUDA-PIPELINE",
+        "entity_type": "gate",
+        "event_type": "gate.completed",
+        "payload_json": "{\"evidence_id\": \"ea49c600-7df5-474a-af79-45d4dff8e22b\", \"status\": \"passed\", \"valid\": true}",
+        "revision": 250,
+        "seq": 250,
+        "timestamp": "2026-08-27T09:09:26Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-G5",
+        "entity_type": "checkpoint",
+        "event_type": "checkpoint.reach",
+        "payload_json": "{}",
+        "revision": 251,
+        "seq": 251,
+        "timestamp": "2026-08-27T09:09:27Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-13",
+        "entity_type": "task",
+        "event_type": "task.completed",
+        "payload_json": "{\"completion_revision\": 252, \"disposition\": \"validated\", \"reached_checkpoints\": []}",
+        "revision": 252,
+        "seq": 252,
+        "timestamp": "2026-08-27T09:09:35Z"
       }
     ],
     "evidence": [
@@ -2809,6 +3099,19 @@
         "checkpoint_id": null,
         "claim_id": null,
         "content_hash": null,
+        "created_at": "2026-08-27T09:07:58Z",
+        "gate_id": "C2-T12",
+        "id": "22a6ceeb-9635-4c80-b0e1-32336becf2ed",
+        "kind": "task_state",
+        "metadata_json": "{\"input_fingerprint\": \"0a4ff47ab821c6fd134da5d71d40039f83cda31bf6a6a6dec3a1c0157502c4e7\", \"inputs\": {\"command_contract\": {\"status\": \"done\", \"task_id\": \"CS-FOUND-12\"}, \"diff_fingerprint\": \"e12bbcc95a71e9cdf7ce90e719d76766d8d61a603cf42d629f07c4de28dc1778\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-13.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"c7ee8eefb7a74cc00279bb029bfa4a1672ffd77a\"}, \"locks\": [], \"resources\": [], \"result\": \"implemented\", \"started_revision\": 231, \"status\": \"done\"}",
+        "path": "/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/22a6ceeb-9635-4c80-b0e1-32336becf2ed",
+        "revision": 232,
+        "status": "passed"
+      },
+      {
+        "checkpoint_id": null,
+        "claim_id": null,
+        "content_hash": null,
         "created_at": "2026-08-27T08:32:40Z",
         "gate_id": "CS-FOUND-04-CPU",
         "id": "274f76d8-22df-4ab8-b1b4-535c816edef4",
@@ -2861,6 +3164,19 @@
         "checkpoint_id": null,
         "claim_id": null,
         "content_hash": null,
+        "created_at": "2026-08-27T09:07:59Z",
+        "gate_id": "G4-I5B",
+        "id": "29bfdf53-0d8b-49f7-810d-77f09c9f5299",
+        "kind": "interface",
+        "metadata_json": "{\"content_hash\": \"e5a76d38652886e16a8b7b06c3068c0fac5b1736b2216465d7e82d1386210b24\", \"input_fingerprint\": \"7dbd9c31dfbd66ad47c502360a90b0438143ebb7d742c5a12e0b7188b8ee5b77\", \"inputs\": {\"command_contract\": {\"interface_id\": \"CS-FOUND-I5B\", \"state\": \"frozen\", \"version\": \"1\"}, \"diff_fingerprint\": \"e12bbcc95a71e9cdf7ce90e719d76766d8d61a603cf42d629f07c4de28dc1778\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-13.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"c7ee8eefb7a74cc00279bb029bfa4a1672ffd77a\"}, \"locks\": [], \"resources\": [], \"started_revision\": 236, \"state\": \"frozen\", \"version\": \"1\"}",
+        "path": "/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/29bfdf53-0d8b-49f7-810d-77f09c9f5299",
+        "revision": 237,
+        "status": "passed"
+      },
+      {
+        "checkpoint_id": null,
+        "claim_id": null,
+        "content_hash": null,
         "created_at": "2026-08-21T12:58:36Z",
         "gate_id": "CS-FOUND-01-MASK-KNOWN",
         "id": "2b7a4b4c-f5d1-4704-a34c-8b546714b049",
@@ -2868,6 +3184,19 @@
         "metadata_json": "{\"argv\": [\"./build-cs-found-baseline/cellShardMaskGroupsRuntimeTest\"], \"environment\": {}, \"expected_exit_code\": 14, \"inputs\": {\"command_contract\": {\"argv\": [\"./build-cs-found-baseline/cellShardMaskGroupsRuntimeTest\"], \"expected_exit_code\": 14, \"locks\": [\"build:cellshard\"], \"resources\": [\"gpu:any\"]}, \"diff_fingerprint\": \"c2de955c4f2cb1f5dc49b2201cf25d85ec518e55eb8b5451d782c4fb1fed3f02\", \"dirty_paths\": [\".todo-orchestrator/cs-found-plan.json\", \".todo-orchestrator/project.json\", \".todo-orchestrator/state.snapshot.json\", \"docs/CS_FOUND_TRANSITION_MAP.md\", \"todo-status.md\", \"todos.md\", \"todos/cellshard-cpp-access-adapter-refactor.md\", \"todos/cs-found-00.md\", \"todos/cs-found-01.md\", \"todos/cs-found-02.md\", \"todos/cs-found-03.md\", \"todos/cs-found-04.md\", \"todos/cs-found-05.md\", \"todos/cs-found-06.md\", \"todos/cs-found-07.md\", \"todos/cs-found-08.md\", \"todos/cs-found-09.md\", \"todos/cs-found-10.md\", \"todos/cs-found-11.md\", \"todos/cs-found-12.md\", \"todos/cs-found-13.md\", \"todos/cs-found-14.md\", \"todos/cs-found-15.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"bbe5917bab88ffca2d16bc86166a8de368a4abbe\"}, \"locks\": [{\"expires_at\": \"2026-08-21T13:03:35Z\", \"lease_id\": \"7db10545-6854-487e-b89a-2719330e554e\", \"name\": \"build:cellshard\"}], \"resources\": [{\"class_id\": \"gpu\", \"expires_at\": \"2026-08-21T13:03:35Z\", \"instance_id\": \"gpu:0\", \"lease_id\": \"2eb236ba-db97-493e-9122-3ebfc69dfd46\", \"metadata\": {\"compute_capability\": \"7.0\", \"model\": \"Tesla V100-SXM2-16GB\"}}], \"returncode\": 14, \"started_revision\": 28}",
         "path": "/home/tumlinson/CellStack/.git/modules/CellShard/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/2b7a4b4c-f5d1-4704-a34c-8b546714b049",
         "revision": 29,
+        "status": "passed"
+      },
+      {
+        "checkpoint_id": null,
+        "claim_id": null,
+        "content_hash": null,
+        "created_at": "2026-08-27T09:07:58Z",
+        "gate_id": "C2-T11",
+        "id": "2fc026c2-a6c0-405c-b027-9610901dcc05",
+        "kind": "task_state",
+        "metadata_json": "{\"input_fingerprint\": \"0f083b954dd32670c3162790bf05587c050ef63a9a19c08238d7269e491ffba1\", \"inputs\": {\"command_contract\": {\"status\": \"done\", \"task_id\": \"CS-FOUND-11\"}, \"diff_fingerprint\": \"e12bbcc95a71e9cdf7ce90e719d76766d8d61a603cf42d629f07c4de28dc1778\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-13.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"c7ee8eefb7a74cc00279bb029bfa4a1672ffd77a\"}, \"locks\": [], \"resources\": [], \"result\": \"implemented\", \"started_revision\": 229, \"status\": \"done\"}",
+        "path": "/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/2fc026c2-a6c0-405c-b027-9610901dcc05",
+        "revision": 230,
         "status": "passed"
       },
       {
@@ -2895,6 +3224,19 @@
         "path": "/home/tumlinson/CellStack/.git/modules/CellShard/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/3db725d7-ca2e-4832-b91f-b8bb9e077653",
         "revision": 43,
         "status": "failed"
+      },
+      {
+        "checkpoint_id": null,
+        "claim_id": null,
+        "content_hash": null,
+        "created_at": "2026-08-27T09:07:58Z",
+        "gate_id": "C2-T10",
+        "id": "427501ab-f21c-4b53-b98f-e640b55f55a1",
+        "kind": "task_state",
+        "metadata_json": "{\"input_fingerprint\": \"5b4e8d8ea9efe73dca920edd84d42409b81376cab3b8df09e7e8e0f1bb53348b\", \"inputs\": {\"command_contract\": {\"status\": \"done\", \"task_id\": \"CS-FOUND-10\"}, \"diff_fingerprint\": \"e12bbcc95a71e9cdf7ce90e719d76766d8d61a603cf42d629f07c4de28dc1778\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-13.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"c7ee8eefb7a74cc00279bb029bfa4a1672ffd77a\"}, \"locks\": [], \"resources\": [], \"result\": \"implemented\", \"started_revision\": 227, \"status\": \"done\"}",
+        "path": "/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/427501ab-f21c-4b53-b98f-e640b55f55a1",
+        "revision": 228,
+        "status": "passed"
       },
       {
         "checkpoint_id": null,
@@ -3134,6 +3476,19 @@
         "checkpoint_id": null,
         "claim_id": null,
         "content_hash": null,
+        "created_at": "2026-08-27T09:07:58Z",
+        "gate_id": "C2-T09",
+        "id": "9e12143b-b9e9-4381-bc14-624629772c98",
+        "kind": "task_state",
+        "metadata_json": "{\"input_fingerprint\": \"4f678c9f491854935db876ba1e8e0aa58bca56a7e705b7ef42751e85064c6001\", \"inputs\": {\"command_contract\": {\"status\": \"done\", \"task_id\": \"CS-FOUND-09\"}, \"diff_fingerprint\": \"e12bbcc95a71e9cdf7ce90e719d76766d8d61a603cf42d629f07c4de28dc1778\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-13.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"c7ee8eefb7a74cc00279bb029bfa4a1672ffd77a\"}, \"locks\": [], \"resources\": [], \"result\": \"implemented\", \"started_revision\": 225, \"status\": \"done\"}",
+        "path": "/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/9e12143b-b9e9-4381-bc14-624629772c98",
+        "revision": 226,
+        "status": "passed"
+      },
+      {
+        "checkpoint_id": null,
+        "claim_id": null,
+        "content_hash": null,
         "created_at": "2026-08-27T08:58:05Z",
         "gate_id": "G3-T09",
         "id": "9ef42132-9257-47bb-abb6-c896eb95f2e8",
@@ -3264,6 +3619,32 @@
         "checkpoint_id": null,
         "claim_id": null,
         "content_hash": null,
+        "created_at": "2026-08-27T09:07:59Z",
+        "gate_id": "G4-I5A",
+        "id": "cbc4f2a7-fee6-4df9-b194-1d52d7dc927c",
+        "kind": "interface",
+        "metadata_json": "{\"content_hash\": \"3d5c4533eeb14b93bddc85067338cea5745790c81bff06407489411f902df82e\", \"input_fingerprint\": \"9c10f9be97af4c5d3c03f1737fa7eed9a8e8818d72b133fa3baed6cfeed1619d\", \"inputs\": {\"command_contract\": {\"interface_id\": \"CS-FOUND-I5A\", \"state\": \"frozen\", \"version\": \"1\"}, \"diff_fingerprint\": \"e12bbcc95a71e9cdf7ce90e719d76766d8d61a603cf42d629f07c4de28dc1778\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-13.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"c7ee8eefb7a74cc00279bb029bfa4a1672ffd77a\"}, \"locks\": [], \"resources\": [], \"started_revision\": 234, \"state\": \"frozen\", \"version\": \"1\"}",
+        "path": "/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/cbc4f2a7-fee6-4df9-b194-1d52d7dc927c",
+        "revision": 235,
+        "status": "passed"
+      },
+      {
+        "checkpoint_id": null,
+        "claim_id": null,
+        "content_hash": null,
+        "created_at": "2026-08-27T09:09:26Z",
+        "gate_id": "G5-CPU-PIPELINE",
+        "id": "d974a540-4bf5-4f03-b60d-420fe2ce9d9a",
+        "kind": "command",
+        "metadata_json": "{\"argv\": [\"./build-cs-found-cpu/cellShardOpaqueImagePipelineTest\"], \"environment\": {}, \"expected_exit_code\": 0, \"input_fingerprint\": \"4c7a3ed1986feb44b075d68d10c3fcff977053b2c55bdf60b1e8d9b898a8bd38\", \"inputs\": {\"command_contract\": {\"argv\": [\"./build-cs-found-cpu/cellShardOpaqueImagePipelineTest\"], \"locks\": [\"build:cellshard\"]}, \"diff_fingerprint\": \"995efbe65c0fe8e5168e8cfe5ef6bd9c274827977748396752c579b9c11ad14a\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"CMakeLists.txt\", \"tests/opaque_image_pipeline_cuda_test.cu\", \"tests/opaque_image_pipeline_test.cc\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-13.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"c7ee8eefb7a74cc00279bb029bfa4a1672ffd77a\"}, \"locks\": [{\"expires_at\": \"2026-08-27T09:14:26Z\", \"lease_id\": \"adca170b-85fe-482a-88c6-8cd367d0907f\", \"name\": \"build:cellshard\"}], \"resources\": [], \"returncode\": 0, \"started_revision\": 247}",
+        "path": "/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/d974a540-4bf5-4f03-b60d-420fe2ce9d9a",
+        "revision": 248,
+        "status": "passed"
+      },
+      {
+        "checkpoint_id": null,
+        "claim_id": null,
+        "content_hash": null,
         "created_at": "2026-08-21T13:04:29Z",
         "gate_id": "G1-CPU-BUILD",
         "id": "d9c766fc-6a27-43b5-8ae9-083cd66ab505",
@@ -3337,6 +3718,19 @@
         "path": "/home/tumlinson/CellStack/.git/modules/CellShard/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/e893f7e0-73f0-47e4-afe9-2a2375d6186f",
         "revision": 54,
         "status": "failed"
+      },
+      {
+        "checkpoint_id": null,
+        "claim_id": null,
+        "content_hash": null,
+        "created_at": "2026-08-27T09:09:26Z",
+        "gate_id": "G5-CUDA-PIPELINE",
+        "id": "ea49c600-7df5-474a-af79-45d4dff8e22b",
+        "kind": "command",
+        "metadata_json": "{\"argv\": [\"./build-cs-found-baseline/cellShardOpaqueImagePipelineCudaTest\"], \"environment\": {}, \"expected_exit_code\": 0, \"input_fingerprint\": \"7bf7581780f173ec73fd811196a536b58ba29171324600cff6fc5c15de89fb8d\", \"inputs\": {\"command_contract\": {\"argv\": [\"./build-cs-found-baseline/cellShardOpaqueImagePipelineCudaTest\"], \"locks\": [\"build:cellshard\"], \"resources\": [\"gpu:any\"]}, \"diff_fingerprint\": \"995efbe65c0fe8e5168e8cfe5ef6bd9c274827977748396752c579b9c11ad14a\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"CMakeLists.txt\", \"tests/opaque_image_pipeline_cuda_test.cu\", \"tests/opaque_image_pipeline_test.cc\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-13.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"c7ee8eefb7a74cc00279bb029bfa4a1672ffd77a\"}, \"locks\": [{\"expires_at\": \"2026-08-27T09:14:26Z\", \"lease_id\": \"451fe4ff-36e9-466a-af1d-11785875f4d1\", \"name\": \"build:cellshard\"}], \"resources\": [{\"class_id\": \"gpu\", \"expires_at\": \"2026-08-27T09:14:26Z\", \"instance_id\": \"gpu:0\", \"lease_id\": \"24af1756-977a-43a0-be65-56d3883307cd\", \"metadata\": {\"compute_capability\": \"7.0\", \"model\": \"Tesla V100-SXM2-16GB\"}}], \"returncode\": 0, \"started_revision\": 249}",
+        "path": "/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/ea49c600-7df5-474a-af79-45d4dff8e22b",
+        "revision": 250,
+        "status": "passed"
       },
       {
         "checkpoint_id": null,
@@ -3435,53 +3829,53 @@
         "checkpoint_id": "CS-FOUND-C2",
         "config_json": "{\"status\": \"done\", \"task_id\": \"CS-FOUND-09\"}",
         "id": "C2-T09",
-        "input_fingerprint": null,
-        "last_run_at": null,
+        "input_fingerprint": "4f678c9f491854935db876ba1e8e0aa58bca56a7e705b7ef42751e85064c6001",
+        "last_run_at": "2026-08-27T09:07:58Z",
         "required": 1,
-        "revision": 166,
-        "status": "pending",
+        "revision": 226,
+        "status": "passed",
         "task_id": "CS-FOUND-13",
         "type": "task_state",
-        "valid": 0
+        "valid": 1
       },
       {
         "checkpoint_id": "CS-FOUND-C2",
         "config_json": "{\"status\": \"done\", \"task_id\": \"CS-FOUND-10\"}",
         "id": "C2-T10",
-        "input_fingerprint": null,
-        "last_run_at": null,
+        "input_fingerprint": "5b4e8d8ea9efe73dca920edd84d42409b81376cab3b8df09e7e8e0f1bb53348b",
+        "last_run_at": "2026-08-27T09:07:58Z",
         "required": 1,
-        "revision": 166,
-        "status": "pending",
+        "revision": 228,
+        "status": "passed",
         "task_id": "CS-FOUND-13",
         "type": "task_state",
-        "valid": 0
+        "valid": 1
       },
       {
         "checkpoint_id": "CS-FOUND-C2",
         "config_json": "{\"status\": \"done\", \"task_id\": \"CS-FOUND-11\"}",
         "id": "C2-T11",
-        "input_fingerprint": null,
-        "last_run_at": null,
+        "input_fingerprint": "0f083b954dd32670c3162790bf05587c050ef63a9a19c08238d7269e491ffba1",
+        "last_run_at": "2026-08-27T09:07:58Z",
         "required": 1,
-        "revision": 166,
-        "status": "pending",
+        "revision": 230,
+        "status": "passed",
         "task_id": "CS-FOUND-13",
         "type": "task_state",
-        "valid": 0
+        "valid": 1
       },
       {
         "checkpoint_id": "CS-FOUND-C2",
         "config_json": "{\"status\": \"done\", \"task_id\": \"CS-FOUND-12\"}",
         "id": "C2-T12",
-        "input_fingerprint": null,
-        "last_run_at": null,
+        "input_fingerprint": "0a4ff47ab821c6fd134da5d71d40039f83cda31bf6a6a6dec3a1c0157502c4e7",
+        "last_run_at": "2026-08-27T09:07:58Z",
         "required": 1,
-        "revision": 166,
-        "status": "pending",
+        "revision": 232,
+        "status": "passed",
         "task_id": "CS-FOUND-13",
         "type": "task_state",
-        "valid": 0
+        "valid": 1
       },
       {
         "checkpoint_id": "CS-FOUND-G0",
@@ -3942,53 +4336,53 @@
         "checkpoint_id": "CS-FOUND-G4",
         "config_json": "{\"interface_id\": \"CS-FOUND-I5A\", \"state\": \"frozen\", \"version\": \"1\"}",
         "id": "G4-I5A",
-        "input_fingerprint": null,
-        "last_run_at": null,
+        "input_fingerprint": "9c10f9be97af4c5d3c03f1737fa7eed9a8e8818d72b133fa3baed6cfeed1619d",
+        "last_run_at": "2026-08-27T09:07:59Z",
         "required": 1,
-        "revision": 166,
-        "status": "pending",
+        "revision": 235,
+        "status": "passed",
         "task_id": "CS-FOUND-13",
         "type": "interface",
-        "valid": 0
+        "valid": 1
       },
       {
         "checkpoint_id": "CS-FOUND-G4",
         "config_json": "{\"interface_id\": \"CS-FOUND-I5B\", \"state\": \"frozen\", \"version\": \"1\"}",
         "id": "G4-I5B",
-        "input_fingerprint": null,
-        "last_run_at": null,
+        "input_fingerprint": "7dbd9c31dfbd66ad47c502360a90b0438143ebb7d742c5a12e0b7188b8ee5b77",
+        "last_run_at": "2026-08-27T09:07:59Z",
         "required": 1,
-        "revision": 166,
-        "status": "pending",
+        "revision": 237,
+        "status": "passed",
         "task_id": "CS-FOUND-13",
         "type": "interface",
-        "valid": 0
+        "valid": 1
       },
       {
         "checkpoint_id": "CS-FOUND-G5",
         "config_json": "{\"argv\": [\"./build-cs-found-cpu/cellShardOpaqueImagePipelineTest\"], \"locks\": [\"build:cellshard\"]}",
         "id": "G5-CPU-PIPELINE",
-        "input_fingerprint": null,
-        "last_run_at": null,
+        "input_fingerprint": "4c7a3ed1986feb44b075d68d10c3fcff977053b2c55bdf60b1e8d9b898a8bd38",
+        "last_run_at": "2026-08-27T09:09:26Z",
         "required": 1,
-        "revision": 166,
-        "status": "pending",
+        "revision": 248,
+        "status": "passed",
         "task_id": "CS-FOUND-13",
         "type": "command",
-        "valid": 0
+        "valid": 1
       },
       {
         "checkpoint_id": "CS-FOUND-G5",
         "config_json": "{\"argv\": [\"./build-cs-found-baseline/cellShardOpaqueImagePipelineCudaTest\"], \"locks\": [\"build:cellshard\"], \"resources\": [\"gpu:any\"]}",
         "id": "G5-CUDA-PIPELINE",
-        "input_fingerprint": null,
-        "last_run_at": null,
+        "input_fingerprint": "7bf7581780f173ec73fd811196a536b58ba29171324600cff6fc5c15de89fb8d",
+        "last_run_at": "2026-08-27T09:09:26Z",
         "required": 1,
-        "revision": 166,
-        "status": "pending",
+        "revision": 250,
+        "status": "passed",
         "task_id": "CS-FOUND-13",
         "type": "command",
-        "valid": 0
+        "valid": 1
       },
       {
         "checkpoint_id": "CS-FOUND-G6",
@@ -4135,6 +4529,16 @@
         "payload_json": "{\"changed_owned_paths\": [], \"checkpoints\": [{\"id\": \"CS-FOUND-C1\", \"reached_at\": \"2026-08-27T08:38:49Z\", \"state\": \"reached\"}, {\"id\": \"CS-FOUND-G2\", \"reached_at\": \"2026-08-27T08:38:58Z\", \"state\": \"reached\"}], \"completion_commit\": \"e64d32216950450031787fa4ffa29ef88d382df1\", \"completion_gates\": [{\"evidence_id\": \"3aa56c34-ce8f-4523-8674-7efb45b2cd8b\", \"evidence_revision\": 126, \"id\": \"C1-T03\", \"input_fingerprint\": \"e4dfcd7d00f33c8be99c268f075a6612f74bf4e5234ad8b95eadd9a243f1926e\", \"status\": \"passed\", \"valid\": true, \"validation_git_head\": \"ea7cc10b9d2c1a61444420ac2515e6f4c1424449\"}, {\"evidence_id\": \"b5d257ce-610d-478d-848d-697a7da4a6ca\", \"evidence_revision\": 128, \"id\": \"C1-T04\", \"input_fingerprint\": \"a904a9d8bae3df5b61b00fda74f2f6fa8593c1e2f348af9637773c7fcbc6f7bc\", \"status\": \"passed\", \"valid\": true, \"validation_git_head\": \"ea7cc10b9d2c1a61444420ac2515e6f4c1424449\"}, {\"evidence_id\": \"e5b25c99-9013-47b5-a811-6bd0f6c45123\", \"evidence_revision\": 130, \"id\": \"C1-T05\", \"input_fingerprint\": \"a8443720de4224f6a4eb55ce5c3638874abe82f4e6897274d2d9e9083030a888\", \"status\": \"passed\", \"valid\": true, \"validation_git_head\": \"ea7cc10b9d2c1a61444420ac2515e6f4c1424449\"}, {\"evidence_id\": \"48c4da63-043e-4fe3-908f-31b4064dad31\", \"evidence_revision\": 132, \"id\": \"C1-T06\", \"input_fingerprint\": \"47b7c766e72c026ebe5d4b628dd5808b54d7c2e2379d80d6ae2a79832122618b\", \"status\": \"passed\", \"valid\": true, \"validation_git_head\": \"ea7cc10b9d2c1a61444420ac2515e6f4c1424449\"}, {\"evidence_id\": \"1a3a07ec-f2e7-4bc6-bdb0-36b20e7a4513\", \"evidence_revision\": 148, \"id\": \"CS-FOUND-07-CPU\", \"input_fingerprint\": \"383518d55a02072c44847ab00470650e3e03b1ec9ad358588b79f63063a271fe\", \"status\": \"passed\", \"valid\": true, \"validation_git_head\": \"ea7cc10b9d2c1a61444420ac2515e6f4c1424449\"}, {\"evidence_id\": \"da1f2acd-5c32-4d1c-90b8-ef5d04a7fdd8\", \"evidence_revision\": 135, \"id\": \"G2-I1\", \"input_fingerprint\": \"fa00ceface6871cd63a972915b540bcc18339a2b110b0ded6dc24b7a964d0b8d\", \"status\": \"passed\", \"valid\": true, \"validation_git_head\": \"ea7cc10b9d2c1a61444420ac2515e6f4c1424449\"}, {\"evidence_id\": \"54244136-8470-4fab-abb7-1332bbb9024f\", \"evidence_revision\": 137, \"id\": \"G2-I2A\", \"input_fingerprint\": \"f30e6484f45f9f26759b57127c06489fa2877c2ca6eaeea36af73c428b077229\", \"status\": \"passed\", \"valid\": true, \"validation_git_head\": \"ea7cc10b9d2c1a61444420ac2515e6f4c1424449\"}, {\"evidence_id\": \"ada593d1-27cd-4689-b715-fedbc77be434\", \"evidence_revision\": 139, \"id\": \"G2-I2B\", \"input_fingerprint\": \"7dc81eac714ba13d24c8400f25de21e3ea67e7f0319c5d5a2b2f15b4e5c6ee9e\", \"status\": \"passed\", \"valid\": true, \"validation_git_head\": \"ea7cc10b9d2c1a61444420ac2515e6f4c1424449\"}, {\"evidence_id\": \"b2de68bc-f68d-4e62-836f-a6c60487a33e\", \"evidence_revision\": 141, \"id\": \"G2-I2C\", \"input_fingerprint\": \"cf1eed48ffae4da53ce6a9d597554753bd3810c04283e1e5aadb8c95e93d11a4\", \"status\": \"passed\", \"valid\": true, \"validation_git_head\": \"ea7cc10b9d2c1a61444420ac2515e6f4c1424449\"}], \"completion_revision\": 150, \"finalized_checkpoints\": [], \"gates\": [{\"id\": \"C1-T03\", \"input_fingerprint\": \"e4dfcd7d00f33c8be99c268f075a6612f74bf4e5234ad8b95eadd9a243f1926e\", \"last_run_at\": \"2026-08-27T08:38:48Z\", \"revision\": 126, \"status\": \"passed\", \"valid\": 1}, {\"id\": \"C1-T04\", \"input_fingerprint\": \"a904a9d8bae3df5b61b00fda74f2f6fa8593c1e2f348af9637773c7fcbc6f7bc\", \"last_run_at\": \"2026-08-27T08:38:48Z\", \"revision\": 128, \"status\": \"passed\", \"valid\": 1}, {\"id\": \"C1-T05\", \"input_fingerprint\": \"a8443720de4224f6a4eb55ce5c3638874abe82f4e6897274d2d9e9083030a888\", \"last_run_at\": \"2026-08-27T08:38:49Z\", \"revision\": 130, \"status\": \"passed\", \"valid\": 1}, {\"id\": \"C1-T06\", \"input_fingerprint\": \"47b7c766e72c026ebe5d4b628dd5808b54d7c2e2379d80d6ae2a79832122618b\", \"last_run_at\": \"2026-08-27T08:38:49Z\", \"revision\": 132, \"status\": \"passed\", \"valid\": 1}, {\"id\": \"CS-FOUND-07-CPU\", \"input_fingerprint\": \"383518d55a02072c44847ab00470650e3e03b1ec9ad358588b79f63063a271fe\", \"last_run_at\": \"2026-08-27T08:41:17Z\", \"revision\": 148, \"status\": \"passed\", \"valid\": 1}, {\"id\": \"G2-I1\", \"input_fingerprint\": \"fa00ceface6871cd63a972915b540bcc18339a2b110b0ded6dc24b7a964d0b8d\", \"last_run_at\": \"2026-08-27T08:38:57Z\", \"revision\": 135, \"status\": \"passed\", \"valid\": 1}, {\"id\": \"G2-I2A\", \"input_fingerprint\": \"f30e6484f45f9f26759b57127c06489fa2877c2ca6eaeea36af73c428b077229\", \"last_run_at\": \"2026-08-27T08:38:57Z\", \"revision\": 137, \"status\": \"passed\", \"valid\": 1}, {\"id\": \"G2-I2B\", \"input_fingerprint\": \"7dc81eac714ba13d24c8400f25de21e3ea67e7f0319c5d5a2b2f15b4e5c6ee9e\", \"last_run_at\": \"2026-08-27T08:38:57Z\", \"revision\": 139, \"status\": \"passed\", \"valid\": 1}, {\"id\": \"G2-I2C\", \"input_fingerprint\": \"cf1eed48ffae4da53ce6a9d597554753bd3810c04283e1e5aadb8c95e93d11a4\", \"last_run_at\": \"2026-08-27T08:38:58Z\", \"revision\": 141, \"status\": \"passed\", \"valid\": 1}], \"git_diffstat\": \"\", \"git_head\": \"e64d32216950450031787fa4ffa29ef88d382df1\", \"interfaces\": [{\"content_hash\": \"b09fd2ca65112edfea3739199be618a0b2b547550733b0d01ce771ba658b0914\", \"id\": \"CS-FOUND-I3A\", \"state\": \"revised\", \"version\": \"1\"}], \"note\": \"\", \"resources\": [], \"task_id\": \"CS-FOUND-07\"}",
         "revision": 150,
         "task_id": "CS-FOUND-07"
+      },
+      {
+        "claim_id": null,
+        "created_at": "2026-08-27T09:09:35Z",
+        "id": "2ebb5f9f-f90d-4e30-9534-3f8ee19c0793",
+        "kind": "complete",
+        "note": "Reached C2 and G4, freezing I5A/I5B. CPU and CUDA opaque-image vertical slices passed and G5 was reached with exact identity/byte preservation and allocator ownership.",
+        "payload_json": "{\"changed_owned_paths\": [], \"checkpoints\": [{\"id\": \"CS-FOUND-C2\", \"reached_at\": \"2026-08-27T09:07:59Z\", \"state\": \"reached\"}, {\"id\": \"CS-FOUND-G4\", \"reached_at\": \"2026-08-27T09:07:59Z\", \"state\": \"reached\"}, {\"id\": \"CS-FOUND-G5\", \"reached_at\": \"2026-08-27T09:09:27Z\", \"state\": \"reached\"}], \"completion_commit\": \"a96268099cd19d57483dacd11e330dcc5e58b064\", \"completion_gates\": [{\"evidence_id\": \"9e12143b-b9e9-4381-bc14-624629772c98\", \"evidence_revision\": 226, \"id\": \"C2-T09\", \"input_fingerprint\": \"4f678c9f491854935db876ba1e8e0aa58bca56a7e705b7ef42751e85064c6001\", \"status\": \"passed\", \"valid\": true, \"validation_git_head\": \"c7ee8eefb7a74cc00279bb029bfa4a1672ffd77a\"}, {\"evidence_id\": \"427501ab-f21c-4b53-b98f-e640b55f55a1\", \"evidence_revision\": 228, \"id\": \"C2-T10\", \"input_fingerprint\": \"5b4e8d8ea9efe73dca920edd84d42409b81376cab3b8df09e7e8e0f1bb53348b\", \"status\": \"passed\", \"valid\": true, \"validation_git_head\": \"c7ee8eefb7a74cc00279bb029bfa4a1672ffd77a\"}, {\"evidence_id\": \"2fc026c2-a6c0-405c-b027-9610901dcc05\", \"evidence_revision\": 230, \"id\": \"C2-T11\", \"input_fingerprint\": \"0f083b954dd32670c3162790bf05587c050ef63a9a19c08238d7269e491ffba1\", \"status\": \"passed\", \"valid\": true, \"validation_git_head\": \"c7ee8eefb7a74cc00279bb029bfa4a1672ffd77a\"}, {\"evidence_id\": \"22a6ceeb-9635-4c80-b0e1-32336becf2ed\", \"evidence_revision\": 232, \"id\": \"C2-T12\", \"input_fingerprint\": \"0a4ff47ab821c6fd134da5d71d40039f83cda31bf6a6a6dec3a1c0157502c4e7\", \"status\": \"passed\", \"valid\": true, \"validation_git_head\": \"c7ee8eefb7a74cc00279bb029bfa4a1672ffd77a\"}, {\"evidence_id\": \"cbc4f2a7-fee6-4df9-b194-1d52d7dc927c\", \"evidence_revision\": 235, \"id\": \"G4-I5A\", \"input_fingerprint\": \"9c10f9be97af4c5d3c03f1737fa7eed9a8e8818d72b133fa3baed6cfeed1619d\", \"status\": \"passed\", \"valid\": true, \"validation_git_head\": \"c7ee8eefb7a74cc00279bb029bfa4a1672ffd77a\"}, {\"evidence_id\": \"29bfdf53-0d8b-49f7-810d-77f09c9f5299\", \"evidence_revision\": 237, \"id\": \"G4-I5B\", \"input_fingerprint\": \"7dbd9c31dfbd66ad47c502360a90b0438143ebb7d742c5a12e0b7188b8ee5b77\", \"status\": \"passed\", \"valid\": true, \"validation_git_head\": \"c7ee8eefb7a74cc00279bb029bfa4a1672ffd77a\"}, {\"evidence_id\": \"d974a540-4bf5-4f03-b60d-420fe2ce9d9a\", \"evidence_revision\": 248, \"id\": \"G5-CPU-PIPELINE\", \"input_fingerprint\": \"4c7a3ed1986feb44b075d68d10c3fcff977053b2c55bdf60b1e8d9b898a8bd38\", \"status\": \"passed\", \"valid\": true, \"validation_git_head\": \"c7ee8eefb7a74cc00279bb029bfa4a1672ffd77a\"}, {\"evidence_id\": \"ea49c600-7df5-474a-af79-45d4dff8e22b\", \"evidence_revision\": 250, \"id\": \"G5-CUDA-PIPELINE\", \"input_fingerprint\": \"7bf7581780f173ec73fd811196a536b58ba29171324600cff6fc5c15de89fb8d\", \"status\": \"passed\", \"valid\": true, \"validation_git_head\": \"c7ee8eefb7a74cc00279bb029bfa4a1672ffd77a\"}], \"completion_revision\": 252, \"finalized_checkpoints\": [], \"gates\": [{\"id\": \"C2-T09\", \"input_fingerprint\": \"4f678c9f491854935db876ba1e8e0aa58bca56a7e705b7ef42751e85064c6001\", \"last_run_at\": \"2026-08-27T09:07:58Z\", \"revision\": 226, \"status\": \"passed\", \"valid\": 1}, {\"id\": \"C2-T10\", \"input_fingerprint\": \"5b4e8d8ea9efe73dca920edd84d42409b81376cab3b8df09e7e8e0f1bb53348b\", \"last_run_at\": \"2026-08-27T09:07:58Z\", \"revision\": 228, \"status\": \"passed\", \"valid\": 1}, {\"id\": \"C2-T11\", \"input_fingerprint\": \"0f083b954dd32670c3162790bf05587c050ef63a9a19c08238d7269e491ffba1\", \"last_run_at\": \"2026-08-27T09:07:58Z\", \"revision\": 230, \"status\": \"passed\", \"valid\": 1}, {\"id\": \"C2-T12\", \"input_fingerprint\": \"0a4ff47ab821c6fd134da5d71d40039f83cda31bf6a6a6dec3a1c0157502c4e7\", \"last_run_at\": \"2026-08-27T09:07:58Z\", \"revision\": 232, \"status\": \"passed\", \"valid\": 1}, {\"id\": \"G4-I5A\", \"input_fingerprint\": \"9c10f9be97af4c5d3c03f1737fa7eed9a8e8818d72b133fa3baed6cfeed1619d\", \"last_run_at\": \"2026-08-27T09:07:59Z\", \"revision\": 235, \"status\": \"passed\", \"valid\": 1}, {\"id\": \"G4-I5B\", \"input_fingerprint\": \"7dbd9c31dfbd66ad47c502360a90b0438143ebb7d742c5a12e0b7188b8ee5b77\", \"last_run_at\": \"2026-08-27T09:07:59Z\", \"revision\": 237, \"status\": \"passed\", \"valid\": 1}, {\"id\": \"G5-CPU-PIPELINE\", \"input_fingerprint\": \"4c7a3ed1986feb44b075d68d10c3fcff977053b2c55bdf60b1e8d9b898a8bd38\", \"last_run_at\": \"2026-08-27T09:09:26Z\", \"revision\": 248, \"status\": \"passed\", \"valid\": 1}, {\"id\": \"G5-CUDA-PIPELINE\", \"input_fingerprint\": \"7bf7581780f173ec73fd811196a536b58ba29171324600cff6fc5c15de89fb8d\", \"last_run_at\": \"2026-08-27T09:09:26Z\", \"revision\": 250, \"status\": \"passed\", \"valid\": 1}], \"git_diffstat\": \".todo-orchestrator/state.snapshot.json | 506 +++++++++++++++++++++++++++++----\\n todo-status.md                         |   4 +-\\n todos.md                               |   4 +-\\n todos/cs-found-13.md                   |   6 +-\\n 4 files changed, 452 insertions(+), 68 deletions(-)\", \"git_head\": \"a96268099cd19d57483dacd11e330dcc5e58b064\", \"interfaces\": [], \"note\": \"Reached C2 and G4, freezing I5A/I5B. CPU and CUDA opaque-image vertical slices passed and G5 was reached with exact identity/byte preservation and allocator ownership.\", \"resources\": [{\"acquired_at\": \"2026-08-27T09:09:26Z\", \"instance_id\": \"gpu:0\", \"released_at\": \"2026-08-27T09:09:26Z\", \"state\": \"released\"}], \"task_id\": \"CS-FOUND-13\"}",
+        "revision": 252,
+        "task_id": "CS-FOUND-13"
       },
       {
         "claim_id": null,
@@ -4390,23 +4794,23 @@
       {
         "content_hash": "3d5c4533eeb14b93bddc85067338cea5745790c81bff06407489411f902df82e",
         "contract_paths_json": "[\"include/CellShard/runtime/source/local_file_source.hh\", \"include/CellShard/runtime/residency/host.hh\"]",
-        "frozen_at": null,
+        "frozen_at": "2026-08-27T09:07:59Z",
         "id": "CS-FOUND-I5A",
         "owner_task_id": "CS-FOUND-10",
         "revised_at": "2026-08-27T09:01:28Z",
-        "revision": 185,
-        "state": "revised",
+        "revision": 233,
+        "state": "frozen",
         "version": "1"
       },
       {
         "content_hash": "e5a76d38652886e16a8b7b06c3068c0fac5b1736b2216465d7e82d1386210b24",
         "contract_paths_json": "[\"include/CellShard/runtime/residency/device.cuh\"]",
-        "frozen_at": null,
+        "frozen_at": "2026-08-27T09:07:59Z",
         "id": "CS-FOUND-I5B",
         "owner_task_id": "CS-FOUND-11",
         "revised_at": "2026-08-27T09:04:17Z",
-        "revision": 202,
-        "state": "revised",
+        "revision": 233,
+        "state": "frozen",
         "version": "1"
       }
     ],
@@ -5499,6 +5903,110 @@
         "task_id": "CS-FOUND-12",
         "valid": 1,
         "validation_git_head": "bd84bf0e3c0c2cbd5af1adcc8aabd4062a4e577b"
+      },
+      {
+        "completion_git_head": "a96268099cd19d57483dacd11e330dcc5e58b064",
+        "completion_revision": 252,
+        "evidence_id": "9e12143b-b9e9-4381-bc14-624629772c98",
+        "evidence_revision": 226,
+        "gate_id": "C2-T09",
+        "input_fingerprint": "4f678c9f491854935db876ba1e8e0aa58bca56a7e705b7ef42751e85064c6001",
+        "provenance_json": "{\"claim_id\": \"a2ea3da1-d00f-4e57-bfc5-09b81772be22\", \"evidence_content_hash\": null, \"evidence_kind\": \"task_state\", \"evidence_metadata\": {\"input_fingerprint\": \"4f678c9f491854935db876ba1e8e0aa58bca56a7e705b7ef42751e85064c6001\", \"inputs\": {\"command_contract\": {\"status\": \"done\", \"task_id\": \"CS-FOUND-09\"}, \"diff_fingerprint\": \"e12bbcc95a71e9cdf7ce90e719d76766d8d61a603cf42d629f07c4de28dc1778\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-13.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"c7ee8eefb7a74cc00279bb029bfa4a1672ffd77a\"}, \"locks\": [], \"resources\": [], \"result\": \"implemented\", \"started_revision\": 225, \"status\": \"done\"}, \"evidence_path\": \"/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/9e12143b-b9e9-4381-bc14-624629772c98\", \"source\": \"completion_transaction\"}",
+        "status": "passed",
+        "task_id": "CS-FOUND-13",
+        "valid": 1,
+        "validation_git_head": "c7ee8eefb7a74cc00279bb029bfa4a1672ffd77a"
+      },
+      {
+        "completion_git_head": "a96268099cd19d57483dacd11e330dcc5e58b064",
+        "completion_revision": 252,
+        "evidence_id": "427501ab-f21c-4b53-b98f-e640b55f55a1",
+        "evidence_revision": 228,
+        "gate_id": "C2-T10",
+        "input_fingerprint": "5b4e8d8ea9efe73dca920edd84d42409b81376cab3b8df09e7e8e0f1bb53348b",
+        "provenance_json": "{\"claim_id\": \"a2ea3da1-d00f-4e57-bfc5-09b81772be22\", \"evidence_content_hash\": null, \"evidence_kind\": \"task_state\", \"evidence_metadata\": {\"input_fingerprint\": \"5b4e8d8ea9efe73dca920edd84d42409b81376cab3b8df09e7e8e0f1bb53348b\", \"inputs\": {\"command_contract\": {\"status\": \"done\", \"task_id\": \"CS-FOUND-10\"}, \"diff_fingerprint\": \"e12bbcc95a71e9cdf7ce90e719d76766d8d61a603cf42d629f07c4de28dc1778\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-13.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"c7ee8eefb7a74cc00279bb029bfa4a1672ffd77a\"}, \"locks\": [], \"resources\": [], \"result\": \"implemented\", \"started_revision\": 227, \"status\": \"done\"}, \"evidence_path\": \"/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/427501ab-f21c-4b53-b98f-e640b55f55a1\", \"source\": \"completion_transaction\"}",
+        "status": "passed",
+        "task_id": "CS-FOUND-13",
+        "valid": 1,
+        "validation_git_head": "c7ee8eefb7a74cc00279bb029bfa4a1672ffd77a"
+      },
+      {
+        "completion_git_head": "a96268099cd19d57483dacd11e330dcc5e58b064",
+        "completion_revision": 252,
+        "evidence_id": "2fc026c2-a6c0-405c-b027-9610901dcc05",
+        "evidence_revision": 230,
+        "gate_id": "C2-T11",
+        "input_fingerprint": "0f083b954dd32670c3162790bf05587c050ef63a9a19c08238d7269e491ffba1",
+        "provenance_json": "{\"claim_id\": \"a2ea3da1-d00f-4e57-bfc5-09b81772be22\", \"evidence_content_hash\": null, \"evidence_kind\": \"task_state\", \"evidence_metadata\": {\"input_fingerprint\": \"0f083b954dd32670c3162790bf05587c050ef63a9a19c08238d7269e491ffba1\", \"inputs\": {\"command_contract\": {\"status\": \"done\", \"task_id\": \"CS-FOUND-11\"}, \"diff_fingerprint\": \"e12bbcc95a71e9cdf7ce90e719d76766d8d61a603cf42d629f07c4de28dc1778\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-13.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"c7ee8eefb7a74cc00279bb029bfa4a1672ffd77a\"}, \"locks\": [], \"resources\": [], \"result\": \"implemented\", \"started_revision\": 229, \"status\": \"done\"}, \"evidence_path\": \"/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/2fc026c2-a6c0-405c-b027-9610901dcc05\", \"source\": \"completion_transaction\"}",
+        "status": "passed",
+        "task_id": "CS-FOUND-13",
+        "valid": 1,
+        "validation_git_head": "c7ee8eefb7a74cc00279bb029bfa4a1672ffd77a"
+      },
+      {
+        "completion_git_head": "a96268099cd19d57483dacd11e330dcc5e58b064",
+        "completion_revision": 252,
+        "evidence_id": "22a6ceeb-9635-4c80-b0e1-32336becf2ed",
+        "evidence_revision": 232,
+        "gate_id": "C2-T12",
+        "input_fingerprint": "0a4ff47ab821c6fd134da5d71d40039f83cda31bf6a6a6dec3a1c0157502c4e7",
+        "provenance_json": "{\"claim_id\": \"a2ea3da1-d00f-4e57-bfc5-09b81772be22\", \"evidence_content_hash\": null, \"evidence_kind\": \"task_state\", \"evidence_metadata\": {\"input_fingerprint\": \"0a4ff47ab821c6fd134da5d71d40039f83cda31bf6a6a6dec3a1c0157502c4e7\", \"inputs\": {\"command_contract\": {\"status\": \"done\", \"task_id\": \"CS-FOUND-12\"}, \"diff_fingerprint\": \"e12bbcc95a71e9cdf7ce90e719d76766d8d61a603cf42d629f07c4de28dc1778\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-13.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"c7ee8eefb7a74cc00279bb029bfa4a1672ffd77a\"}, \"locks\": [], \"resources\": [], \"result\": \"implemented\", \"started_revision\": 231, \"status\": \"done\"}, \"evidence_path\": \"/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/22a6ceeb-9635-4c80-b0e1-32336becf2ed\", \"source\": \"completion_transaction\"}",
+        "status": "passed",
+        "task_id": "CS-FOUND-13",
+        "valid": 1,
+        "validation_git_head": "c7ee8eefb7a74cc00279bb029bfa4a1672ffd77a"
+      },
+      {
+        "completion_git_head": "a96268099cd19d57483dacd11e330dcc5e58b064",
+        "completion_revision": 252,
+        "evidence_id": "cbc4f2a7-fee6-4df9-b194-1d52d7dc927c",
+        "evidence_revision": 235,
+        "gate_id": "G4-I5A",
+        "input_fingerprint": "9c10f9be97af4c5d3c03f1737fa7eed9a8e8818d72b133fa3baed6cfeed1619d",
+        "provenance_json": "{\"claim_id\": \"a2ea3da1-d00f-4e57-bfc5-09b81772be22\", \"evidence_content_hash\": null, \"evidence_kind\": \"interface\", \"evidence_metadata\": {\"content_hash\": \"3d5c4533eeb14b93bddc85067338cea5745790c81bff06407489411f902df82e\", \"input_fingerprint\": \"9c10f9be97af4c5d3c03f1737fa7eed9a8e8818d72b133fa3baed6cfeed1619d\", \"inputs\": {\"command_contract\": {\"interface_id\": \"CS-FOUND-I5A\", \"state\": \"frozen\", \"version\": \"1\"}, \"diff_fingerprint\": \"e12bbcc95a71e9cdf7ce90e719d76766d8d61a603cf42d629f07c4de28dc1778\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-13.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"c7ee8eefb7a74cc00279bb029bfa4a1672ffd77a\"}, \"locks\": [], \"resources\": [], \"started_revision\": 234, \"state\": \"frozen\", \"version\": \"1\"}, \"evidence_path\": \"/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/cbc4f2a7-fee6-4df9-b194-1d52d7dc927c\", \"source\": \"completion_transaction\"}",
+        "status": "passed",
+        "task_id": "CS-FOUND-13",
+        "valid": 1,
+        "validation_git_head": "c7ee8eefb7a74cc00279bb029bfa4a1672ffd77a"
+      },
+      {
+        "completion_git_head": "a96268099cd19d57483dacd11e330dcc5e58b064",
+        "completion_revision": 252,
+        "evidence_id": "29bfdf53-0d8b-49f7-810d-77f09c9f5299",
+        "evidence_revision": 237,
+        "gate_id": "G4-I5B",
+        "input_fingerprint": "7dbd9c31dfbd66ad47c502360a90b0438143ebb7d742c5a12e0b7188b8ee5b77",
+        "provenance_json": "{\"claim_id\": \"a2ea3da1-d00f-4e57-bfc5-09b81772be22\", \"evidence_content_hash\": null, \"evidence_kind\": \"interface\", \"evidence_metadata\": {\"content_hash\": \"e5a76d38652886e16a8b7b06c3068c0fac5b1736b2216465d7e82d1386210b24\", \"input_fingerprint\": \"7dbd9c31dfbd66ad47c502360a90b0438143ebb7d742c5a12e0b7188b8ee5b77\", \"inputs\": {\"command_contract\": {\"interface_id\": \"CS-FOUND-I5B\", \"state\": \"frozen\", \"version\": \"1\"}, \"diff_fingerprint\": \"e12bbcc95a71e9cdf7ce90e719d76766d8d61a603cf42d629f07c4de28dc1778\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-13.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"c7ee8eefb7a74cc00279bb029bfa4a1672ffd77a\"}, \"locks\": [], \"resources\": [], \"started_revision\": 236, \"state\": \"frozen\", \"version\": \"1\"}, \"evidence_path\": \"/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/29bfdf53-0d8b-49f7-810d-77f09c9f5299\", \"source\": \"completion_transaction\"}",
+        "status": "passed",
+        "task_id": "CS-FOUND-13",
+        "valid": 1,
+        "validation_git_head": "c7ee8eefb7a74cc00279bb029bfa4a1672ffd77a"
+      },
+      {
+        "completion_git_head": "a96268099cd19d57483dacd11e330dcc5e58b064",
+        "completion_revision": 252,
+        "evidence_id": "d974a540-4bf5-4f03-b60d-420fe2ce9d9a",
+        "evidence_revision": 248,
+        "gate_id": "G5-CPU-PIPELINE",
+        "input_fingerprint": "4c7a3ed1986feb44b075d68d10c3fcff977053b2c55bdf60b1e8d9b898a8bd38",
+        "provenance_json": "{\"claim_id\": \"a2ea3da1-d00f-4e57-bfc5-09b81772be22\", \"evidence_content_hash\": null, \"evidence_kind\": \"command\", \"evidence_metadata\": {\"argv\": [\"./build-cs-found-cpu/cellShardOpaqueImagePipelineTest\"], \"environment\": {}, \"expected_exit_code\": 0, \"input_fingerprint\": \"4c7a3ed1986feb44b075d68d10c3fcff977053b2c55bdf60b1e8d9b898a8bd38\", \"inputs\": {\"command_contract\": {\"argv\": [\"./build-cs-found-cpu/cellShardOpaqueImagePipelineTest\"], \"locks\": [\"build:cellshard\"]}, \"diff_fingerprint\": \"995efbe65c0fe8e5168e8cfe5ef6bd9c274827977748396752c579b9c11ad14a\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"CMakeLists.txt\", \"tests/opaque_image_pipeline_cuda_test.cu\", \"tests/opaque_image_pipeline_test.cc\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-13.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"c7ee8eefb7a74cc00279bb029bfa4a1672ffd77a\"}, \"locks\": [{\"expires_at\": \"2026-08-27T09:14:26Z\", \"lease_id\": \"adca170b-85fe-482a-88c6-8cd367d0907f\", \"name\": \"build:cellshard\"}], \"resources\": [], \"returncode\": 0, \"started_revision\": 247}, \"evidence_path\": \"/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/d974a540-4bf5-4f03-b60d-420fe2ce9d9a\", \"source\": \"completion_transaction\"}",
+        "status": "passed",
+        "task_id": "CS-FOUND-13",
+        "valid": 1,
+        "validation_git_head": "c7ee8eefb7a74cc00279bb029bfa4a1672ffd77a"
+      },
+      {
+        "completion_git_head": "a96268099cd19d57483dacd11e330dcc5e58b064",
+        "completion_revision": 252,
+        "evidence_id": "ea49c600-7df5-474a-af79-45d4dff8e22b",
+        "evidence_revision": 250,
+        "gate_id": "G5-CUDA-PIPELINE",
+        "input_fingerprint": "7bf7581780f173ec73fd811196a536b58ba29171324600cff6fc5c15de89fb8d",
+        "provenance_json": "{\"claim_id\": \"a2ea3da1-d00f-4e57-bfc5-09b81772be22\", \"evidence_content_hash\": null, \"evidence_kind\": \"command\", \"evidence_metadata\": {\"argv\": [\"./build-cs-found-baseline/cellShardOpaqueImagePipelineCudaTest\"], \"environment\": {}, \"expected_exit_code\": 0, \"input_fingerprint\": \"7bf7581780f173ec73fd811196a536b58ba29171324600cff6fc5c15de89fb8d\", \"inputs\": {\"command_contract\": {\"argv\": [\"./build-cs-found-baseline/cellShardOpaqueImagePipelineCudaTest\"], \"locks\": [\"build:cellshard\"], \"resources\": [\"gpu:any\"]}, \"diff_fingerprint\": \"995efbe65c0fe8e5168e8cfe5ef6bd9c274827977748396752c579b9c11ad14a\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"CMakeLists.txt\", \"tests/opaque_image_pipeline_cuda_test.cu\", \"tests/opaque_image_pipeline_test.cc\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-13.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"c7ee8eefb7a74cc00279bb029bfa4a1672ffd77a\"}, \"locks\": [{\"expires_at\": \"2026-08-27T09:14:26Z\", \"lease_id\": \"451fe4ff-36e9-466a-af1d-11785875f4d1\", \"name\": \"build:cellshard\"}], \"resources\": [{\"class_id\": \"gpu\", \"expires_at\": \"2026-08-27T09:14:26Z\", \"instance_id\": \"gpu:0\", \"lease_id\": \"24af1756-977a-43a0-be65-56d3883307cd\", \"metadata\": {\"compute_capability\": \"7.0\", \"model\": \"Tesla V100-SXM2-16GB\"}}], \"returncode\": 0, \"started_revision\": 249}, \"evidence_path\": \"/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/ea49c600-7df5-474a-af79-45d4dff8e22b\", \"source\": \"completion_transaction\"}",
+        "status": "passed",
+        "task_id": "CS-FOUND-13",
+        "valid": 1,
+        "validation_git_head": "c7ee8eefb7a74cc00279bb029bfa4a1672ffd77a"
       }
     ],
     "task_dependencies": [
@@ -6725,9 +7233,9 @@
       },
       {
         "attention_reason": null,
-        "completion_commit": null,
-        "completion_git_head": null,
-        "completion_revision": null,
+        "completion_commit": "a96268099cd19d57483dacd11e330dcc5e58b064",
+        "completion_git_head": "a96268099cd19d57483dacd11e330dcc5e58b064",
+        "completion_revision": 252,
         "created_at": "2026-08-21T12:05:03Z",
         "id": "CS-FOUND-13",
         "kind": "integration_task",
@@ -6739,14 +7247,14 @@
         "parallel_policy": "integration_exclusive",
         "parent_id": "CS-FOUND-00",
         "priority": 30,
-        "result": null,
+        "result": "validated",
         "result_policy_json": "{\"allowed_dispositions\": [\"implemented\", \"validated\"]}",
-        "revision": 166,
-        "status": "planned",
+        "revision": 252,
+        "status": "done",
         "tags_json": "[]",
         "title": "End-to-end opaque image vertical slice",
-        "updated_at": "2026-08-27T08:56:40Z",
-        "version": 13
+        "updated_at": "2026-08-27T09:09:35Z",
+        "version": 15
       },
       {
         "attention_reason": null,

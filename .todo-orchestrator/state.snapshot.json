@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-27T08:33:11Z",
+  "generated_at": "2026-08-27T08:35:38Z",
   "project": {
     "configuration": {
       "busy_timeout_ms": 5000,
@@ -18,7 +18,7 @@
     "project_uuid": "a52537a5-20db-4aeb-a126-dd0128c71fda",
     "schema_version": 2
   },
-  "project_revision": 105,
+  "project_revision": 113,
   "schema_version": 2,
   "tables": {
     "barrier_requirements": [
@@ -1479,6 +1479,86 @@
         "revision": 105,
         "seq": 105,
         "timestamp": "2026-08-27T08:33:11Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-05",
+        "entity_type": "claim",
+        "event_type": "continue.completed",
+        "payload_json": "{\"requested_task_id\": \"CS-FOUND-05\"}",
+        "revision": 106,
+        "seq": 106,
+        "timestamp": "2026-08-27T08:34:04Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "build:cellshard",
+        "entity_type": "lock",
+        "event_type": "lock.acquired",
+        "payload_json": "{\"names\": [\"build:cellshard\"]}",
+        "revision": 107,
+        "seq": 107,
+        "timestamp": "2026-08-27T08:35:23Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "build:cellshard",
+        "entity_type": "lock",
+        "event_type": "lock.released",
+        "payload_json": "{}",
+        "revision": 108,
+        "seq": 108,
+        "timestamp": "2026-08-27T08:35:23Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "build:cellshard",
+        "entity_type": "lock",
+        "event_type": "lock.acquired",
+        "payload_json": "{\"names\": [\"build:cellshard\"]}",
+        "revision": 109,
+        "seq": 109,
+        "timestamp": "2026-08-27T08:35:23Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "build:cellshard",
+        "entity_type": "lock",
+        "event_type": "lock.released",
+        "payload_json": "{}",
+        "revision": 110,
+        "seq": 110,
+        "timestamp": "2026-08-27T08:35:24Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-05-CPU",
+        "entity_type": "gate",
+        "event_type": "gate.started",
+        "payload_json": "{\"gate_id\": \"CS-FOUND-05-CPU\"}",
+        "revision": 111,
+        "seq": 111,
+        "timestamp": "2026-08-27T08:35:31Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-05-CPU",
+        "entity_type": "gate",
+        "event_type": "gate.completed",
+        "payload_json": "{\"evidence_id\": \"07cb3f47-f16e-45cf-ace5-c05536b60ade\", \"status\": \"passed\", \"valid\": true}",
+        "revision": 112,
+        "seq": 112,
+        "timestamp": "2026-08-27T08:35:31Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-I2B",
+        "entity_type": "interface",
+        "event_type": "interface.revise",
+        "payload_json": "{\"version\": \"1\"}",
+        "revision": 113,
+        "seq": 113,
+        "timestamp": "2026-08-27T08:35:38Z"
       }
     ],
     "evidence": [
@@ -1519,6 +1599,19 @@
         "metadata_json": "{\"argv\": [\"cmake\", \"-S\", \".\", \"-B\", \"build-cs-found-baseline\", \"-DCELLSHARD_ENABLE_CUDA=ON\", \"-DCELLSHARD_BUILD_TESTS=ON\", \"-DCELLSHARD_BUILD_EXPORT=ON\", \"-DCELLSHARD_CELLERATOR_SOURCE_DIR=/tmp/cs-found-cellerator-72f3012adf63bbd8308fea620c9d8d8841136b51\", \"-DCELLERATOR_DIST_NCCL_LIBRARY=FALSE\"], \"environment\": {}, \"expected_exit_code\": 0, \"inputs\": {\"command_contract\": {\"argv\": [\"cmake\", \"-S\", \".\", \"-B\", \"build-cs-found-baseline\", \"-DCELLSHARD_ENABLE_CUDA=ON\", \"-DCELLSHARD_BUILD_TESTS=ON\", \"-DCELLSHARD_BUILD_EXPORT=ON\", \"-DCELLSHARD_CELLERATOR_SOURCE_DIR=/tmp/cs-found-cellerator-72f3012adf63bbd8308fea620c9d8d8841136b51\", \"-DCELLERATOR_DIST_NCCL_LIBRARY=FALSE\"], \"locks\": [\"build:cellshard\"], \"timeout\": 1200}, \"diff_fingerprint\": \"c2de955c4f2cb1f5dc49b2201cf25d85ec518e55eb8b5451d782c4fb1fed3f02\", \"dirty_paths\": [\".todo-orchestrator/cs-found-plan.json\", \".todo-orchestrator/project.json\", \".todo-orchestrator/state.snapshot.json\", \"docs/CS_FOUND_TRANSITION_MAP.md\", \"todo-status.md\", \"todos.md\", \"todos/cellshard-cpp-access-adapter-refactor.md\", \"todos/cs-found-00.md\", \"todos/cs-found-01.md\", \"todos/cs-found-02.md\", \"todos/cs-found-03.md\", \"todos/cs-found-04.md\", \"todos/cs-found-05.md\", \"todos/cs-found-06.md\", \"todos/cs-found-07.md\", \"todos/cs-found-08.md\", \"todos/cs-found-09.md\", \"todos/cs-found-10.md\", \"todos/cs-found-11.md\", \"todos/cs-found-12.md\", \"todos/cs-found-13.md\", \"todos/cs-found-14.md\", \"todos/cs-found-15.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"bbe5917bab88ffca2d16bc86166a8de368a4abbe\"}, \"locks\": [{\"expires_at\": \"2026-08-21T13:03:16Z\", \"lease_id\": \"5cf1eb9e-7d0d-43fc-a7c5-37f86140315f\", \"name\": \"build:cellshard\"}], \"resources\": [], \"returncode\": 0, \"started_revision\": 10}",
         "path": "/home/tumlinson/CellStack/.git/modules/CellShard/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/075bb3b5-b528-4915-b799-a469e22e8813",
         "revision": 11,
+        "status": "passed"
+      },
+      {
+        "checkpoint_id": null,
+        "claim_id": null,
+        "content_hash": null,
+        "created_at": "2026-08-27T08:35:31Z",
+        "gate_id": "CS-FOUND-05-CPU",
+        "id": "07cb3f47-f16e-45cf-ace5-c05536b60ade",
+        "kind": "command",
+        "metadata_json": "{\"argv\": [\"./build-cs-found-cpu/cellShardFoundationArtifactTest\"], \"environment\": {}, \"expected_exit_code\": 0, \"input_fingerprint\": \"09891b2b6f7b403797416c69d3d0f9df240622be11804fc5b4cb4c13709dc2bf\", \"inputs\": {\"command_contract\": {\"argv\": [\"./build-cs-found-cpu/cellShardFoundationArtifactTest\"], \"locks\": [\"build:cellshard\"]}, \"diff_fingerprint\": \"d72f1b68303f4d566e8cd357c8489b06570099d485a0bb027dc803c6f82439fa\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"CMakeLists.txt\", \"include/CellShard/artifact/image.hh\", \"tests/foundation_artifact_test.cc\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-05.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"1067ab2c3272b40a8f61bbad99c0c7379a779d0b\"}, \"locks\": [{\"expires_at\": \"2026-08-27T08:40:31Z\", \"lease_id\": \"4727b5db-9a5e-49a6-b160-c062a138fe0e\", \"name\": \"build:cellshard\"}], \"resources\": [], \"returncode\": 0, \"started_revision\": 111}",
+        "path": "/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/07cb3f47-f16e-45cf-ace5-c05536b60ade",
+        "revision": 112,
         "status": "passed"
       },
       {
@@ -2164,14 +2257,14 @@
         "checkpoint_id": null,
         "config_json": "{\"argv\": [\"./build-cs-found-cpu/cellShardFoundationArtifactTest\"], \"locks\": [\"build:cellshard\"]}",
         "id": "CS-FOUND-05-CPU",
-        "input_fingerprint": null,
-        "last_run_at": null,
+        "input_fingerprint": "09891b2b6f7b403797416c69d3d0f9df240622be11804fc5b4cb4c13709dc2bf",
+        "last_run_at": "2026-08-27T08:35:31Z",
         "required": 1,
-        "revision": 92,
-        "status": "pending",
+        "revision": 112,
+        "status": "passed",
         "task_id": "CS-FOUND-05",
         "type": "command",
-        "valid": 0
+        "valid": 1
       },
       {
         "checkpoint_id": null,
@@ -2774,14 +2867,14 @@
         "version": "1"
       },
       {
-        "content_hash": null,
+        "content_hash": "7c86e72818699a566787ed1561d97f8448ce199974b827a81712f4ff5777696a",
         "contract_paths_json": "[\"include/CellShard/artifact/image.hh\"]",
         "frozen_at": null,
         "id": "CS-FOUND-I2B",
         "owner_task_id": "CS-FOUND-05",
-        "revised_at": null,
-        "revision": 92,
-        "state": "draft",
+        "revised_at": "2026-08-27T08:35:38Z",
+        "revision": 113,
+        "state": "revised",
         "version": "1"
       },
       {
@@ -4722,12 +4815,12 @@
         "priority": 80,
         "result": null,
         "result_policy_json": "{\"allowed_dispositions\": [\"implemented\", \"validated\"]}",
-        "revision": 92,
-        "status": "planned",
+        "revision": 106,
+        "status": "in_progress",
         "tags_json": "[]",
         "title": "Projection and image descriptors",
-        "updated_at": "2026-08-27T08:28:44Z",
-        "version": 11
+        "updated_at": "2026-08-27T08:34:04Z",
+        "version": 12
       },
       {
         "attention_reason": null,

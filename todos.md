@@ -53,7 +53,7 @@ _None recorded yet._
 <!-- todo-orchestrator:v2-managed:start -->
 # Todo Orchestrator v2 Projection
 
-Project revision: `166`
+Project revision: `186`
 
 ## Workstreams
 - `CS-FOUND-00` | kind: epic | status: in_progress | parent: - | objective: Establish stable CellShard identity, domain, partition, image, extent, source, snapshot, host-residency, and device-residency contracts before placement, streaming, routing, or multi-node work.
@@ -66,7 +66,7 @@ Project revision: `166`
 - `CS-FOUND-07` | kind: task | status: done | parent: CS-FOUND-00 | objective: Freeze the descriptor ABI checkpoint, then implement separate in-memory artifact/source catalogs and snapshot validation as CS-FOUND-I3A.
 - `CS-FOUND-08` | kind: task | status: done | parent: CS-FOUND-00 | objective: Implement deterministic explicit little-endian CPEXEC02 buffer encoding/decoding as CS-FOUND-I3B without CSPACK file integration.
 - `CS-FOUND-09` | kind: integration_task | status: done | parent: CS-FOUND-00 | objective: Integrate independently inspectable CPEXEC02 entries into unchanged CSPACK01 with atomic publication and expose CS-FOUND-I4.
-- `CS-FOUND-10` | kind: task | status: planned | parent: CS-FOUND-00 | objective: Reach G3, then resolve one image extent through LocalFileSource into one move-only host residency allocation as CS-FOUND-I5A.
+- `CS-FOUND-10` | kind: task | status: done | parent: CS-FOUND-00 | objective: Reach G3, then resolve one image extent through LocalFileSource into one move-only host residency allocation as CS-FOUND-I5A.
 - `CS-FOUND-12` | kind: task | status: planned | parent: CS-FOUND-00 | objective: Provide explicit-context legacy CPEXEC01 and sharded adapters without defining new semantics through row shards.
 - `CS-FOUND-11` | kind: task | status: planned | parent: CS-FOUND-00 | objective: Stage a validated host image through a caller allocator with one asynchronous H2D copy and move-only device residency as CS-FOUND-I5B.
 - `CS-FOUND-13` | kind: integration_task | status: planned | parent: CS-FOUND-00 | objective: Freeze the image/residency checkpoint and prove the specified fake producer to host/device fake consumer pipeline with exact identity and byte preservation.

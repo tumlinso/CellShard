@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-27T08:56:40Z",
+  "generated_at": "2026-08-27T09:01:28Z",
   "project": {
     "configuration": {
       "busy_timeout_ms": 5000,
@@ -18,7 +18,7 @@
     "project_uuid": "a52537a5-20db-4aeb-a126-dd0128c71fda",
     "schema_version": 2
   },
-  "project_revision": 166,
+  "project_revision": 186,
   "schema_version": 2,
   "tables": {
     "barrier_requirements": [
@@ -91,12 +91,12 @@
         "title": "Descriptor implementation fan-in"
       },
       {
-        "explanation": "1/4 requirements satisfied; target=4",
+        "explanation": "2/4 requirements satisfied; target=4",
         "id": "CS-FOUND-IMAGE-RESIDENCY-FANIN",
         "mode": "all",
         "opened_at": null,
         "quorum": null,
-        "revision": 166,
+        "revision": 186,
         "state": "closed",
         "title": "Image and residency implementation fan-in"
       }
@@ -380,10 +380,10 @@
       {
         "id": "CS-FOUND-G3",
         "metadata_json": "{}",
-        "reached_at": null,
-        "revision": 166,
+        "reached_at": "2026-08-27T08:58:05Z",
+        "revision": 174,
         "revoked_at": null,
-        "state": "pending",
+        "state": "reached",
         "task_id": "CS-FOUND-10",
         "title": "G3 Snapshot and image envelope valid"
       },
@@ -2089,6 +2089,206 @@
         "revision": 166,
         "seq": 166,
         "timestamp": "2026-08-27T08:56:40Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-10",
+        "entity_type": "claim",
+        "event_type": "continue.completed",
+        "payload_json": "{\"requested_task_id\": \"CS-FOUND-10\"}",
+        "revision": 167,
+        "seq": 167,
+        "timestamp": "2026-08-27T08:57:52Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "G3-T07",
+        "entity_type": "gate",
+        "event_type": "gate.started",
+        "payload_json": "{\"gate_id\": \"G3-T07\"}",
+        "revision": 168,
+        "seq": 168,
+        "timestamp": "2026-08-27T08:58:05Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "G3-T07",
+        "entity_type": "gate",
+        "event_type": "gate.completed",
+        "payload_json": "{\"evidence_id\": \"0322a969-af1a-4234-8e2c-7d19ccbdf2bd\", \"status\": \"passed\", \"valid\": true}",
+        "revision": 169,
+        "seq": 169,
+        "timestamp": "2026-08-27T08:58:05Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "G3-T08",
+        "entity_type": "gate",
+        "event_type": "gate.started",
+        "payload_json": "{\"gate_id\": \"G3-T08\"}",
+        "revision": 170,
+        "seq": 170,
+        "timestamp": "2026-08-27T08:58:05Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "G3-T08",
+        "entity_type": "gate",
+        "event_type": "gate.completed",
+        "payload_json": "{\"evidence_id\": \"f20e886e-8475-4d35-844c-1d9159402d0d\", \"status\": \"passed\", \"valid\": true}",
+        "revision": 171,
+        "seq": 171,
+        "timestamp": "2026-08-27T08:58:05Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "G3-T09",
+        "entity_type": "gate",
+        "event_type": "gate.started",
+        "payload_json": "{\"gate_id\": \"G3-T09\"}",
+        "revision": 172,
+        "seq": 172,
+        "timestamp": "2026-08-27T08:58:05Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "G3-T09",
+        "entity_type": "gate",
+        "event_type": "gate.completed",
+        "payload_json": "{\"evidence_id\": \"9ef42132-9257-47bb-abb6-c896eb95f2e8\", \"status\": \"passed\", \"valid\": true}",
+        "revision": 173,
+        "seq": 173,
+        "timestamp": "2026-08-27T08:58:05Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-G3",
+        "entity_type": "checkpoint",
+        "event_type": "checkpoint.reach",
+        "payload_json": "{}",
+        "revision": 174,
+        "seq": 174,
+        "timestamp": "2026-08-27T08:58:05Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "build:cellshard",
+        "entity_type": "lock",
+        "event_type": "lock.acquired",
+        "payload_json": "{\"names\": [\"build:cellshard\"]}",
+        "revision": 175,
+        "seq": 175,
+        "timestamp": "2026-08-27T09:00:42Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "build:cellshard",
+        "entity_type": "lock",
+        "event_type": "lock.released",
+        "payload_json": "{}",
+        "revision": 176,
+        "seq": 176,
+        "timestamp": "2026-08-27T09:00:43Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "build:cellshard",
+        "entity_type": "lock",
+        "event_type": "lock.acquired",
+        "payload_json": "{\"names\": [\"build:cellshard\"]}",
+        "revision": 177,
+        "seq": 177,
+        "timestamp": "2026-08-27T09:00:43Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "build:cellshard",
+        "entity_type": "lock",
+        "event_type": "lock.released",
+        "payload_json": "{}",
+        "revision": 178,
+        "seq": 178,
+        "timestamp": "2026-08-27T09:00:44Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-10-CPU",
+        "entity_type": "gate",
+        "event_type": "gate.started",
+        "payload_json": "{\"gate_id\": \"CS-FOUND-10-CPU\"}",
+        "revision": 179,
+        "seq": 179,
+        "timestamp": "2026-08-27T09:00:49Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-10-CPU",
+        "entity_type": "gate",
+        "event_type": "gate.completed",
+        "payload_json": "{\"evidence_id\": \"4ac703ff-11d4-4ccd-91df-329bbd86d6c7\", \"status\": \"passed\", \"valid\": true}",
+        "revision": 180,
+        "seq": 180,
+        "timestamp": "2026-08-27T09:00:49Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "build:cellshard",
+        "entity_type": "lock",
+        "event_type": "lock.acquired",
+        "payload_json": "{\"names\": [\"build:cellshard\"]}",
+        "revision": 181,
+        "seq": 181,
+        "timestamp": "2026-08-27T09:01:17Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "build:cellshard",
+        "entity_type": "lock",
+        "event_type": "lock.released",
+        "payload_json": "{}",
+        "revision": 182,
+        "seq": 182,
+        "timestamp": "2026-08-27T09:01:18Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-10-CPU",
+        "entity_type": "gate",
+        "event_type": "gate.started",
+        "payload_json": "{\"gate_id\": \"CS-FOUND-10-CPU\"}",
+        "revision": 183,
+        "seq": 183,
+        "timestamp": "2026-08-27T09:01:18Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-10-CPU",
+        "entity_type": "gate",
+        "event_type": "gate.completed",
+        "payload_json": "{\"evidence_id\": \"5313bcac-54e1-4547-bb6a-8ed519124fb4\", \"status\": \"passed\", \"valid\": true}",
+        "revision": 184,
+        "seq": 184,
+        "timestamp": "2026-08-27T09:01:18Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-I5A",
+        "entity_type": "interface",
+        "event_type": "interface.revise",
+        "payload_json": "{\"version\": \"1\"}",
+        "revision": 185,
+        "seq": 185,
+        "timestamp": "2026-08-27T09:01:28Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-FOUND-10",
+        "entity_type": "task",
+        "event_type": "task.completed",
+        "payload_json": "{\"completion_revision\": 186, \"disposition\": \"implemented\", \"reached_checkpoints\": []}",
+        "revision": 186,
+        "seq": 186,
+        "timestamp": "2026-08-27T09:01:28Z"
       }
     ],
     "evidence": [
@@ -2103,6 +2303,19 @@
         "metadata_json": "{\"argv\": [\"./build-cs-found-baseline/cellShardAccessAdapterTest\"], \"environment\": {}, \"expected_exit_code\": 0, \"inputs\": {\"command_contract\": {\"argv\": [\"./build-cs-found-baseline/cellShardAccessAdapterTest\"], \"locks\": [\"build:cellshard\"]}, \"diff_fingerprint\": \"c2de955c4f2cb1f5dc49b2201cf25d85ec518e55eb8b5451d782c4fb1fed3f02\", \"dirty_paths\": [\".todo-orchestrator/cs-found-plan.json\", \".todo-orchestrator/project.json\", \".todo-orchestrator/state.snapshot.json\", \"docs/CS_FOUND_TRANSITION_MAP.md\", \"todo-status.md\", \"todos.md\", \"todos/cellshard-cpp-access-adapter-refactor.md\", \"todos/cs-found-00.md\", \"todos/cs-found-01.md\", \"todos/cs-found-02.md\", \"todos/cs-found-03.md\", \"todos/cs-found-04.md\", \"todos/cs-found-05.md\", \"todos/cs-found-06.md\", \"todos/cs-found-07.md\", \"todos/cs-found-08.md\", \"todos/cs-found-09.md\", \"todos/cs-found-10.md\", \"todos/cs-found-11.md\", \"todos/cs-found-12.md\", \"todos/cs-found-13.md\", \"todos/cs-found-14.md\", \"todos/cs-found-15.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"bbe5917bab88ffca2d16bc86166a8de368a4abbe\"}, \"locks\": [{\"expires_at\": \"2026-08-21T13:03:17Z\", \"lease_id\": \"433a00c9-28e8-4cfd-9a70-b7ac6e9a5cb3\", \"name\": \"build:cellshard\"}], \"resources\": [], \"returncode\": 0, \"started_revision\": 14}",
         "path": "/home/tumlinson/CellStack/.git/modules/CellShard/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/006d4024-ae22-4184-89ba-33540a3dd20d",
         "revision": 15,
+        "status": "passed"
+      },
+      {
+        "checkpoint_id": null,
+        "claim_id": null,
+        "content_hash": null,
+        "created_at": "2026-08-27T08:58:05Z",
+        "gate_id": "G3-T07",
+        "id": "0322a969-af1a-4234-8e2c-7d19ccbdf2bd",
+        "kind": "task_state",
+        "metadata_json": "{\"input_fingerprint\": \"38525574b11bc11926c1515a2a7b7c3f7ff7d95742667c155f75e4f2a356dbcf\", \"inputs\": {\"command_contract\": {\"status\": \"done\", \"task_id\": \"CS-FOUND-07\"}, \"diff_fingerprint\": \"e771edbbaf9f01a43689d3d040501e2561d9deb47c7d0b2c499644a99873a3f8\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-10.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"baf5f71dbfd7a21cf28df2d12362ec0c0432ce53\"}, \"locks\": [], \"resources\": [], \"result\": \"implemented\", \"started_revision\": 168, \"status\": \"done\"}",
+        "path": "/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/0322a969-af1a-4234-8e2c-7d19ccbdf2bd",
+        "revision": 169,
         "status": "passed"
       },
       {
@@ -2317,6 +2530,19 @@
         "checkpoint_id": null,
         "claim_id": null,
         "content_hash": null,
+        "created_at": "2026-08-27T09:00:49Z",
+        "gate_id": "CS-FOUND-10-CPU",
+        "id": "4ac703ff-11d4-4ccd-91df-329bbd86d6c7",
+        "kind": "command",
+        "metadata_json": "{\"argv\": [\"./build-cs-found-cpu/cellShardHostResidencyTest\"], \"environment\": {}, \"expected_exit_code\": 0, \"input_fingerprint\": \"a5a6a45d5c4b7c40663d2a6ed8907d957843d3b8feb42d60e0d6a141c05e31a5\", \"inputs\": {\"command_contract\": {\"argv\": [\"./build-cs-found-cpu/cellShardHostResidencyTest\"], \"locks\": [\"build:cellshard\"]}, \"diff_fingerprint\": \"6427dd77a63bad97303ec1c2a0a1bb07c23c55f17260110252b00e3481ba4b67\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"CMakeLists.txt\", \"include/CellShard/runtime/residency.hh\", \"include/CellShard/runtime/residency/host.hh\", \"include/CellShard/runtime/source/local_file_source.hh\", \"src/runtime/residency/host.cc\", \"src/runtime/source/local_file_source.cc\", \"tests/host_residency_test.cc\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-10.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"baf5f71dbfd7a21cf28df2d12362ec0c0432ce53\"}, \"locks\": [{\"expires_at\": \"2026-08-27T09:05:49Z\", \"lease_id\": \"0254cd86-5073-46f3-97b6-a5e2ef6c8164\", \"name\": \"build:cellshard\"}], \"resources\": [], \"returncode\": 0, \"started_revision\": 179}",
+        "path": "/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/4ac703ff-11d4-4ccd-91df-329bbd86d6c7",
+        "revision": 180,
+        "status": "passed"
+      },
+      {
+        "checkpoint_id": null,
+        "claim_id": null,
+        "content_hash": null,
         "created_at": "2026-08-21T13:01:58Z",
         "gate_id": "G1-CPU-BUILD",
         "id": "4d841f87-d3c3-4fd2-8530-9fa7ce35d8f5",
@@ -2325,6 +2551,19 @@
         "path": "/home/tumlinson/CellStack/.git/modules/CellShard/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/4d841f87-d3c3-4fd2-8530-9fa7ce35d8f5",
         "revision": 45,
         "status": "failed"
+      },
+      {
+        "checkpoint_id": null,
+        "claim_id": null,
+        "content_hash": null,
+        "created_at": "2026-08-27T09:01:18Z",
+        "gate_id": "CS-FOUND-10-CPU",
+        "id": "5313bcac-54e1-4547-bb6a-8ed519124fb4",
+        "kind": "command",
+        "metadata_json": "{\"argv\": [\"./build-cs-found-cpu/cellShardHostResidencyTest\"], \"environment\": {}, \"expected_exit_code\": 0, \"input_fingerprint\": \"a5a6a45d5c4b7c40663d2a6ed8907d957843d3b8feb42d60e0d6a141c05e31a5\", \"inputs\": {\"command_contract\": {\"argv\": [\"./build-cs-found-cpu/cellShardHostResidencyTest\"], \"locks\": [\"build:cellshard\"]}, \"diff_fingerprint\": \"6427dd77a63bad97303ec1c2a0a1bb07c23c55f17260110252b00e3481ba4b67\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"CMakeLists.txt\", \"include/CellShard/runtime/residency.hh\", \"include/CellShard/runtime/residency/host.hh\", \"include/CellShard/runtime/source/local_file_source.hh\", \"src/runtime/residency/host.cc\", \"src/runtime/source/local_file_source.cc\", \"tests/host_residency_test.cc\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-10.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"baf5f71dbfd7a21cf28df2d12362ec0c0432ce53\"}, \"locks\": [{\"expires_at\": \"2026-08-27T09:06:18Z\", \"lease_id\": \"9a77fac2-1891-4663-b5c7-ce19471121e1\", \"name\": \"build:cellshard\"}], \"resources\": [], \"returncode\": 0, \"started_revision\": 183}",
+        "path": "/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/5313bcac-54e1-4547-bb6a-8ed519124fb4",
+        "revision": 184,
+        "status": "passed"
       },
       {
         "checkpoint_id": null,
@@ -2455,6 +2694,19 @@
         "path": "/home/tumlinson/CellStack/.git/modules/CellShard/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/90b54eca-9c17-410d-9392-db997254f19d",
         "revision": 57,
         "status": "failed"
+      },
+      {
+        "checkpoint_id": null,
+        "claim_id": null,
+        "content_hash": null,
+        "created_at": "2026-08-27T08:58:05Z",
+        "gate_id": "G3-T09",
+        "id": "9ef42132-9257-47bb-abb6-c896eb95f2e8",
+        "kind": "task_state",
+        "metadata_json": "{\"input_fingerprint\": \"4f678c9f491854935db876ba1e8e0aa58bca56a7e705b7ef42751e85064c6001\", \"inputs\": {\"command_contract\": {\"status\": \"done\", \"task_id\": \"CS-FOUND-09\"}, \"diff_fingerprint\": \"e771edbbaf9f01a43689d3d040501e2561d9deb47c7d0b2c499644a99873a3f8\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-10.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"baf5f71dbfd7a21cf28df2d12362ec0c0432ce53\"}, \"locks\": [], \"resources\": [], \"result\": \"implemented\", \"started_revision\": 172, \"status\": \"done\"}",
+        "path": "/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/9ef42132-9257-47bb-abb6-c896eb95f2e8",
+        "revision": 173,
+        "status": "passed"
       },
       {
         "checkpoint_id": null,
@@ -2637,6 +2889,19 @@
         "path": "/home/tumlinson/CellStack/.git/modules/CellShard/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/e893f7e0-73f0-47e4-afe9-2a2375d6186f",
         "revision": 54,
         "status": "failed"
+      },
+      {
+        "checkpoint_id": null,
+        "claim_id": null,
+        "content_hash": null,
+        "created_at": "2026-08-27T08:58:05Z",
+        "gate_id": "G3-T08",
+        "id": "f20e886e-8475-4d35-844c-1d9159402d0d",
+        "kind": "task_state",
+        "metadata_json": "{\"input_fingerprint\": \"113e9a3684052eb3a82cf5a0bc320c1edfe3b13311cff704b9b593e5286f5707\", \"inputs\": {\"command_contract\": {\"status\": \"done\", \"task_id\": \"CS-FOUND-08\"}, \"diff_fingerprint\": \"e771edbbaf9f01a43689d3d040501e2561d9deb47c7d0b2c499644a99873a3f8\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-10.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"baf5f71dbfd7a21cf28df2d12362ec0c0432ce53\"}, \"locks\": [], \"resources\": [], \"result\": \"implemented\", \"started_revision\": 170, \"status\": \"done\"}",
+        "path": "/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/f20e886e-8475-4d35-844c-1d9159402d0d",
+        "revision": 171,
+        "status": "passed"
       },
       {
         "checkpoint_id": null,
@@ -2982,14 +3247,14 @@
         "checkpoint_id": null,
         "config_json": "{\"argv\": [\"./build-cs-found-cpu/cellShardHostResidencyTest\"], \"locks\": [\"build:cellshard\"]}",
         "id": "CS-FOUND-10-CPU",
-        "input_fingerprint": null,
-        "last_run_at": null,
+        "input_fingerprint": "a5a6a45d5c4b7c40663d2a6ed8907d957843d3b8feb42d60e0d6a141c05e31a5",
+        "last_run_at": "2026-08-27T09:01:18Z",
         "required": 1,
-        "revision": 166,
-        "status": "pending",
+        "revision": 184,
+        "status": "passed",
         "task_id": "CS-FOUND-10",
         "type": "command",
-        "valid": 0
+        "valid": 1
       },
       {
         "checkpoint_id": null,
@@ -3190,40 +3455,40 @@
         "checkpoint_id": "CS-FOUND-G3",
         "config_json": "{\"status\": \"done\", \"task_id\": \"CS-FOUND-07\"}",
         "id": "G3-T07",
-        "input_fingerprint": null,
-        "last_run_at": null,
+        "input_fingerprint": "38525574b11bc11926c1515a2a7b7c3f7ff7d95742667c155f75e4f2a356dbcf",
+        "last_run_at": "2026-08-27T08:58:05Z",
         "required": 1,
-        "revision": 166,
-        "status": "pending",
+        "revision": 169,
+        "status": "passed",
         "task_id": "CS-FOUND-10",
         "type": "task_state",
-        "valid": 0
+        "valid": 1
       },
       {
         "checkpoint_id": "CS-FOUND-G3",
         "config_json": "{\"status\": \"done\", \"task_id\": \"CS-FOUND-08\"}",
         "id": "G3-T08",
-        "input_fingerprint": null,
-        "last_run_at": null,
+        "input_fingerprint": "113e9a3684052eb3a82cf5a0bc320c1edfe3b13311cff704b9b593e5286f5707",
+        "last_run_at": "2026-08-27T08:58:05Z",
         "required": 1,
-        "revision": 166,
-        "status": "pending",
+        "revision": 171,
+        "status": "passed",
         "task_id": "CS-FOUND-10",
         "type": "task_state",
-        "valid": 0
+        "valid": 1
       },
       {
         "checkpoint_id": "CS-FOUND-G3",
         "config_json": "{\"status\": \"done\", \"task_id\": \"CS-FOUND-09\"}",
         "id": "G3-T09",
-        "input_fingerprint": null,
-        "last_run_at": null,
+        "input_fingerprint": "4f678c9f491854935db876ba1e8e0aa58bca56a7e705b7ef42751e85064c6001",
+        "last_run_at": "2026-08-27T08:58:05Z",
         "required": 1,
-        "revision": 166,
-        "status": "pending",
+        "revision": 173,
+        "status": "passed",
         "task_id": "CS-FOUND-10",
         "type": "task_state",
-        "valid": 0
+        "valid": 1
       },
       {
         "checkpoint_id": "CS-FOUND-G4",
@@ -3445,6 +3710,16 @@
       },
       {
         "claim_id": null,
+        "created_at": "2026-08-27T09:01:28Z",
+        "id": "67cd021a-34c8-4866-9365-66adedb22d79",
+        "kind": "complete",
+        "note": "Reached G3 and froze I3A/I3B/I4. Added pread-backed local exact source and one-allocation move-only host residency with digest validation. Required CPU gate passed.",
+        "payload_json": "{\"changed_owned_paths\": [], \"checkpoints\": [{\"id\": \"CS-FOUND-G3\", \"reached_at\": \"2026-08-27T08:58:05Z\", \"state\": \"reached\"}], \"completion_commit\": \"0817e45781f50c26b19fe5d34b3d74fbac35c26b\", \"completion_gates\": [{\"evidence_id\": \"5313bcac-54e1-4547-bb6a-8ed519124fb4\", \"evidence_revision\": 184, \"id\": \"CS-FOUND-10-CPU\", \"input_fingerprint\": \"a5a6a45d5c4b7c40663d2a6ed8907d957843d3b8feb42d60e0d6a141c05e31a5\", \"status\": \"passed\", \"valid\": true, \"validation_git_head\": \"baf5f71dbfd7a21cf28df2d12362ec0c0432ce53\"}, {\"evidence_id\": \"0322a969-af1a-4234-8e2c-7d19ccbdf2bd\", \"evidence_revision\": 169, \"id\": \"G3-T07\", \"input_fingerprint\": \"38525574b11bc11926c1515a2a7b7c3f7ff7d95742667c155f75e4f2a356dbcf\", \"status\": \"passed\", \"valid\": true, \"validation_git_head\": \"baf5f71dbfd7a21cf28df2d12362ec0c0432ce53\"}, {\"evidence_id\": \"f20e886e-8475-4d35-844c-1d9159402d0d\", \"evidence_revision\": 171, \"id\": \"G3-T08\", \"input_fingerprint\": \"113e9a3684052eb3a82cf5a0bc320c1edfe3b13311cff704b9b593e5286f5707\", \"status\": \"passed\", \"valid\": true, \"validation_git_head\": \"baf5f71dbfd7a21cf28df2d12362ec0c0432ce53\"}, {\"evidence_id\": \"9ef42132-9257-47bb-abb6-c896eb95f2e8\", \"evidence_revision\": 173, \"id\": \"G3-T09\", \"input_fingerprint\": \"4f678c9f491854935db876ba1e8e0aa58bca56a7e705b7ef42751e85064c6001\", \"status\": \"passed\", \"valid\": true, \"validation_git_head\": \"baf5f71dbfd7a21cf28df2d12362ec0c0432ce53\"}], \"completion_revision\": 186, \"finalized_checkpoints\": [], \"gates\": [{\"id\": \"CS-FOUND-10-CPU\", \"input_fingerprint\": \"a5a6a45d5c4b7c40663d2a6ed8907d957843d3b8feb42d60e0d6a141c05e31a5\", \"last_run_at\": \"2026-08-27T09:01:18Z\", \"revision\": 184, \"status\": \"passed\", \"valid\": 1}, {\"id\": \"G3-T07\", \"input_fingerprint\": \"38525574b11bc11926c1515a2a7b7c3f7ff7d95742667c155f75e4f2a356dbcf\", \"last_run_at\": \"2026-08-27T08:58:05Z\", \"revision\": 169, \"status\": \"passed\", \"valid\": 1}, {\"id\": \"G3-T08\", \"input_fingerprint\": \"113e9a3684052eb3a82cf5a0bc320c1edfe3b13311cff704b9b593e5286f5707\", \"last_run_at\": \"2026-08-27T08:58:05Z\", \"revision\": 171, \"status\": \"passed\", \"valid\": 1}, {\"id\": \"G3-T09\", \"input_fingerprint\": \"4f678c9f491854935db876ba1e8e0aa58bca56a7e705b7ef42751e85064c6001\", \"last_run_at\": \"2026-08-27T08:58:05Z\", \"revision\": 173, \"status\": \"passed\", \"valid\": 1}], \"git_diffstat\": \".todo-orchestrator/state.snapshot.json | 341 ++++++++++++++++++++++++++++-----\\n todo-status.md                         |   4 +-\\n todos.md                               |   4 +-\\n todos/cs-found-10.md                   |   6 +-\\n 4 files changed, 305 insertions(+), 50 deletions(-)\", \"git_head\": \"0817e45781f50c26b19fe5d34b3d74fbac35c26b\", \"interfaces\": [{\"content_hash\": \"3d5c4533eeb14b93bddc85067338cea5745790c81bff06407489411f902df82e\", \"id\": \"CS-FOUND-I5A\", \"state\": \"revised\", \"version\": \"1\"}], \"note\": \"Reached G3 and froze I3A/I3B/I4. Added pread-backed local exact source and one-allocation move-only host residency with digest validation. Required CPU gate passed.\", \"resources\": [], \"task_id\": \"CS-FOUND-10\"}",
+        "revision": 186,
+        "task_id": "CS-FOUND-10"
+      },
+      {
+        "claim_id": null,
         "created_at": "2026-08-27T08:35:49Z",
         "id": "94260b8f-3edb-48ad-a9d2-c73469d47eb2",
         "kind": "complete",
@@ -3614,45 +3889,45 @@
       {
         "content_hash": "b09fd2ca65112edfea3739199be618a0b2b547550733b0d01ce771ba658b0914",
         "contract_paths_json": "[\"include/CellShard/artifact/catalog.hh\", \"include/CellShard/artifact/snapshot.hh\"]",
-        "frozen_at": null,
+        "frozen_at": "2026-08-27T08:58:05Z",
         "id": "CS-FOUND-I3A",
         "owner_task_id": "CS-FOUND-07",
         "revised_at": "2026-08-27T08:41:22Z",
-        "revision": 166,
-        "state": "revised",
-        "version": "1"
-      },
-      {
-        "content_hash": "4a7ed45bc559f7e07d1350d80551def18712ec038ff5ce3ce5d634bc5d68556d",
-        "contract_paths_json": "[\"include/CellShard/io/pack/image_envelope.hh\"]",
-        "frozen_at": null,
-        "id": "CS-FOUND-I3B",
-        "owner_task_id": "CS-FOUND-08",
-        "revised_at": "2026-08-27T08:45:37Z",
-        "revision": 166,
-        "state": "revised",
+        "revision": 174,
+        "state": "frozen",
         "version": "1"
       },
       {
         "content_hash": "32c45f1dc09643d711f04e7e9f086cda22f25a67b986c8e34e4bad3d97bd229a",
         "contract_paths_json": "[\"include/CellShard/io/pack/image_envelope.hh\"]",
-        "frozen_at": null,
+        "frozen_at": "2026-08-27T08:58:05Z",
+        "id": "CS-FOUND-I3B",
+        "owner_task_id": "CS-FOUND-08",
+        "revised_at": "2026-08-27T08:45:37Z",
+        "revision": 174,
+        "state": "frozen",
+        "version": "1"
+      },
+      {
+        "content_hash": "32c45f1dc09643d711f04e7e9f086cda22f25a67b986c8e34e4bad3d97bd229a",
+        "contract_paths_json": "[\"include/CellShard/io/pack/image_envelope.hh\"]",
+        "frozen_at": "2026-08-27T08:58:05Z",
         "id": "CS-FOUND-I4",
         "owner_task_id": "CS-FOUND-09",
         "revised_at": "2026-08-27T08:54:50Z",
-        "revision": 166,
-        "state": "revised",
+        "revision": 174,
+        "state": "frozen",
         "version": "2"
       },
       {
-        "content_hash": null,
+        "content_hash": "3d5c4533eeb14b93bddc85067338cea5745790c81bff06407489411f902df82e",
         "contract_paths_json": "[\"include/CellShard/runtime/source/local_file_source.hh\", \"include/CellShard/runtime/residency/host.hh\"]",
         "frozen_at": null,
         "id": "CS-FOUND-I5A",
         "owner_task_id": "CS-FOUND-10",
-        "revised_at": null,
-        "revision": 166,
-        "state": "draft",
+        "revised_at": "2026-08-27T09:01:28Z",
+        "revision": 185,
+        "state": "revised",
         "version": "1"
       },
       {
@@ -4652,6 +4927,58 @@
         "task_id": "CS-FOUND-08",
         "valid": 1,
         "validation_git_head": "971ba92179f9f3f1d7c1cbe7cca958aca229629e"
+      },
+      {
+        "completion_git_head": "0817e45781f50c26b19fe5d34b3d74fbac35c26b",
+        "completion_revision": 186,
+        "evidence_id": "5313bcac-54e1-4547-bb6a-8ed519124fb4",
+        "evidence_revision": 184,
+        "gate_id": "CS-FOUND-10-CPU",
+        "input_fingerprint": "a5a6a45d5c4b7c40663d2a6ed8907d957843d3b8feb42d60e0d6a141c05e31a5",
+        "provenance_json": "{\"claim_id\": \"88b1c5f0-9a56-42d9-accd-bdc8a0932a03\", \"evidence_content_hash\": null, \"evidence_kind\": \"command\", \"evidence_metadata\": {\"argv\": [\"./build-cs-found-cpu/cellShardHostResidencyTest\"], \"environment\": {}, \"expected_exit_code\": 0, \"input_fingerprint\": \"a5a6a45d5c4b7c40663d2a6ed8907d957843d3b8feb42d60e0d6a141c05e31a5\", \"inputs\": {\"command_contract\": {\"argv\": [\"./build-cs-found-cpu/cellShardHostResidencyTest\"], \"locks\": [\"build:cellshard\"]}, \"diff_fingerprint\": \"6427dd77a63bad97303ec1c2a0a1bb07c23c55f17260110252b00e3481ba4b67\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"CMakeLists.txt\", \"include/CellShard/runtime/residency.hh\", \"include/CellShard/runtime/residency/host.hh\", \"include/CellShard/runtime/source/local_file_source.hh\", \"src/runtime/residency/host.cc\", \"src/runtime/source/local_file_source.cc\", \"tests/host_residency_test.cc\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-10.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"baf5f71dbfd7a21cf28df2d12362ec0c0432ce53\"}, \"locks\": [{\"expires_at\": \"2026-08-27T09:06:18Z\", \"lease_id\": \"9a77fac2-1891-4663-b5c7-ce19471121e1\", \"name\": \"build:cellshard\"}], \"resources\": [], \"returncode\": 0, \"started_revision\": 183}, \"evidence_path\": \"/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/5313bcac-54e1-4547-bb6a-8ed519124fb4\", \"source\": \"completion_transaction\"}",
+        "status": "passed",
+        "task_id": "CS-FOUND-10",
+        "valid": 1,
+        "validation_git_head": "baf5f71dbfd7a21cf28df2d12362ec0c0432ce53"
+      },
+      {
+        "completion_git_head": "0817e45781f50c26b19fe5d34b3d74fbac35c26b",
+        "completion_revision": 186,
+        "evidence_id": "0322a969-af1a-4234-8e2c-7d19ccbdf2bd",
+        "evidence_revision": 169,
+        "gate_id": "G3-T07",
+        "input_fingerprint": "38525574b11bc11926c1515a2a7b7c3f7ff7d95742667c155f75e4f2a356dbcf",
+        "provenance_json": "{\"claim_id\": \"88b1c5f0-9a56-42d9-accd-bdc8a0932a03\", \"evidence_content_hash\": null, \"evidence_kind\": \"task_state\", \"evidence_metadata\": {\"input_fingerprint\": \"38525574b11bc11926c1515a2a7b7c3f7ff7d95742667c155f75e4f2a356dbcf\", \"inputs\": {\"command_contract\": {\"status\": \"done\", \"task_id\": \"CS-FOUND-07\"}, \"diff_fingerprint\": \"e771edbbaf9f01a43689d3d040501e2561d9deb47c7d0b2c499644a99873a3f8\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-10.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"baf5f71dbfd7a21cf28df2d12362ec0c0432ce53\"}, \"locks\": [], \"resources\": [], \"result\": \"implemented\", \"started_revision\": 168, \"status\": \"done\"}, \"evidence_path\": \"/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/0322a969-af1a-4234-8e2c-7d19ccbdf2bd\", \"source\": \"completion_transaction\"}",
+        "status": "passed",
+        "task_id": "CS-FOUND-10",
+        "valid": 1,
+        "validation_git_head": "baf5f71dbfd7a21cf28df2d12362ec0c0432ce53"
+      },
+      {
+        "completion_git_head": "0817e45781f50c26b19fe5d34b3d74fbac35c26b",
+        "completion_revision": 186,
+        "evidence_id": "f20e886e-8475-4d35-844c-1d9159402d0d",
+        "evidence_revision": 171,
+        "gate_id": "G3-T08",
+        "input_fingerprint": "113e9a3684052eb3a82cf5a0bc320c1edfe3b13311cff704b9b593e5286f5707",
+        "provenance_json": "{\"claim_id\": \"88b1c5f0-9a56-42d9-accd-bdc8a0932a03\", \"evidence_content_hash\": null, \"evidence_kind\": \"task_state\", \"evidence_metadata\": {\"input_fingerprint\": \"113e9a3684052eb3a82cf5a0bc320c1edfe3b13311cff704b9b593e5286f5707\", \"inputs\": {\"command_contract\": {\"status\": \"done\", \"task_id\": \"CS-FOUND-08\"}, \"diff_fingerprint\": \"e771edbbaf9f01a43689d3d040501e2561d9deb47c7d0b2c499644a99873a3f8\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-10.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"baf5f71dbfd7a21cf28df2d12362ec0c0432ce53\"}, \"locks\": [], \"resources\": [], \"result\": \"implemented\", \"started_revision\": 170, \"status\": \"done\"}, \"evidence_path\": \"/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/f20e886e-8475-4d35-844c-1d9159402d0d\", \"source\": \"completion_transaction\"}",
+        "status": "passed",
+        "task_id": "CS-FOUND-10",
+        "valid": 1,
+        "validation_git_head": "baf5f71dbfd7a21cf28df2d12362ec0c0432ce53"
+      },
+      {
+        "completion_git_head": "0817e45781f50c26b19fe5d34b3d74fbac35c26b",
+        "completion_revision": 186,
+        "evidence_id": "9ef42132-9257-47bb-abb6-c896eb95f2e8",
+        "evidence_revision": 173,
+        "gate_id": "G3-T09",
+        "input_fingerprint": "4f678c9f491854935db876ba1e8e0aa58bca56a7e705b7ef42751e85064c6001",
+        "provenance_json": "{\"claim_id\": \"88b1c5f0-9a56-42d9-accd-bdc8a0932a03\", \"evidence_content_hash\": null, \"evidence_kind\": \"task_state\", \"evidence_metadata\": {\"input_fingerprint\": \"4f678c9f491854935db876ba1e8e0aa58bca56a7e705b7ef42751e85064c6001\", \"inputs\": {\"command_contract\": {\"status\": \"done\", \"task_id\": \"CS-FOUND-09\"}, \"diff_fingerprint\": \"e771edbbaf9f01a43689d3d040501e2561d9deb47c7d0b2c499644a99873a3f8\", \"dirty_paths\": [\".todo-orchestrator/state.snapshot.json\", \"todo-status.md\", \"todos.md\", \"todos/cs-found-10.md\"], \"files\": [], \"interfaces\": [], \"recorded_git_head\": \"baf5f71dbfd7a21cf28df2d12362ec0c0432ce53\"}, \"locks\": [], \"resources\": [], \"result\": \"implemented\", \"started_revision\": 172, \"status\": \"done\"}, \"evidence_path\": \"/home/tumlinson/CellShard/.git/todo-orchestrator/a52537a5-20db-4aeb-a126-dd0128c71fda/evidence/9ef42132-9257-47bb-abb6-c896eb95f2e8\", \"source\": \"completion_transaction\"}",
+        "status": "passed",
+        "task_id": "CS-FOUND-10",
+        "valid": 1,
+        "validation_git_head": "baf5f71dbfd7a21cf28df2d12362ec0c0432ce53"
       }
     ],
     "task_dependencies": [
@@ -5803,9 +6130,9 @@
       },
       {
         "attention_reason": null,
-        "completion_commit": null,
-        "completion_git_head": null,
-        "completion_revision": null,
+        "completion_commit": "0817e45781f50c26b19fe5d34b3d74fbac35c26b",
+        "completion_git_head": "0817e45781f50c26b19fe5d34b3d74fbac35c26b",
+        "completion_revision": 186,
         "created_at": "2026-08-21T12:05:03Z",
         "id": "CS-FOUND-10",
         "kind": "task",
@@ -5817,14 +6144,14 @@
         "parallel_policy": "parallel_safe",
         "parent_id": "CS-FOUND-00",
         "priority": 50,
-        "result": null,
+        "result": "implemented",
         "result_policy_json": "{\"allowed_dispositions\": [\"implemented\", \"validated\"]}",
-        "revision": 166,
-        "status": "planned",
+        "revision": 186,
+        "status": "done",
         "tags_json": "[]",
         "title": "Local-file source and host residency",
-        "updated_at": "2026-08-27T08:56:40Z",
-        "version": 13
+        "updated_at": "2026-08-27T09:01:28Z",
+        "version": 15
       },
       {
         "attention_reason": null,

@@ -3,16 +3,16 @@
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-FOUND-10: Local-file source and host residency
 
-Task revision: `166`; current project revision is in `todo-status.md`.
+Task revision: `186`; current project revision is in `todo-status.md`.
 
 ## Objective
 Reach G3, then resolve one image extent through LocalFileSource into one move-only host residency allocation as CS-FOUND-I5A.
 
 ## State
-- Lifecycle: `planned`
-- Execution: `ready`
+- Lifecycle: `done`
+- Execution: `closed`
 - Parallel policy: `parallel_safe`
-- Result: `-`
+- Result: `implemented`
 
 ## Next Action
 Review and freeze I3A/I3B/I4 at G3, then implement pread-backed local exact reads and one-allocation host residency.

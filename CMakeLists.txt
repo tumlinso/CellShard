@@ -146,7 +146,7 @@ if(NOT CELLSHARD_CELLERATOR_QUANTIZED_INCLUDE_ROOT)
         "Set CELLSHARD_CELLERATOR_SOURCE_DIR or build inside a workspace where Cellerator is available.")
 endif()
 
-if(CELLSHARD_ENABLE_CUDA AND NOT TARGET Cellerator::compute_matrix_convert)
+if(CELLSHARD_ENABLE_CUDA AND NOT TARGET cellshard_cellerator_compute_matrix_convert)
     if(CELLSHARD_CELLERATOR_SOURCE_DIR
        AND EXISTS "${CELLSHARD_CELLERATOR_SOURCE_DIR}/src/compute/matrix/convert/bucket.cu"
        AND EXISTS "${CELLSHARD_CELLERATOR_SOURCE_DIR}/src/compute/matrix/convert/compressed.cu")
@@ -154,7 +154,9 @@ if(CELLSHARD_ENABLE_CUDA AND NOT TARGET Cellerator::compute_matrix_convert)
             "${CELLSHARD_CELLERATOR_SOURCE_DIR}/src/compute/matrix/convert/bucket.cu"
             "${CELLSHARD_CELLERATOR_SOURCE_DIR}/src/compute/matrix/convert/compressed.cu"
         )
-        add_library(Cellerator::compute_matrix_convert ALIAS cellshard_cellerator_compute_matrix_convert)
+        if(NOT TARGET Cellerator::compute_matrix_convert)
+            add_library(Cellerator::compute_matrix_convert ALIAS cellshard_cellerator_compute_matrix_convert)
+        endif()
         target_include_directories(cellshard_cellerator_compute_matrix_convert PUBLIC
             "$<BUILD_INTERFACE:${CELLSHARD_CELLERATOR_QUANTIZED_INCLUDE_ROOT}>"
         )
@@ -174,7 +176,7 @@ if(CELLSHARD_ENABLE_CUDA AND NOT TARGET Cellerator::compute_matrix_convert)
         )
     else()
         message(FATAL_ERROR
-            "CELLSHARD_ENABLE_CUDA requires Cellerator::compute_matrix_convert for GPU-assisted sparse layout conversion. "
+            "CELLSHARD_ENABLE_CUDA requires Cellerator compatibility sources for GPU-assisted sparse layout conversion. "
             "Build with Cellerator as a sibling/source dependency or set CELLSHARD_CELLERATOR_SOURCE_DIR.")
     endif()
 endif()
@@ -228,7 +230,7 @@ target_include_directories(cellshard_headers INTERFACE
 )
 target_compile_features(cellshard_headers INTERFACE cxx_std_17)
 if(CELLSHARD_ENABLE_CUDA)
-    target_link_libraries(cellshard_headers INTERFACE $<BUILD_INTERFACE:Cellerator::compute_matrix_convert>)
+    target_link_libraries(cellshard_headers INTERFACE $<BUILD_INTERFACE:cellshard_cellerator_compute_matrix_convert>)
 endif()
 if(CELLSHARD_CELLERATOR_QUANTIZED_INCLUDE_ROOT)
     target_include_directories(cellshard_headers INTERFACE
@@ -304,7 +306,7 @@ target_link_libraries(cellshard_inspect
         ${HDF5_LIBRARIES}
 )
 if(CELLSHARD_ENABLE_CUDA)
-    target_link_libraries(cellshard_inspect PUBLIC $<BUILD_INTERFACE:Cellerator::compute_matrix_convert> CUDA::cudart CUDA::cusparse)
+    target_link_libraries(cellshard_inspect PUBLIC $<BUILD_INTERFACE:cellshard_cellerator_compute_matrix_convert> CUDA::cudart CUDA::cusparse)
 endif()
 set_target_properties(cellshard_inspect PROPERTIES
     CXX_STANDARD 17

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "device.hh"
+#include "device_bindings.cuh"
 #include "distributed.hh"
 
 #include <cstddef>
@@ -82,31 +83,18 @@ struct alignas(16) sparse_group_reduce_fleet_result {
 };
 
 struct alignas(16) sparse_group_reduce_fleet_workspace {
-    ::cellerator::dist::local_context local;
     unsigned int slot_count;
-    unsigned int *slots;
+    int *device_ids;
     sparse_group_reduce_workspace *devices;
     sparse_group_reduce_result *results;
     void **reduce_scratch;
     std::size_t *reduce_scratch_bytes;
-#if CELLERATOR_DIST_HAS_NCCL
-    ::cellerator::dist::nccl_communicator ranked_nccl;
-#endif
-};
-
-struct alignas(16) ranked_nccl_config_view {
-    int world_size;
-    const int *local_world_ranks;
-    const void *unique_id;
-    std::size_t unique_id_bytes;
 };
 
 struct alignas(16) sparse_group_reduce_fleet_config {
-    const int *device_ids;
-    unsigned int device_count;
+    device_binding_view devices;
     unsigned int enable_peer_access;
     unsigned int stream_flags;
-    const ranked_nccl_config_view *ranked_nccl;
 };
 
 struct alignas(16) masked_sparse_reoptimize_config {

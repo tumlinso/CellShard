@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-27T09:24:52Z",
+  "generated_at": "2026-08-28T10:18:31Z",
   "project": {
     "configuration": {
       "busy_timeout_ms": 5000,
@@ -18,8 +18,9 @@
     "project_uuid": "a52537a5-20db-4aeb-a126-dd0128c71fda",
     "schema_version": 2
   },
-  "project_revision": 302,
+  "project_revision": 305,
   "schema_version": 2,
+  "snapshot_version": 3,
   "tables": {
     "barrier_requirements": [
       {
@@ -3449,6 +3450,36 @@
         "revision": 302,
         "seq": 302,
         "timestamp": "2026-08-27T09:24:52Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "a52537a5-20db-4aeb-a126-dd0128c71fda",
+        "entity_type": "project",
+        "event_type": "plan.applied",
+        "payload_json": "{\"file\": \"/home/tumlinson/CellShard/cellshard-cellerator-cycle-plan.json\"}",
+        "revision": 303,
+        "seq": 303,
+        "timestamp": "2026-08-28T10:09:45Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-POST-REMAP-MAIN",
+        "entity_type": "workflow_dispatch",
+        "event_type": "workflow.next_task",
+        "payload_json": "{\"lane_id\": \"CS-POST-REMAP-MAIN\", \"run_id\": \"CS-POST-REMAP-RUN\", \"status\": \"claimed\", \"task_id\": \"CS-POST-REMAP-01\"}",
+        "revision": 304,
+        "seq": 304,
+        "timestamp": "2026-08-28T10:09:58Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-POST-REMAP-01",
+        "entity_type": "task",
+        "event_type": "task.completed",
+        "payload_json": "{\"completion_revision\": 305, \"disposition\": \"implemented\", \"reached_checkpoints\": []}",
+        "revision": 305,
+        "seq": 305,
+        "timestamp": "2026-08-28T10:18:31Z"
       }
     ],
     "evidence": [
@@ -5206,6 +5237,16 @@
       },
       {
         "claim_id": null,
+        "created_at": "2026-08-28T10:18:31Z",
+        "id": "82aa99e2-8e37-4242-a9bf-d0135baea925",
+        "kind": "complete",
+        "note": "Removed Cellerator::dist and Cellerator::runtime synthesis/linkage from CellShard, replaced runtime/distributed coupling with neutral device_binding_view, removed unused CellShard NCCL ownership, narrowed installed compatibility headers, added a compile test, and passed fresh CUDA build plus focused residency/payload/access/package validation. cellShardMaskGroupsRuntimeTest retains its pre-existing exit-14 numerical assertion; no affected kernel path changed.",
+        "payload_json": "{\"changed_owned_paths\": [\".todo-orchestrator/state.snapshot.json\", \"CMakeLists.txt\", \"README.md\", \"SUPPORT.md\", \"cellshard-cellerator-cycle-plan.json\", \"include/CellShard/runtime/device_bindings.cuh\", \"include/CellShard/runtime/distributed/distributed.cuh\", \"include/CellShard/runtime/mask_groups.cuh\", \"src/runtime/mask_groups.cu\", \"tests/distributed_binding_compile_test.cu\", \"todo-status.md\", \"todos.md\"], \"checkpoints\": [], \"completion_commit\": \"a7fbae5981b4e4325c095f814caf3aa3c0b0fde4\", \"completion_gates\": [], \"completion_revision\": 305, \"finalized_checkpoints\": [], \"gates\": [], \"git_diffstat\": \".todo-orchestrator/state.snapshot.json             | 273 ++++++++++++++++++++-\\n CMakeLists.txt                                     | 187 ++++----------\\n README.md                                          |   4 +-\\n SUPPORT.md                                         |   4 +\\n .../CellShard/runtime/distributed/distributed.cuh  |  37 +--\\n include/CellShard/runtime/mask_groups.cuh          |  18 +-\\n src/runtime/mask_groups.cu                         | 117 ++++-----\\n todo-status.md                                     |   3 +-\\n todos.md                                           |   3 +-\\n 9 files changed, 396 insertions(+), 250 deletions(-)\", \"git_head\": \"a7fbae5981b4e4325c095f814caf3aa3c0b0fde4\", \"interfaces\": [], \"note\": \"Removed Cellerator::dist and Cellerator::runtime synthesis/linkage from CellShard, replaced runtime/distributed coupling with neutral device_binding_view, removed unused CellShard NCCL ownership, narrowed installed compatibility headers, added a compile test, and passed fresh CUDA build plus focused residency/payload/access/package validation. cellShardMaskGroupsRuntimeTest retains its pre-existing exit-14 numerical assertion; no affected kernel path changed.\", \"resources\": [], \"task_id\": \"CS-POST-REMAP-01\"}",
+        "revision": 305,
+        "task_id": "CS-POST-REMAP-01"
+      },
+      {
+        "claim_id": null,
         "created_at": "2026-08-27T08:35:49Z",
         "id": "94260b8f-3edb-48ad-a9d2-c73469d47eb2",
         "kind": "complete",
@@ -5479,6 +5520,27 @@
         "id": "CS-FOUND-SCOPE",
         "rule": "Modify only CellShard; never modify CellStack, Cellerator, or Baseplane, and do not depend on their uncommitted state.",
         "scope_json": "{}",
+        "severity": "error"
+      },
+      {
+        "enforcement": null,
+        "id": "CS-POST-COMPAT",
+        "rule": "Existing Cellerator-owned format compatibility headers are classified separately from runtime ownership and do not justify a runtime or distributed reverse dependency.",
+        "scope_json": "{\"program\": \"CS-POST-REMAP\"}",
+        "severity": "error"
+      },
+      {
+        "enforcement": null,
+        "id": "CS-POST-NO-DUPLICATION",
+        "rule": "Do not duplicate Cellerator runtime types in CellShard or hide the cycle behind forwarding headers.",
+        "scope_json": "{\"program\": \"CS-POST-REMAP\"}",
+        "severity": "error"
+      },
+      {
+        "enforcement": null,
+        "id": "CS-POST-OWNERSHIP",
+        "rule": "CellShard owns storage, residency, transport, shard metadata, and neutral device assignment metadata; Cellerator owns execution resources, execution streams, NCCL policy, topology, scheduling, and Cellerator-specific placement.",
+        "scope_json": "{\"program\": \"CS-POST-REMAP\"}",
         "severity": "error"
       }
     ],
@@ -6196,6 +6258,81 @@
         "mode": "read",
         "path": "tests",
         "task_id": "CS-FOUND-15"
+      },
+      {
+        "mode": "exclusive",
+        "path": ".todo-orchestrator",
+        "task_id": "CS-POST-REMAP-01"
+      },
+      {
+        "mode": "exclusive",
+        "path": "ARCHITECTURE_FOLLOWUPS.md",
+        "task_id": "CS-POST-REMAP-01"
+      },
+      {
+        "mode": "exclusive",
+        "path": "CMakeLists.txt",
+        "task_id": "CS-POST-REMAP-01"
+      },
+      {
+        "mode": "exclusive",
+        "path": "README.md",
+        "task_id": "CS-POST-REMAP-01"
+      },
+      {
+        "mode": "exclusive",
+        "path": "SUPPORT.md",
+        "task_id": "CS-POST-REMAP-01"
+      },
+      {
+        "mode": "exclusive",
+        "path": "cellshard-cellerator-cycle-plan.json",
+        "task_id": "CS-POST-REMAP-01"
+      },
+      {
+        "mode": "exclusive",
+        "path": "include/CellShard/runtime",
+        "task_id": "CS-POST-REMAP-01"
+      },
+      {
+        "mode": "exclusive",
+        "path": "src/runtime",
+        "task_id": "CS-POST-REMAP-01"
+      },
+      {
+        "mode": "exclusive",
+        "path": "tests",
+        "task_id": "CS-POST-REMAP-01"
+      },
+      {
+        "mode": "exclusive",
+        "path": "todo-status.md",
+        "task_id": "CS-POST-REMAP-01"
+      },
+      {
+        "mode": "exclusive",
+        "path": "todos.md",
+        "task_id": "CS-POST-REMAP-01"
+      },
+      {
+        "mode": "read",
+        "path": "docs",
+        "task_id": "CS-POST-REMAP-01"
+      },
+      {
+        "mode": "read",
+        "path": "export",
+        "task_id": "CS-POST-REMAP-01"
+      },
+      {
+        "mode": "read",
+        "path": "include/CellShard",
+        "task_id": "CS-POST-REMAP-01"
+      },
+      {
+        "mode": "read",
+        "path": "src",
+        "task_id": "CS-POST-REMAP-01"
       }
     ],
     "resource_classes": [
@@ -7524,6 +7661,18 @@
       {
         "invariant_id": "CS-FOUND-SCOPE",
         "task_id": "CS-FOUND-15"
+      },
+      {
+        "invariant_id": "CS-POST-COMPAT",
+        "task_id": "CS-POST-REMAP-01"
+      },
+      {
+        "invariant_id": "CS-POST-NO-DUPLICATION",
+        "task_id": "CS-POST-REMAP-01"
+      },
+      {
+        "invariant_id": "CS-POST-OWNERSHIP",
+        "task_id": "CS-POST-REMAP-01"
       }
     ],
     "task_locks": [
@@ -8041,6 +8190,31 @@
       },
       {
         "attention_reason": null,
+        "completion_commit": "a7fbae5981b4e4325c095f814caf3aa3c0b0fde4",
+        "completion_git_head": "a7fbae5981b4e4325c095f814caf3aa3c0b0fde4",
+        "completion_revision": 305,
+        "created_at": "2026-08-28T10:09:45Z",
+        "id": "CS-POST-REMAP-01",
+        "kind": "integration_task",
+        "legacy_owner": null,
+        "legacy_payload_json": "{}",
+        "next_action": "Replace local_context and Cellerator::dist use with narrow neutral inputs, remove Cellerator::dist CMake synthesis/linkage, and validate CellShard independently with CUDA enabled.",
+        "notes": "",
+        "objective": "Refactor CellShard distributed and mask-group APIs so public/runtime code no longer includes Cellerator runtime or distributed headers, names Cellerator runtime types, links Cellerator::dist, or synthesizes that target; preserve compatibility-format headers separately and prove an independent CUDA-enabled CellShard build.",
+        "parallel_policy": "project_exclusive",
+        "parent_id": null,
+        "priority": 400,
+        "result": "implemented",
+        "result_policy_json": "{\"allowed_dispositions\": [\"implemented\", \"validated\", \"failed\"]}",
+        "revision": 305,
+        "status": "done",
+        "tags_json": "[]",
+        "title": "Replace Cellerator runtime coupling with neutral CellShard delivery descriptors",
+        "updated_at": "2026-08-28T10:18:31Z",
+        "version": 3
+      },
+      {
+        "attention_reason": null,
         "completion_commit": null,
         "completion_git_head": null,
         "completion_revision": null,
@@ -8064,6 +8238,117 @@
         "updated_at": "2026-08-21T11:55:57Z",
         "version": 1
       }
-    ]
-  }
+    ],
+    "workflow_context_fragments": [
+      {
+        "content_hash": "1b0a47a25eb2beb5cf5955bb659355fe82555ec904f80facc2b68f853ed515dc",
+        "content_json": "{\"authority\":\"server_enforced_role_and_task_scope\",\"interfaces\":[],\"ordered_tasks\":[\"CS-POST-REMAP-01\"],\"rendezvous\":[],\"role\":\"implementer\",\"workspace_mode\":\"exclusive\"}",
+        "created_at": "2026-08-28T10:09:45Z",
+        "creation_revision": 303,
+        "id": "CS-POST-REMAP-RUN:lane_brief:CS-POST-REMAP-MAIN:-:1",
+        "invalidated_at": null,
+        "invalidation_revision": null,
+        "kind": "lane_brief",
+        "lane_id": "CS-POST-REMAP-MAIN",
+        "owner_scope_json": "{\"lane_id\":\"CS-POST-REMAP-MAIN\",\"run_id\":\"CS-POST-REMAP-RUN\"}",
+        "run_id": "CS-POST-REMAP-RUN",
+        "superseded_by": null,
+        "task_id": null,
+        "version": 1
+      },
+      {
+        "content_hash": "1d8907c87aaa946f54c227cb45d746f9891c3a8e852ea1681596022659397e57",
+        "content_json": "{\"acceptance_conditions\":[\"CellShard public/runtime source has zero Cellerator runtime or distributed includes and type references.\",\"CellShard no longer locates, synthesizes, or links Cellerator::dist.\",\"An independent CUDA-enabled CellShard configure, build, and focused runtime test pass.\"],\"boundaries\":[\"No transfer of NCCL policy or Cellerator scheduling ownership into CellShard.\",\"No redesign of CellShard persistence, artifact, source, identity, or residency foundations.\",\"No duplication of Cellerator runtime abstractions.\"],\"objective\":\"Remove only CellShard's reverse Cellerator runtime dependency and preserve its storage and delivery semantics.\"}",
+        "created_at": "2026-08-28T10:09:45Z",
+        "creation_revision": 303,
+        "id": "CS-POST-REMAP-RUN:run_charter:-:-:1",
+        "invalidated_at": null,
+        "invalidation_revision": null,
+        "kind": "run_charter",
+        "lane_id": null,
+        "owner_scope_json": "{\"run_id\":\"CS-POST-REMAP-RUN\"}",
+        "run_id": "CS-POST-REMAP-RUN",
+        "superseded_by": null,
+        "task_id": null,
+        "version": 1
+      },
+      {
+        "content_hash": "8f85a81cc377776fa9effddf51e39c1c3a515c3f1fa09968b90904672f0aba3a",
+        "content_json": "{\"completion_contract\":null,\"forbidden_mutations\":[],\"gates\":[],\"next_action\":\"Replace local_context and Cellerator::dist use with narrow neutral inputs, remove Cellerator::dist CMake synthesis/linkage, and validate CellShard independently with CUDA enabled.\",\"objective\":\"Refactor CellShard distributed and mask-group APIs so public/runtime code no longer includes Cellerator runtime or distributed headers, names Cellerator runtime types, links Cellerator::dist, or synthesizes that target; preserve compatibility-format headers separately and prove an independent CUDA-enabled CellShard build.\",\"scope\":{\"exclusive_paths\":[\"cellshard-cellerator-cycle-plan.json\",\"CMakeLists.txt\",\"include/CellShard/runtime\",\"src/runtime\",\"tests\",\"README.md\",\"SUPPORT.md\",\"ARCHITECTURE_FOLLOWUPS.md\",\".todo-orchestrator\",\"todo-status.md\",\"todos.md\"],\"read_paths\":[\"include/CellShard\",\"src\",\"docs\",\"export\"]},\"tests\":[]}",
+        "created_at": "2026-08-28T10:09:45Z",
+        "creation_revision": 303,
+        "id": "CS-POST-REMAP-RUN:task_brief:CS-POST-REMAP-MAIN:CS-POST-REMAP-01:1",
+        "invalidated_at": null,
+        "invalidation_revision": null,
+        "kind": "task_brief",
+        "lane_id": "CS-POST-REMAP-MAIN",
+        "owner_scope_json": "{\"lane_id\":\"CS-POST-REMAP-MAIN\",\"run_id\":\"CS-POST-REMAP-RUN\",\"task_id\":\"CS-POST-REMAP-01\"}",
+        "run_id": "CS-POST-REMAP-RUN",
+        "superseded_by": null,
+        "task_id": "CS-POST-REMAP-01",
+        "version": 1
+      }
+    ],
+    "workflow_integration_queue": [],
+    "workflow_lane_tasks": [
+      {
+        "activated_at": "2026-08-28T10:09:58Z",
+        "completed_at": "2026-08-28T10:18:31Z",
+        "enqueued_at": "2026-08-28T10:09:45Z",
+        "lane_id": "CS-POST-REMAP-MAIN",
+        "position": 0,
+        "revision": 305,
+        "state": "completed",
+        "task_id": "CS-POST-REMAP-01"
+      }
+    ],
+    "workflow_lanes": [
+      {
+        "context_cursor": 0,
+        "created_at": "2026-08-28T10:09:45Z",
+        "id": "CS-POST-REMAP-MAIN",
+        "parent_lane_id": null,
+        "revision": 305,
+        "role": "implementer",
+        "run_id": "CS-POST-REMAP-RUN",
+        "state": "closed",
+        "updated_at": "2026-08-28T10:18:31Z",
+        "workspace_mode": "exclusive"
+      }
+    ],
+    "workflow_message_receipts": [],
+    "workflow_message_recipients": [],
+    "workflow_messages": [],
+    "workflow_patch_artifacts": [],
+    "workflow_recovery_audit": [],
+    "workflow_rendezvous": [],
+    "workflow_rendezvous_arrivals": [],
+    "workflow_rendezvous_participants": [],
+    "workflow_run_charters": [
+      {
+        "content_hash": "1d8907c87aaa946f54c227cb45d746f9891c3a8e852ea1681596022659397e57",
+        "content_json": "{\"acceptance_conditions\":[\"CellShard public/runtime source has zero Cellerator runtime or distributed includes and type references.\",\"CellShard no longer locates, synthesizes, or links Cellerator::dist.\",\"An independent CUDA-enabled CellShard configure, build, and focused runtime test pass.\"],\"boundaries\":[\"No transfer of NCCL policy or Cellerator scheduling ownership into CellShard.\",\"No redesign of CellShard persistence, artifact, source, identity, or residency foundations.\",\"No duplication of Cellerator runtime abstractions.\"],\"objective\":\"Remove only CellShard's reverse Cellerator runtime dependency and preserve its storage and delivery semantics.\"}",
+        "created_at": "2026-08-28T10:09:45Z",
+        "creation_revision": 303,
+        "run_id": "CS-POST-REMAP-RUN",
+        "superseded_at": null,
+        "superseded_revision": null,
+        "version": 1
+      }
+    ],
+    "workflow_runs": [
+      {
+        "active_charter_version": 1,
+        "completed_at": null,
+        "created_at": "2026-08-28T10:09:45Z",
+        "id": "CS-POST-REMAP-RUN",
+        "revision": 303,
+        "root_task_id": "CS-POST-REMAP-01",
+        "status": "active",
+        "updated_at": "2026-08-28T10:09:45Z"
+      }
+    ],
+    "workflow_workspaces": []
+  },
+  "workflow_snapshot_version": 1
 }

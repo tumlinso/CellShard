@@ -20,9 +20,10 @@ _No staleness review recorded yet._
 <!-- todo-orchestrator:v2-managed:start -->
 # Todo Status v2 Projection
 
-Project revision: `302`
+Project revision: `305`
 
 ## Workstreams
+- `CS-POST-REMAP-01` | status: done | execution: closed | next: Replace local_context and Cellerator::dist use with narrow neutral inputs, remove Cellerator::dist CMake synthesis/linkage, and validate CellShard independently with CUDA enabled.
 - `CS-FOUND-00` | status: closed | execution: inactive | next: Program complete at CS-FOUND-G7; investigate the broader physical-runtime problem without creating a successor program in this handoff.
 - `CS-FOUND-01` | status: done | execution: closed | next: Create the source-backed transition map, run the baseline gates, reach G0, and complete with evidence without architecture implementation.
 - `CS-FOUND-02` | status: done | execution: closed | next: Add only the legacy codec/container baseline tests, run G1 gates, record results, reach G1, and stop without claiming CS-FOUND-03.

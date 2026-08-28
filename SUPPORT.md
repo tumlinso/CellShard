@@ -57,6 +57,10 @@ CellShard `0.1.x` is intentionally narrow.
 - Python: `3.10` through `3.13`
 - HDF5: C library available at build time
 - CUDA: optional, but the main runtime/staging path assumes the repo's current CUDA toolchain posture
+- CellShard runtime and distributed headers use neutral device IDs and optional
+  stream handles. They do not require Cellerator runtime/distributed types or
+  own Cellerator collective policy. Cellerator sparse-format compatibility
+  headers remain a separately scoped transitional surface.
 
 ## Support Notes
 

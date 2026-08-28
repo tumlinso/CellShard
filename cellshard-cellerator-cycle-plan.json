@@ -1,0 +1,77 @@
+{
+  "schema_version": 3,
+  "project": {
+    "name": "CS-POST-REMAP",
+    "workspace": "cellshard",
+    "repository": "CellShard",
+    "baseline_commit": "a7fbae5981b4e4325c095f814caf3aa3c0b0fde4",
+    "objective": "Remove CellShard's reverse dependency on Cellerator runtime and distributed types while preserving storage, staging, masking, and delivery behavior."
+  },
+  "invariants": [
+    {"id": "CS-POST-OWNERSHIP", "rule": "CellShard owns storage, residency, transport, shard metadata, and neutral device assignment metadata; Cellerator owns execution resources, execution streams, NCCL policy, topology, scheduling, and Cellerator-specific placement.", "severity": "error", "scope": {"program": "CS-POST-REMAP"}},
+    {"id": "CS-POST-NO-DUPLICATION", "rule": "Do not duplicate Cellerator runtime types in CellShard or hide the cycle behind forwarding headers.", "severity": "error", "scope": {"program": "CS-POST-REMAP"}},
+    {"id": "CS-POST-COMPAT", "rule": "Existing Cellerator-owned format compatibility headers are classified separately from runtime ownership and do not justify a runtime or distributed reverse dependency.", "severity": "error", "scope": {"program": "CS-POST-REMAP"}}
+  ],
+  "tasks": [
+    {
+      "id": "CS-POST-REMAP-01",
+      "kind": "integration_task",
+      "title": "Replace Cellerator runtime coupling with neutral CellShard delivery descriptors",
+      "objective": "Refactor CellShard distributed and mask-group APIs so public/runtime code no longer includes Cellerator runtime or distributed headers, names Cellerator runtime types, links Cellerator::dist, or synthesizes that target; preserve compatibility-format headers separately and prove an independent CUDA-enabled CellShard build.",
+      "priority": 400,
+      "parallel_policy": "project_exclusive",
+      "scope": {
+        "exclusive_paths": [
+          "cellshard-cellerator-cycle-plan.json",
+          "CMakeLists.txt",
+          "include/CellShard/runtime",
+          "src/runtime",
+          "tests",
+          "README.md",
+          "SUPPORT.md",
+          "ARCHITECTURE_FOLLOWUPS.md",
+          ".todo-orchestrator",
+          "todo-status.md",
+          "todos.md"
+        ],
+        "read_paths": ["include/CellShard", "src", "docs", "export"]
+      },
+      "invariants": [
+        "CS-POST-OWNERSHIP",
+        "CS-POST-NO-DUPLICATION",
+        "CS-POST-COMPAT"
+      ],
+      "next_action": "Replace local_context and Cellerator::dist use with narrow neutral inputs, remove Cellerator::dist CMake synthesis/linkage, and validate CellShard independently with CUDA enabled.",
+      "result_policy": {
+        "allowed_dispositions": ["implemented", "validated", "failed"]
+      }
+    }
+  ],
+  "runs": [
+    {
+      "id": "CS-POST-REMAP-RUN",
+      "root_task_id": "CS-POST-REMAP-01",
+      "charter": {
+        "objective": "Remove only CellShard's reverse Cellerator runtime dependency and preserve its storage and delivery semantics.",
+        "boundaries": [
+          "No transfer of NCCL policy or Cellerator scheduling ownership into CellShard.",
+          "No redesign of CellShard persistence, artifact, source, identity, or residency foundations.",
+          "No duplication of Cellerator runtime abstractions."
+        ],
+        "acceptance_conditions": [
+          "CellShard public/runtime source has zero Cellerator runtime or distributed includes and type references.",
+          "CellShard no longer locates, synthesizes, or links Cellerator::dist.",
+          "An independent CUDA-enabled CellShard configure, build, and focused runtime test pass."
+        ]
+      },
+      "lanes": [
+        {
+          "id": "CS-POST-REMAP-MAIN",
+          "role": "implementer",
+          "tasks": ["CS-POST-REMAP-01"],
+          "workspace": {"mode": "exclusive"}
+        }
+      ]
+    }
+  ]
+}

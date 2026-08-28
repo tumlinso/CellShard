@@ -7,9 +7,9 @@
 #include <vector>
 
 #include <cuda_runtime.h>
-#include <Cellerator/dist/distributed.cuh>
 
 #include "../device/sharded_device.cuh"
+#include "../device_bindings.cuh"
 
 namespace cellshard {
 namespace distributed {
@@ -78,13 +78,13 @@ inline int reserve(shard_map *map, unsigned long shard_count, unsigned int devic
 template<typename MatrixT>
 inline int assign_shards_round_robin(shard_map *map,
                                      const ::cellshard::sharded<MatrixT> *view,
-                                     const ::cellerator::dist::local_context *ctx) {
+                                     const ::cellshard::runtime::device_binding_view *bindings) {
     unsigned long i = 0;
 
-    if (map == 0 || view == 0 || ctx == 0 || ctx->device_count == 0) return 0;
-    if (!reserve(map, view->num_shards, ctx->device_count)) return 0;
+    if (map == 0 || view == 0 || !::cellshard::runtime::valid(bindings)) return 0;
+    if (!reserve(map, view->num_shards, bindings->count)) return 0;
     for (i = 0; i < view->num_shards; ++i) {
-        map->device_slot[i] = (int) (i % ctx->device_count);
+        map->device_slot[i] = (int) (i % bindings->count);
         map->device_bytes[map->device_slot[i]] += ::cellshard::device::device_shard_bytes(view, i);
     }
     return 1;
@@ -93,13 +93,13 @@ inline int assign_shards_round_robin(shard_map *map,
 template<typename MatrixT>
 inline int assign_shards_by_bytes(shard_map *map,
                                   const ::cellshard::sharded<MatrixT> *view,
-                                  const ::cellerator::dist::local_context *ctx) {
+                                  const ::cellshard::runtime::device_binding_view *bindings) {
     shard_weight *weights = 0;
     unsigned long i = 0;
     int ok = 0;
 
-    if (map == 0 || view == 0 || ctx == 0 || ctx->device_count == 0) return 0;
-    if (!reserve(map, view->num_shards, ctx->device_count)) return 0;
+    if (map == 0 || view == 0 || !::cellshard::runtime::valid(bindings)) return 0;
+    if (!reserve(map, view->num_shards, bindings->count)) return 0;
     // Largest-first greedy placement is materially better than input-order
     // assignment for skewed shard sizes. The real bottleneck here is eventual
     // resident device footprint, so sort by device_shard_bytes() before the
@@ -118,7 +118,7 @@ inline int assign_shards_by_bytes(shard_map *map,
         unsigned int d = 1;
         const unsigned long shard_id = weights[i].shard_id;
         const std::size_t shard_bytes = weights[i].bytes;
-        for (d = 1; d < ctx->device_count; ++d) {
+        for (d = 1; d < bindings->count; ++d) {
             if (map->device_bytes[d] < map->device_bytes[best]) best = d;
         }
         map->device_slot[shard_id] = (int) best;
@@ -172,7 +172,7 @@ inline int reserve_parts(device_fleet<MatrixT> *fleet, unsigned long capacity) {
 
 template<typename MatrixT>
 inline cudaError_t stage_shard_on_owner(device_fleet<MatrixT> *fleet,
-                                        const ::cellerator::dist::local_context *ctx,
+                                        const ::cellshard::runtime::device_binding_view *bindings,
                                         shard_map *map,
                                         ::cellshard::sharded<MatrixT> *view,
                                         const ::cellshard::shard_storage *storage,
@@ -181,9 +181,9 @@ inline cudaError_t stage_shard_on_owner(device_fleet<MatrixT> *fleet,
     const int slot = (map != 0 && shardId < map->shard_count && map->device_slot != 0) ? map->device_slot[shardId] : -1;
     cudaStream_t stream = 0;
 
-    if (fleet == 0 || ctx == 0 || view == 0) return cudaErrorInvalidValue;
-    if (slot < 0 || (unsigned int) slot >= fleet->count || (unsigned int) slot >= ctx->device_count) return cudaErrorInvalidValue;
-    if (ctx->streams != 0) stream = ctx->streams[slot];
+    if (fleet == 0 || !::cellshard::runtime::valid(bindings) || view == 0) return cudaErrorInvalidValue;
+    if (slot < 0 || (unsigned int) slot >= fleet->count || (unsigned int) slot >= bindings->count) return cudaErrorInvalidValue;
+    stream = ::cellshard::runtime::stream_for_slot(bindings, (unsigned int) slot);
     // This calls directly into stage_shard_async(), so it may trigger:
     // - synchronous source-backed host fetch for cold parts
     // - device allocation
@@ -192,14 +192,14 @@ inline cudaError_t stage_shard_on_owner(device_fleet<MatrixT> *fleet,
                                                   view,
                                                   storage,
                                                   shardId,
-                                                  ctx->device_ids[slot],
+                                                  bindings->device_ids[slot],
                                                   stream,
                                                   drop_host_after_upload);
 }
 
 template<typename MatrixT>
 inline cudaError_t stage_all_shards_on_owners(device_fleet<MatrixT> *fleet,
-                                              const ::cellerator::dist::local_context *ctx,
+                                              const ::cellshard::runtime::device_binding_view *bindings,
                                               shard_map *map,
                                               ::cellshard::sharded<MatrixT> *view,
                                               const ::cellshard::shard_storage *storage,
@@ -211,8 +211,9 @@ inline cudaError_t stage_all_shards_on_owners(device_fleet<MatrixT> *fleet,
     // Queue owner-local work concurrently across GPUs. A single host thread
     // walking every device serially can leave copy engines underfed even when
     // each device has its own stream and independent shard queue.
-    workers.reserve(ctx->device_count);
-    for (unsigned int slot = 0; slot < ctx->device_count; ++slot) {
+    if (!::cellshard::runtime::valid(bindings)) return cudaErrorInvalidValue;
+    workers.reserve(bindings->count);
+    for (unsigned int slot = 0; slot < bindings->count; ++slot) {
         workers.emplace_back([&, slot]() {
             unsigned long i = 0;
             for (i = 0; i < view->num_shards; ++i) {
@@ -224,7 +225,7 @@ inline cudaError_t stage_all_shards_on_owners(device_fleet<MatrixT> *fleet,
                     return;
                 }
                 if ((unsigned int) map->device_slot[i] != slot) continue;
-                err = stage_shard_on_owner(fleet, ctx, map, view, storage, i, drop_host_after_upload);
+                err = stage_shard_on_owner(fleet, bindings, map, view, storage, i, drop_host_after_upload);
                 if (err != cudaSuccess) {
                     int expected = (int) cudaSuccess;
                     first_error.compare_exchange_strong(expected, (int) err);

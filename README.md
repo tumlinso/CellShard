@@ -104,7 +104,7 @@ Useful public/runtime waypoints:
 - `include/CellShard/runtime/storage/shard_storage.cuh`: shard-storage backend, role, and capability definitions for the active `.csh5` runtime
 - `include/CellShard/runtime/host/sharded_host.cuh`: host-side fetch/drop and shard regrouping
 - `include/CellShard/runtime/device/sharded_device.cuh`: single-GPU upload and staging
-- `include/CellShard/runtime/distributed/distributed.cuh`: local multi-GPU shard placement and owner staging over CelleratorDist device contexts
+- `include/CellShard/runtime/distributed/distributed.cuh`: local multi-GPU shard placement and owner staging over explicit neutral device/stream bindings supplied by the caller
 - `include/CellShard/runtime/mask_groups.cuh`: generic sparse row/feature
   masks, grouped row reductions, fleet dispatch, and the explicit masked-layout
   reoptimization hook
@@ -506,7 +506,7 @@ If you are browsing the code for the first time:
 - read `include/CellShard/runtime/layout/sharded.cuh` and `include/CellShard/runtime/host/sharded_host.cuh` for the host-side model
 - read `include/CellShard/runtime/device/sharded_device.cuh` for upload and staging
 - read `include/CellShard/io/csh5/api.cuh`, `src/io/csh5/create.cc`, `src/io/csh5/metadata.cc`, `src/io/csh5/finalize_preprocess.cc`, `src/io/csh5/write.cc`, and `src/io/csh5/runtime/` if you care about the `.csh5` container and shard `.cspack` runtime caches
-- read `include/CellShard/runtime/distributed/distributed.cuh` if you care about local multi-GPU placement over CelleratorDist device contexts
+- read `include/CellShard/runtime/distributed/distributed.cuh` if you care about local multi-GPU placement over caller-supplied device/stream bindings; execution topology and collective policy remain caller-owned
 
 ## Notes
 

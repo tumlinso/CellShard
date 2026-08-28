@@ -6,7 +6,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <memory>
 #include <new>
 
 #include <cuda_fp16.h>
@@ -462,8 +461,28 @@ __global__ void scatter_masked_blocked_ell_to_compressed_kernel(device::blocked_
 }
 
 int selected_device_id(const sparse_group_reduce_fleet_workspace *fleet, unsigned int index) {
-    if (fleet == nullptr || index >= fleet->slot_count || fleet->slots == nullptr || fleet->local.device_ids == nullptr) return -1;
-    return fleet->local.device_ids[fleet->slots[index]];
+    if (fleet == nullptr || index >= fleet->slot_count || fleet->device_ids == nullptr) return -1;
+    return fleet->device_ids[index];
+}
+
+int enable_selected_peer_access(const int *device_ids, unsigned int count) {
+    for (unsigned int src = 0u; src < count; ++src) {
+        if (!cuda_ok(cudaSetDevice(device_ids[src]), "cudaSetDevice sparse group peer access")) return 0;
+        for (unsigned int dst = 0u; dst < count; ++dst) {
+            if (src == dst) continue;
+            int can_access = 0;
+            if (!cuda_ok(cudaDeviceCanAccessPeer(&can_access, device_ids[src], device_ids[dst]),
+                         "cudaDeviceCanAccessPeer sparse group fleet")) return 0;
+            if (can_access == 0) continue;
+            cudaError_t err = cudaDeviceEnablePeerAccess(device_ids[dst], 0u);
+            if (err == cudaErrorPeerAccessAlreadyEnabled) {
+                (void) cudaGetLastError();
+                err = cudaSuccess;
+            }
+            if (!cuda_ok(err, "cudaDeviceEnablePeerAccess sparse group fleet")) return 0;
+        }
+    }
+    return 1;
 }
 
 masked_reoptimize_private *private_state(masked_sparse_reoptimize_workspace *workspace) {
@@ -540,10 +559,6 @@ void init(sparse_group_reduce_workspace *workspace) {
 void init(sparse_group_reduce_fleet_workspace *fleet) {
     if (fleet == nullptr) return;
     std::memset(fleet, 0, sizeof(*fleet));
-    ::cellerator::dist::init(&fleet->local);
-#if CELLERATOR_DIST_HAS_NCCL
-    ::cellerator::dist::init(&fleet->ranked_nccl);
-#endif
 }
 
 void init(masked_sparse_reoptimize_workspace *workspace) {
@@ -576,15 +591,11 @@ void clear(sparse_group_reduce_fleet_workspace *fleet) {
             }
         }
     }
-#if CELLERATOR_DIST_HAS_NCCL
-    ::cellerator::dist::clear(&fleet->ranked_nccl);
-#endif
     std::free(fleet->reduce_scratch);
     std::free(fleet->reduce_scratch_bytes);
     std::free(fleet->results);
     std::free(fleet->devices);
-    std::free(fleet->slots);
-    ::cellerator::dist::clear(&fleet->local);
+    std::free(fleet->device_ids);
     init(fleet);
 }
 
@@ -625,19 +636,18 @@ int setup_fleet(sparse_group_reduce_fleet_workspace *fleet,
 
     const unsigned int stream_flags = config != nullptr ? config->stream_flags : cudaStreamNonBlocking;
     const unsigned int enable_peer = config == nullptr || config->enable_peer_access != 0u;
-    if (config != nullptr && config->device_count != 0u && config->device_ids == nullptr) return 0;
-    if (!cuda_ok(::cellerator::dist::discover_local(&fleet->local, 1, stream_flags), "discover sparse group fleet")) return 0;
-    if (fleet->local.device_count == 0u) return 0;
-    if (enable_peer != 0u && !cuda_ok(::cellerator::dist::enable_peer_access(&fleet->local), "enable sparse group fleet peer access")) return 0;
-
-    const unsigned int requested = config != nullptr ? config->device_count : 0u;
-    const unsigned int selected_count = requested != 0u ? requested : fleet->local.device_count;
-    fleet->slots = (unsigned int *) std::calloc((std::size_t) selected_count, sizeof(unsigned int));
+    int visible_count = 0;
+    const unsigned int requested = config != nullptr ? config->devices.count : 0u;
+    if (requested != 0u && config->devices.device_ids == nullptr) return 0;
+    if (requested == 0u && !cuda_ok(cudaGetDeviceCount(&visible_count), "cudaGetDeviceCount sparse group fleet")) return 0;
+    const unsigned int selected_count = requested != 0u ? requested : (unsigned int) visible_count;
+    if (selected_count == 0u) return 0;
+    fleet->device_ids = (int *) std::calloc((std::size_t) selected_count, sizeof(int));
     fleet->devices = (sparse_group_reduce_workspace *) std::calloc((std::size_t) selected_count, sizeof(sparse_group_reduce_workspace));
     fleet->results = (sparse_group_reduce_result *) std::calloc((std::size_t) selected_count, sizeof(sparse_group_reduce_result));
     fleet->reduce_scratch = (void **) std::calloc((std::size_t) selected_count, sizeof(void *));
     fleet->reduce_scratch_bytes = (std::size_t *) std::calloc((std::size_t) selected_count, sizeof(std::size_t));
-    if (fleet->slots == nullptr || fleet->devices == nullptr || fleet->results == nullptr
+    if (fleet->device_ids == nullptr || fleet->devices == nullptr || fleet->results == nullptr
         || fleet->reduce_scratch == nullptr || fleet->reduce_scratch_bytes == nullptr) {
         clear(fleet);
         return 0;
@@ -646,60 +656,35 @@ int setup_fleet(sparse_group_reduce_fleet_workspace *fleet,
     for (unsigned int i = 0u; i < selected_count; ++i) init(fleet->devices + i);
 
     for (unsigned int i = 0u; i < selected_count; ++i) {
-        const int requested_device = requested != 0u ? config->device_ids[i] : fleet->local.device_ids[i];
-        int found = -1;
-        for (unsigned int slot = 0u; slot < fleet->local.device_count; ++slot) {
-            if (fleet->local.device_ids[slot] == requested_device) {
-                found = (int) slot;
-                break;
+        const int requested_device = requested != 0u ? config->devices.device_ids[i] : (int) i;
+        cudaStream_t stream = requested != 0u
+            ? ::cellshard::runtime::stream_for_slot(&config->devices, i)
+            : (cudaStream_t) 0;
+        int owns_stream = 0;
+        if (stream == (cudaStream_t) 0) {
+            if (!cuda_ok(cudaSetDevice(requested_device), "cudaSetDevice sparse group fleet stream")) {
+                clear(fleet);
+                return 0;
             }
+            if (!cuda_ok(cudaStreamCreateWithFlags(&stream, stream_flags),
+                         "cudaStreamCreateWithFlags sparse group fleet")) {
+                clear(fleet);
+                return 0;
+            }
+            owns_stream = 1;
         }
-        if (found < 0) {
+        fleet->device_ids[i] = requested_device;
+        if (!setup(fleet->devices + i, requested_device, stream)) {
+            if (owns_stream != 0) (void) cudaStreamDestroy(stream);
             clear(fleet);
             return 0;
         }
-        fleet->slots[i] = (unsigned int) found;
-        if (!setup(fleet->devices + i, requested_device, fleet->local.streams != nullptr ? fleet->local.streams[found] : (cudaStream_t) 0)) {
-            clear(fleet);
-            return 0;
-        }
+        fleet->devices[i].owns_stream = owns_stream;
     }
-
-#if CELLERATOR_DIST_HAS_NCCL
-    if (config != nullptr && config->ranked_nccl != nullptr && config->ranked_nccl->unique_id != nullptr) {
-        if (config->ranked_nccl->local_world_ranks == nullptr
-            || config->ranked_nccl->world_size <= 0
-            || config->ranked_nccl->unique_id_bytes != sizeof(ncclUniqueId)) {
-            clear(fleet);
-            return 0;
-        }
-        std::unique_ptr<int[]> device_ids(new (std::nothrow) int[selected_count]);
-        if (!device_ids) {
-            clear(fleet);
-            return 0;
-        }
-        for (unsigned int i = 0u; i < selected_count; ++i) device_ids[i] = selected_device_id(fleet, i);
-        ncclUniqueId unique_id;
-        std::memcpy(&unique_id, config->ranked_nccl->unique_id, sizeof(unique_id));
-        if (::cellerator::dist::init_ranked_nccl_communicator(&fleet->ranked_nccl,
-                                                       device_ids.get(),
-                                                       fleet->slots,
-                                                       selected_count,
-                                                       config->ranked_nccl->local_world_ranks,
-                                                       config->ranked_nccl->world_size,
-                                                       &unique_id) != ncclSuccess) {
-            clear(fleet);
-            return 0;
-        }
-    } else if (selected_count > 1u) {
-        (void) ::cellerator::dist::init_local_nccl(&fleet->local);
-    }
-#else
-    if (config != nullptr && config->ranked_nccl != nullptr && config->ranked_nccl->unique_id != nullptr) {
+    if (enable_peer != 0u && !enable_selected_peer_access(fleet->device_ids, selected_count)) {
         clear(fleet);
         return 0;
     }
-#endif
 
     return 1;
 }

@@ -53,9 +53,10 @@ _None recorded yet._
 <!-- todo-orchestrator:v2-managed:start -->
 # Todo Orchestrator v2 Projection
 
-Project revision: `302`
+Project revision: `305`
 
 ## Workstreams
+- `CS-POST-REMAP-01` | kind: integration_task | status: done | parent: - | objective: Refactor CellShard distributed and mask-group APIs so public/runtime code no longer includes Cellerator runtime or distributed headers, names Cellerator runtime types, links Cellerator::dist, or synthesizes that target; preserve compatibility-format headers separately and prove an independent CUDA-enabled CellShard build.
 - `CS-FOUND-00` | kind: epic | status: closed | parent: - | objective: Establish stable CellShard identity, domain, partition, image, extent, source, snapshot, host-residency, and device-residency contracts before placement, streaming, routing, or multi-node work.
 - `CS-FOUND-01` | kind: task | status: done | parent: CS-FOUND-00 | objective: Reconstruct current CellShard implementation and reconcile it with the architecture review before introducing new architecture code.
 - `CS-FOUND-02` | kind: task | status: done | parent: CS-FOUND-00 | objective: Protect current CSPACK01 and native CPEXEC01 behavior with focused positive, malformed-input, ownership, publication, and CUDA upload tests.

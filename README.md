@@ -26,13 +26,21 @@ Its scope is narrow:
 - ship packed dense and compressed sparse fallback/interchange payloads
 - optionally stream source matrices and metadata into canonical CellShard containers
 
-CellShard is the storage, pack-delivery, and distributed execution base layer. It is not the analysis toolkit, model layer, or Torch integration layer. Those live on the Cellerator side.
+CellShard is the storage, pack-delivery, and distributed execution base layer.
+It is not the preprocessing workflow, biomath library, model layer, or Torch
+integration layer. Conventional preprocessing lives in BioPrep; biomath,
+accelerator execution, models, and Torch integration live in Cellerator.
 
 CellShard is independently buildable and packageable. It interoperates with
 [Cellerator](https://github.com/tumlinso/Cellerator) and may transport payloads
 that use [Baseplane](https://github.com/tumlinso/Baseplane) primitives, but it
 does not require the former CellStack wrapper or either sibling checkout for
 its normal standalone build.
+
+Optional headers under `CellShard/interop/cellerator/` compose path-backed
+selected-row export or execution-payload residency with Cellerator's
+storage-neutral sampling and CPE2 APIs. They do not add a mandatory Cellerator
+dependency to CellShard core targets.
 
 ## What CellShard Owns
 
@@ -147,8 +155,8 @@ Useful public/runtime waypoints:
 CellShard still exposes runtime masking as a compatibility runtime surface while
 generic sparse compute primitives migrate toward Cellerator. It is not a
 biology-specific QC policy. Biological group definitions such as mitochondrial,
-ribosomal, or hemoglobin feature rules are compiled by Cellerator preprocessing and
-passed in as ordinary `uint32_t` feature-group masks. Runtime row masks and
+ribosomal, or hemoglobin feature rules are compiled by BioPrep and passed in as
+ordinary `uint32_t` feature-group masks. Runtime row masks and
 feature masks are independent: a feature can belong to one or more groups and
 still be excluded from a particular masked reduction or explicit rebuild.
 
@@ -184,7 +192,14 @@ needs expanded floats.
 ## Ownership Boundary
 
 - CellShard owns optional bounded source ingest, metadata capture, local `.cspool` staging, and one-pass emission of an immutable canonical sparse matrix when `CELLSHARD_BUILD_INGEST=ON`.
-- Cellerator owns preprocessing, ML compute, model workflows, Torch interop, trajectory logic, and reusable analysis kernels above CellShard storage/runtime surfaces.
+- BioPrep owns conventional preprocessing workflows, normalization decisions,
+  and biological QC/marker policy.
+- Cellerator owns biomath, accelerator compute, ML/model workflows, Torch
+  interop, trajectory logic, and reusable numerical kernels above CellShard
+  storage/runtime surfaces.
+- CellShard may feed both BioPrep and Cellerator through metadata, selected-row
+  exports, and resident buffers without owning their numerical or workflow
+  semantics.
 - CellShard owns partitioning, sharding, biological cell/feature/assay indexing,
   CSPACK generation, CSPACK delivery, and append-only canonical/runtime
   generation management.

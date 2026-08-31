@@ -53,7 +53,7 @@ _None recorded yet._
 <!-- todo-orchestrator:v2-managed:start -->
 # Todo Orchestrator v2 Projection
 
-Project revision: `305`
+Project revision: `311`
 
 ## Workstreams
 - `CS-POST-REMAP-01` | kind: integration_task | status: done | parent: - | objective: Refactor CellShard distributed and mask-group APIs so public/runtime code no longer includes Cellerator runtime or distributed headers, names Cellerator runtime types, links Cellerator::dist, or synthesizes that target; preserve compatibility-format headers separately and prove an independent CUDA-enabled CellShard build.
@@ -61,6 +61,7 @@ Project revision: `305`
 - `CS-FOUND-01` | kind: task | status: done | parent: CS-FOUND-00 | objective: Reconstruct current CellShard implementation and reconcile it with the architecture review before introducing new architecture code.
 - `CS-FOUND-02` | kind: task | status: done | parent: CS-FOUND-00 | objective: Protect current CSPACK01 and native CPEXEC01 behavior with focused positive, malformed-input, ownership, publication, and CUDA upload tests.
 - `CS-FOUND-03` | kind: task | status: done | parent: CS-FOUND-00 | objective: Implement the specified zero-cost strong IDs, tagged content digest, array view, and typed status primitive as CS-FOUND-I1.
+- `CS-STORAGE-01` | kind: task | status: done | parent: - | objective: Extend existing CellShard export/storage surfaces with a neutral selected-row structural handoff, add the optional Cellerator integration adapter and tests where justified, and update live ownership documentation without changing CPE2 semantics or requiring Cellerator for normal builds.
 - `CS-FOUND-04` | kind: task | status: done | parent: CS-FOUND-00 | objective: Implement domain, partition-map, partition-selection, partition-descriptor, and explicit-order domain-binding contracts as CS-FOUND-I2A.
 - `CS-FOUND-05` | kind: task | status: done | parent: CS-FOUND-00 | objective: Represent producer-owned opaque execution images through producer ABI, target, projection, reuse, owning descriptor, and allocation-free view as CS-FOUND-I2B.
 - `CS-FOUND-06` | kind: task | status: done | parent: CS-FOUND-00 | objective: Separate immutable storage objects/extents from mutable source locations and define the non-owning storage-independent exact-read boundary as CS-FOUND-I2C.

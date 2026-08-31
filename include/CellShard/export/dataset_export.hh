@@ -243,6 +243,10 @@ bool materialize_derived_dataset(const char *source_path,
 bool load_observation_metadata(const char *path,
                                std::vector<observation_metadata_column> *out,
                                std::string *error = nullptr);
+bool load_observation_text_column(const char *path,
+                                  const char *column_name,
+                                  std::vector<std::string> *out,
+                                  std::string *error = nullptr);
 bool load_feature_metadata(const char *path,
                            std::vector<annotation_column> *out,
                            std::string *error = nullptr);

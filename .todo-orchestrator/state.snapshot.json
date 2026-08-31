@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-28T10:18:31Z",
+  "generated_at": "2026-08-28T16:55:16Z",
   "project": {
     "configuration": {
       "busy_timeout_ms": 5000,
@@ -18,7 +18,7 @@
     "project_uuid": "a52537a5-20db-4aeb-a126-dd0128c71fda",
     "schema_version": 2
   },
-  "project_revision": 305,
+  "project_revision": 311,
   "schema_version": 2,
   "snapshot_version": 3,
   "tables": {
@@ -3480,6 +3480,66 @@
         "revision": 305,
         "seq": 305,
         "timestamp": "2026-08-28T10:18:31Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "a52537a5-20db-4aeb-a126-dd0128c71fda",
+        "entity_type": "project",
+        "event_type": "plan.applied",
+        "payload_json": "{\"file\": \"/tmp/cellshard-storage-boundary-plan.json\"}",
+        "revision": 306,
+        "seq": 306,
+        "timestamp": "2026-08-28T15:31:36Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-STORAGE-01",
+        "entity_type": "claim",
+        "event_type": "continue.completed",
+        "payload_json": "{\"requested_task_id\": \"CS-STORAGE-01\"}",
+        "revision": 307,
+        "seq": 307,
+        "timestamp": "2026-08-28T15:33:56Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-STORAGE-01",
+        "entity_type": "claim",
+        "event_type": "claim.pulsed",
+        "payload_json": "{}",
+        "revision": 308,
+        "seq": 308,
+        "timestamp": "2026-08-28T15:37:38Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-STORAGE-01",
+        "entity_type": "claim",
+        "event_type": "claim.pulsed",
+        "payload_json": "{}",
+        "revision": 309,
+        "seq": 309,
+        "timestamp": "2026-08-28T16:39:31Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-STORAGE-01",
+        "entity_type": "claim",
+        "event_type": "claim.pulsed",
+        "payload_json": "{}",
+        "revision": 310,
+        "seq": 310,
+        "timestamp": "2026-08-28T16:54:02Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-STORAGE-01",
+        "entity_type": "task",
+        "event_type": "task.completed",
+        "payload_json": "{\"completion_revision\": 311, \"disposition\": \"implemented\", \"reached_checkpoints\": []}",
+        "revision": 311,
+        "seq": 311,
+        "timestamp": "2026-08-28T16:55:16Z"
       }
     ],
     "evidence": [
@@ -5147,6 +5207,16 @@
       },
       {
         "claim_id": null,
+        "created_at": "2026-08-28T16:55:16Z",
+        "id": "25b4c75b-d74a-4deb-b414-50901345f464",
+        "kind": "complete",
+        "note": "CellShard now owns named metadata loading plus optional path-backed sampling and execution-payload Cellerator adapters; host integration passed. CUDA execution deferred for missing X wiring; CPU package link remains blocked by pre-existing cudaHostUnregister references.",
+        "payload_json": "{\"changed_owned_paths\": [\"AGENTS.md\", \"README.md\", \"SUPPORT.md\", \"docs/FORMAT_ROLES.md\", \"export/summary/load_summary.cc\", \"include/CellShard/export/dataset_export.hh\", \"include/CellShard/interop/cellerator/execution_payload.hh\", \"include/CellShard/interop/cellerator/sampling.hh\", \"tests/cellerator_sampling_adapter_test.cc\", \"tests/cellshard_export_runtime_test.cu\"], \"checkpoints\": [], \"completion_commit\": \"fd180e46ff9f2ec3c5df4a481bd8a2a0bd407662\", \"completion_gates\": [], \"completion_revision\": 311, \"finalized_checkpoints\": [], \"gates\": [], \"git_diffstat\": \".todo-orchestrator/state.snapshot.json     | 176 ++++++++++++++++++++++++++++-\\n AGENTS.md                                  |   2 +-\\n README.md                                  |  23 +++-\\n SUPPORT.md                                 |   6 +\\n docs/FORMAT_ROLES.md                       |   4 +-\\n export/summary/load_summary.cc             |  24 ++++\\n include/CellShard/export/dataset_export.hh |   4 +\\n tests/cellshard_export_runtime_test.cu     |  35 ++++++\\n todo-status.md                             |   3 +-\\n todos.md                                   |   3 +-\\n 10 files changed, 270 insertions(+), 10 deletions(-)\", \"git_head\": \"fd180e46ff9f2ec3c5df4a481bd8a2a0bd407662\", \"interfaces\": [], \"note\": \"CellShard now owns named metadata loading plus optional path-backed sampling and execution-payload Cellerator adapters; host integration passed. CUDA execution deferred for missing X wiring; CPU package link remains blocked by pre-existing cudaHostUnregister references.\", \"resources\": [], \"task_id\": \"CS-STORAGE-01\"}",
+        "revision": 311,
+        "task_id": "CS-STORAGE-01"
+      },
+      {
+        "claim_id": null,
         "created_at": "2026-08-27T09:23:15Z",
         "id": "29214da2-c372-4aac-95ac-e01d9006823c",
         "kind": "complete",
@@ -5542,6 +5612,20 @@
         "rule": "CellShard owns storage, residency, transport, shard metadata, and neutral device assignment metadata; Cellerator owns execution resources, execution streams, NCCL policy, topology, scheduling, and Cellerator-specific placement.",
         "scope_json": "{\"program\": \"CS-POST-REMAP\"}",
         "severity": "error"
+      },
+      {
+        "enforcement": null,
+        "id": "CS-STORAGE-BOUNDARY",
+        "rule": "CellShard owns path-backed dataset access, selected-row loading, metadata loading, payload transport, and optional Cellerator handoff; Cellerator owns sampling and CPE2 semantics; normal CellShard remains independently buildable.",
+        "scope_json": "{}",
+        "severity": "error"
+      },
+      {
+        "enforcement": null,
+        "id": "CS-STORAGE-NO-BIOPREP",
+        "rule": "Do not modify Cellerator preprocessing implementation, preprocessing Python APIs, or BioPrep migration files.",
+        "scope_json": "{}",
+        "severity": "error"
       }
     ],
     "live_recovery_audit": [],
@@ -5571,6 +5655,11 @@
         "capacity": 1,
         "metadata_json": "{}",
         "name": "file:tests/execution_payload_test.cu"
+      },
+      {
+        "capacity": 1,
+        "metadata_json": "{}",
+        "name": "surface:cellshard-storage-boundary"
       },
       {
         "capacity": 1,
@@ -6333,6 +6422,71 @@
         "mode": "read",
         "path": "src",
         "task_id": "CS-POST-REMAP-01"
+      },
+      {
+        "mode": "exclusive",
+        "path": "AGENTS.md",
+        "task_id": "CS-STORAGE-01"
+      },
+      {
+        "mode": "exclusive",
+        "path": "CMakeLists.txt",
+        "task_id": "CS-STORAGE-01"
+      },
+      {
+        "mode": "exclusive",
+        "path": "README.md",
+        "task_id": "CS-STORAGE-01"
+      },
+      {
+        "mode": "exclusive",
+        "path": "SUPPORT.md",
+        "task_id": "CS-STORAGE-01"
+      },
+      {
+        "mode": "exclusive",
+        "path": "docs/FORMAT_ROLES.md",
+        "task_id": "CS-STORAGE-01"
+      },
+      {
+        "mode": "exclusive",
+        "path": "export",
+        "task_id": "CS-STORAGE-01"
+      },
+      {
+        "mode": "exclusive",
+        "path": "include/CellShard/export",
+        "task_id": "CS-STORAGE-01"
+      },
+      {
+        "mode": "exclusive",
+        "path": "include/CellShard/interop/cellerator",
+        "task_id": "CS-STORAGE-01"
+      },
+      {
+        "mode": "exclusive",
+        "path": "src/interop/cellerator",
+        "task_id": "CS-STORAGE-01"
+      },
+      {
+        "mode": "exclusive",
+        "path": "tests",
+        "task_id": "CS-STORAGE-01"
+      },
+      {
+        "mode": "read",
+        "path": "docs",
+        "task_id": "CS-STORAGE-01"
+      },
+      {
+        "mode": "read",
+        "path": "include",
+        "task_id": "CS-STORAGE-01"
+      },
+      {
+        "mode": "read",
+        "path": "src",
+        "task_id": "CS-STORAGE-01"
       }
     ],
     "resource_classes": [
@@ -7673,6 +7827,14 @@
       {
         "invariant_id": "CS-POST-OWNERSHIP",
         "task_id": "CS-POST-REMAP-01"
+      },
+      {
+        "invariant_id": "CS-STORAGE-BOUNDARY",
+        "task_id": "CS-STORAGE-01"
+      },
+      {
+        "invariant_id": "CS-STORAGE-NO-BIOPREP",
+        "task_id": "CS-STORAGE-01"
       }
     ],
     "task_locks": [
@@ -7785,6 +7947,11 @@
         "lock_name": "surface:package-exports",
         "phase": "claim",
         "task_id": "CS-FOUND-15"
+      },
+      {
+        "lock_name": "surface:cellshard-storage-boundary",
+        "phase": "claim",
+        "task_id": "CS-STORAGE-01"
       }
     ],
     "tasks": [
@@ -8211,6 +8378,31 @@
         "tags_json": "[]",
         "title": "Replace Cellerator runtime coupling with neutral CellShard delivery descriptors",
         "updated_at": "2026-08-28T10:18:31Z",
+        "version": 3
+      },
+      {
+        "attention_reason": null,
+        "completion_commit": "fd180e46ff9f2ec3c5df4a481bd8a2a0bd407662",
+        "completion_git_head": "fd180e46ff9f2ec3c5df4a481bd8a2a0bd407662",
+        "completion_revision": 311,
+        "created_at": "2026-08-28T15:31:36Z",
+        "id": "CS-STORAGE-01",
+        "kind": "task",
+        "legacy_owner": null,
+        "legacy_payload_json": "{}",
+        "next_action": "Reuse existing dataset export and execution-payload APIs, implement only the CellShard-owned adapter boundary, add focused synthetic tests, update current docs, and validate CPU/CUDA/package buildability.",
+        "notes": "Scope is the CellShard half of the cross-repository storage/filesystem boundary. Non-goals: sampling algorithm changes, CPE2 schema changes, BioPrep work, neighbor/ML/trajectory redesign, new storage formats, or mandatory Cellerator dependency. Acceptance: file-backed sampled-row adapter is CellShard-owned, transport-to-CPE2 integration is optional and CellShard-side if implemented, metadata/selected-row tests pass, docs name BioPrep, and normal CellShard build stays independent.",
+        "objective": "Extend existing CellShard export/storage surfaces with a neutral selected-row structural handoff, add the optional Cellerator integration adapter and tests where justified, and update live ownership documentation without changing CPE2 semantics or requiring Cellerator for normal builds.",
+        "parallel_policy": "serial",
+        "parent_id": null,
+        "priority": 90,
+        "result": "implemented",
+        "result_policy_json": "{\"allowed_dispositions\": [\"implemented\", \"validated\"]}",
+        "revision": 311,
+        "status": "done",
+        "tags_json": "[]",
+        "title": "Own file-backed sampling materialization and compute handoff",
+        "updated_at": "2026-08-28T16:55:16Z",
         "version": 3
       },
       {

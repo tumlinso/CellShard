@@ -23,6 +23,8 @@ CellShard `0.1.x` is intentionally narrow.
   - `cellshard::access::pack_adapter<Binding>`
   - `cellshard::access::archive_to_pack<ArchiveBinding, PackBinding, Policy>`
   - dense and compressed sparse fallback bindings
+- `CellShard::export` path-backed dataset access, including summary, selected-row
+  CSR, observation metadata, and named text-column loading
 - Python package/module:
   - `open`
   - `Dataset`
@@ -73,6 +75,10 @@ CellShard `0.1.x` is intentionally narrow.
   Torch are explicit conversion formats or explicit `to_*` calls.
 - Torch is optional interop, not the default representation and not a CellShard
   build dependency.
+- `CellShard/interop/cellerator/sampling.hh` and
+  `CellShard/interop/cellerator/execution_payload.hh` are optional header-only
+  adapters for consumers that also provide Cellerator; normal CellShard
+  package components do not link Cellerator through them.
 - CellShard-owned payload layouts are intentionally limited to packed dense and
   compressed sparse fallback/interchange bindings. Optimized layouts such as
   Blocked-ELL, Sliced-ELL, and quantized Blocked-ELL are caller-owned and should

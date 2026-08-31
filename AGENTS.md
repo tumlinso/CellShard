@@ -36,7 +36,7 @@ layout policy.
 Do not move model training, Torch/libtorch integration, trajectory logic, or ML
 compute into CellShard. Those belong in Cellerator. Do not move biological
 preprocessing policy, normalization decisions, marker/QC semantics, or workflow
-policy into CellShard. Those belong in Cellerator preprocessing. Neighbor-caller
+policy into CellShard. Those belong in BioPrep. Neighbor-caller
 orchestration and query policy belong in CellShardNeighbors.
 
 Cellerator is the migration target for generic sparse compute primitives.

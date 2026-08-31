@@ -1,6 +1,9 @@
 #include <CellShard/export/dataset_export.hh>
 #include <CellShard/CellShard.hh>
 #include <CellShard/io/cshard.hh>
+#if defined(CELLSHARD_TEST_CELLERATOR_ADAPTER)
+#include <CellShard/interop/cellerator/sampling.hh>
+#endif
 
 #include <cmath>
 #include <cstdio>
@@ -977,6 +980,28 @@ int main() {
     require(close_float(row_subset.data[4], 3.0f), "row subset data[4] mismatch");
     require(close_float(row_subset.data[5], 4.0f), "row subset data[5] mismatch");
 
+#if defined(CELLSHARD_TEST_CELLERATOR_ADAPTER)
+    namespace sampling = ::cellerator::compute::sampling;
+    sampling::sample_spec sample_spec;
+    sampling::sample_plan sample_plan;
+    sampling::owned_sampled_csr_structure sampled_structure;
+    sample_spec.mode = sampling::selection_mode::exact_lowest_hash;
+    sample_spec.seed = 919u;
+    sample_spec.split_name = "cellshard-file-adapter";
+    sample_spec.requested_row_count = 64u;
+    error.clear();
+    require(cs::interop::cellerator::build_sample_plan(
+                path, sample_spec, &sample_plan, &error), error.c_str());
+    require(cs::interop::cellerator::materialize_sampled_csr_structure(
+                path, sample_plan, &sampled_structure, &error), error.c_str());
+    const sampling::sampled_csr_structure_view sampled_view = sampled_structure.view();
+    require(sampled_view.sampled_row_count == 2u && sampled_view.gene_count == 4u
+                && sampled_view.nnz == 4u,
+            "CellShard Cellerator sampled adapter shape mismatch");
+    require(sampled_view.row_ptr[2] == 4u && sampled_view.column_indices[3] == 3u,
+            "CellShard Cellerator sampled adapter structure mismatch");
+#endif
+
     cse::anndata_export snapshot;
     error.clear();
     require(cse::load_dataset_for_anndata(path, &snapshot, &error), error.c_str());
@@ -998,6 +1023,16 @@ int main() {
     error.clear();
     require(cse::load_observation_metadata(path, &loaded_obs_columns, &error), error.c_str());
     require(loaded_obs_columns.size() == 2u, "explicit observation metadata load mismatch");
+    std::vector<std::string> loaded_batches;
+    error.clear();
+    require(cse::load_observation_text_column(path, "batch", &loaded_batches, &error), error.c_str());
+    require(loaded_batches == std::vector<std::string>({"batch0", "batch1"}),
+            "observation text-column load mismatch");
+    error.clear();
+    require(!cse::load_observation_text_column(path, "quality", &loaded_batches, &error),
+            "non-text observation column was accepted as text");
+    require(error == "requested observation metadata column is not text",
+            "non-text observation column error mismatch");
     std::vector<cse::annotation_column> loaded_var_columns;
     error.clear();
     require(cse::load_feature_metadata(path, &loaded_var_columns, &error), error.c_str());

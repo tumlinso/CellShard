@@ -193,6 +193,30 @@ bool load_observation_metadata(const char *path,
     return load_annotation_metadata_impl(path, "/observation_metadata", columns, error);
 }
 
+bool load_observation_text_column(const char *path,
+                                  const char *column_name,
+                                  std::vector<std::string> *out,
+                                  std::string *error) {
+    std::vector<observation_metadata_column> columns;
+    if (column_name == nullptr || *column_name == '\0' || out == nullptr) {
+        set_error(error, "observation text-column request is invalid");
+        return false;
+    }
+    out->clear();
+    if (!load_observation_metadata(path, &columns, error)) return false;
+    for (observation_metadata_column &column : columns) {
+        if (column.name != column_name) continue;
+        if (column.type != cellshard::dataset_observation_metadata_type_text) {
+            set_error(error, "requested observation metadata column is not text");
+            return false;
+        }
+        *out = std::move(column.text_values);
+        return true;
+    }
+    set_error(error, std::string("missing observation metadata column: ") + column_name);
+    return false;
+}
+
 bool load_feature_metadata(const char *path,
                            std::vector<annotation_column> *columns,
                            std::string *error) {

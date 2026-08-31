@@ -10,7 +10,9 @@ CellShard should own biological metadata, storage roles, sharding, packing,
 delivery, and inspection. Optimized matrix layouts and the fastest
 archive-to-pack conversions are caller-owned through the header-only C++ access
 adapter contract. Cellerator should consume execution-ready packs and run
-biological sparse compute.
+biological sparse compute. BioPrep owns conventional preprocessing workflow and
+QC policy; it may read from and publish through CellShard without moving those
+numerical decisions into the storage layer.
 
 ---
 

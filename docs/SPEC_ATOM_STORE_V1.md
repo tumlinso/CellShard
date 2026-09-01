@@ -112,6 +112,11 @@ it, compare-exchanges the root from the exact parent digest to the new digest,
 and durably synchronizes the root. A failed stage or object sync never switches
 the root; a compare-exchange conflict never overwrites a concurrent publisher.
 
+Crash recovery classifies validated candidates against the durable root as the
+active root, a durable direct successor eligible for explicit recovery, an
+unreferenced orphan, an incomplete unsynchronized object, or corruption.
+Recovery never promotes an orphan or incomplete object implicitly.
+
 All counts and byte offsets are unsigned 64-bit values. Stable records are
 pointer-free and trivially copyable. Runtime pointers, paths, GPU ordinals,
 streams, topology routes, and mutable source locations are forbidden in the

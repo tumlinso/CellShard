@@ -3,7 +3,7 @@
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-JBC-B06: Reconcile the closed access-adapter lifecycle without reopening
 
-Task revision: `325`; current project revision is in `todo-status.md`.
+Task revision: `1041`; current project revision is in `todo-status.md`.
 
 ## Objective
 Reconcile the closed access-adapter lifecycle without reopening. Deliver this as one isolated, reviewable step in the CellShard baseline, successor charter, and compatibility map workstream.

@@ -117,6 +117,12 @@ active root, a durable direct successor eligible for explicit recovery, an
 unreferenced orphan, an incomplete unsynchronized object, or corruption.
 Recovery never promotes an orphan or incomplete object implicitly.
 
+Consolidation is a checked planning pass over immutable extents. It omits only
+entries explicitly marked non-live, preserves each live content digest, and
+produces an aligned source-to-target copy plan and exact output size. The
+result is published as a new generation; consolidation never mutates extents
+or changes semantic identities in place.
+
 All counts and byte offsets are unsigned 64-bit values. Stable records are
 pointer-free and trivially copyable. Runtime pointers, paths, GPU ordinals,
 streams, topology routes, and mutable source locations are forbidden in the

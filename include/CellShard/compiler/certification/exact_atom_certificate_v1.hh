@@ -155,7 +155,7 @@ emit_exact_atom_certificate_v1(
         return {exact_atom_certificate_emit_code_v1::
                     invalid_certificate_identity};
     }
-    if ((summary.completed_stage_mask & required_atom_certificate_stage_mask_v1)
+    if (summary.completed_stage_mask
         != required_atom_certificate_stage_mask_v1) {
         return {exact_atom_certificate_emit_code_v1::incomplete_stages};
     }
@@ -166,6 +166,11 @@ emit_exact_atom_certificate_v1(
     if (summary.contribution_owner_count
             > UINT64_MAX - summary.residual_count
         || summary.contribution_owner_count + summary.residual_count
+               != common.exact_coverage.logical_count
+        || result.certified_entity_count
+               > UINT64_MAX - result.certified_relation_edge_count
+        || result.certified_entity_count
+                   + result.certified_relation_edge_count
                != common.exact_coverage.logical_count) {
         return {exact_atom_certificate_emit_code_v1::count_mismatch};
     }

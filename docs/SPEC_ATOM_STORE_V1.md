@@ -51,6 +51,12 @@ dependencies, payload descriptors and bytes, lowering artifacts, and
 provenance. Unknown required section types are rejected. Optional types may be
 skipped only when their directory flags explicitly permit it.
 
+The v1 large-arena header is 256 bytes and its directory uses 96-byte entries.
+Both the directory and every section have at least 64-byte power-of-two
+alignment. Directory entries carry a section kind, exactly one of required or
+optional, 64-bit extent and record geometry, and an algorithm-tagged section
+digest. Record geometry must account for the entire section when nonzero.
+
 All counts and byte offsets are unsigned 64-bit values. Stable records are
 pointer-free and trivially copyable. Runtime pointers, paths, GPU ordinals,
 streams, topology routes, and mutable source locations are forbidden in the

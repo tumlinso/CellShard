@@ -1,11 +1,16 @@
 # Repository Guidelines
 
-CellShard is performance-first and biology-informed. Its foundations exist to
-make the physical realization of structured biological computation fast, not
-to turn the project into an artifact catalog or generic tensor runtime.
-CellShard may carry operational biological structure useful for organization,
-locality, representation, streaming, residency, and reuse, while producers
-retain biological theory, mathematical semantics, and sparse-kernel policy.
+CellShard is a performance-first, biology-native compiler and physical-runtime
+system. It compiles recurrent biological organization into exact reusable
+artifacts, placement, acquisition, residency, and transport plans. Its purpose
+is to reduce total execution, movement, reconstruction, and communication cost,
+not to turn the project into an artifact catalog or generic tensor runtime.
+
+The frozen successor contract is
+`docs/JBC/CELLSHARD_JBC_SUCCESSOR_CHARTER_V1.md`. Existing implementation and
+format documents remain authoritative compatibility descriptions; new work
+must converge toward that charter without presenting unfinished transitions as
+complete.
 
 Legacy row shards are compatibility/delivery machinery, not the semantic
 definition of domains or partitions. Preserve opaque producer payload bytes
@@ -15,17 +20,25 @@ identity.
 
 ## Scope And Ownership
 
-CellShard is the storage, pack-delivery, and runtime-staging layer for
-large sharded sparse omics matrices. It owns:
+CellShard owns global biological recurrence compilation and physical
+realization. This includes:
 
-- persisted dataset, partition, shard, and pack layout metadata
-- partition, shard, and sharded-matrix metadata
-- `.csh5` canonical dataset storage
-- `.cspack` runtime pack generation, delivery, and fetch paths
+- bounded proposal evidence and independent exact coverage certification
+- atom composition, grammars, bases, superatoms, partials, and lineage
+- global physical views, topology, placement, routing, acquisition, caching,
+  residency, transport, leases, pins, readiness, and reconstruction
+- persisted dataset, partition, shard, image, extent, catalog, snapshot, and
+  source metadata
+- `.csh5` canonical dataset storage and `.cspack` compatibility publication,
+  delivery, and fetch paths
 - `.cspool` bounded local ingest spool files
 - experimental `.cshard` archive inspection, validation, conversion, and row reads
-- host fetch/drop, device upload, staging, and local distributed placement helpers
 - optional bounded ingest, export helpers, and Python bindings
+
+Approximate evidence proposes only. Independently certified exact coverage is
+required before execution. Shape, offsets, ordinal position, paths, pointers,
+devices, replicas, or service/placement epochs never establish biological
+identity.
 
 Sparse matrix representation primitives such as Blocked-ELL, Sliced-ELL, and
 quantized Blocked-ELL are Cellerator-owned compute/layout types. CellShard
@@ -33,8 +46,10 @@ exposes temporary compatibility headers and may serialize, cache, stage, and
 ship those payloads, but it should not be the source of truth for their compute
 layout policy.
 
-Do not move model training, Torch/libtorch integration, trajectory logic, or ML
-compute into CellShard. Those belong in Cellerator. Do not move biological
+Do not move model training, Torch/libtorch integration, trajectory inference or
+scientific policy, or ML compute into CellShard. Those belong in Cellerator.
+CellShard may compile caller-supplied trajectory/lineage structure for exact
+reuse without inferring pseudotime or fate. Do not move biological
 preprocessing policy, normalization decisions, marker/QC semantics, or workflow
 policy into CellShard. Those belong in BioPrep. Neighbor-caller
 orchestration and query policy belong in CellShardNeighbors.
@@ -44,25 +59,29 @@ CellShard may temporarily host compatibility runtime wrappers while callers are
 migrated. Biological feature groups may be passed in as ordinary feature masks,
 but CellShard should not define biological QC policy.
 
-## Runtime And Format Posture
+## Compiler, Runtime, And Format Posture
 
-Keep the hot path centered on:
+The successor path is:
 
 ```text
-.csh5 -> .cspack -> GPU execution
+typed observations and relations
+  -> bounded recurrence evidence
+  -> independent exact certification
+  -> compiled catalogs/images/extents/routes
+  -> acquisition and residency
+  -> Cellerator-owned numerical execution
 ```
 
-`.csh5` is the durable canonical source and append target. `.cspack` is the
-execution-facing runtime artifact. Avoid normalizing direct `.csh5` reads as
-the performance path for repeated execution. Owner-side runtime code may build
-or refresh packs; executor-facing code should consume published pack generations
-when the required runtime artifact exists.
+No single archive or pack is the universal successor path. Selection includes
+publication, acquisition, transfer, reconstruction, synchronization, and
+expected reuse. Steady-state execution performs no discovery, catalog parsing,
+hidden allocation, global sorting, topology search, or silent canonicalization.
 
-`.cspack` is a shard-pack family, not a metadata-rich archive. Keep rich dataset
-metadata in `.csh5` today and future archive formats later. `.cspool` is a
-machine-local ingest artifact, not a public archive. `.cshard` is experimental
-standby archive work and must not silently replace `.csh5` as the production
-source of truth.
+Compatibility remains explicit: `.csh5` is the current durable canonical
+source; `.cspack` is a generated execution-container family; `.cspool` is a
+machine-local ingest artifact; `.cshard` is experimental standby. Preserve
+their byte contracts and reference paths until versioned replacements have
+adapters, migrated consumers, and differential fixtures.
 
 When changing format or runtime behavior, read the relevant docs first:
 
@@ -71,6 +90,10 @@ When changing format or runtime behavior, read the relevant docs first:
 - `docs/SPEC_CSPACK_V1.md` for the current CSPACK byte-level contract
 - `docs/SPEC_CSPOOL_V1.md` and `docs/SPEC_CSHARD_V1.md` for spool/archive work
 - `docs/FORMAT_ROLES.md` for ecosystem format boundaries
+- `docs/JBC/CELLSHARD_JBC_SUCCESSOR_CHARTER_V1.md` for the frozen successor
+  ownership and convergence contract
+- `docs/JBC/CS_JBC_B02_SOURCE_TRANSITION_MAP.md` for source-level migration
+  classification
 - `docs/PARKING_LOT.md` for deferred ideas
 
 ## Source Layout
@@ -84,6 +107,12 @@ Key areas:
   sparse layouts plus CellShard-local dense/compressed fallback layouts
 - `include/CellShard/runtime/`: sharded layout, storage dispatch, host/device
   staging, masking, and local distributed helpers
+- `include/CellShard/compiler/`: reserved successor recurrence compiler
+  contracts and cold builders; populated only by owning tasks
+- `include/CellShard/artifact/atom_store/`: reserved successor immutable
+  catalog/image/extent publication contracts
+- `include/CellShard/runtime/v2/`: reserved successor acquisition, topology,
+  placement, residency, and transport contracts
 - `include/CellShard/io/`: `.cspack`, `.csh5`, `.cspool`, and `.cshard` public
   entry surfaces
 - `include/CellShard/ingest/`: optional source ingest headers
@@ -95,6 +124,8 @@ Key areas:
 - `export/`: non-Torch export helpers split by responsibility
 - `python/`: optional pybind module and Python package wrapper
 - `tests/`: focused compile, runtime, package, and format checks
+- `tests/jbc/` and `bench/jbc/`: reserved exact-oracle, adversarial,
+  differential, complete-cost, and no-promotion evidence
 
 ## Coding Style
 

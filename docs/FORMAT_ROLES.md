@@ -6,13 +6,32 @@ The guiding rule is simple:
 
 > Archive formats preserve meaning. Pack formats preserve speed.
 
-CellShard should own biological metadata, storage roles, sharding, packing,
-delivery, and inspection. Optimized matrix layouts and the fastest
-archive-to-pack conversions are caller-owned through the header-only C++ access
-adapter contract. Cellerator should consume execution-ready packs and run
-biological sparse compute. BioPrep owns conventional preprocessing workflow and
-QC policy; it may read from and publish through CellShard without moving those
-numerical decisions into the storage layer.
+## Successor-charter overlay
+
+The frozen biology-native compiler successor charter is
+[`docs/JBC/CELLSHARD_JBC_SUCCESSOR_CHARTER_V1.md`](JBC/CELLSHARD_JBC_SUCCESSOR_CHARTER_V1.md).
+It supersedes the idea that CellShard's future architecture is only storage,
+pack delivery, and a mandatory `CSH5 -> CSPACK -> GPU` hot path. CellShard also
+owns exact global recurrence compilation, physical realization, publication,
+topology, placement, acquisition, residency, and transport. Cellerator retains
+mathematical and local numerical-execution ownership.
+
+The format roles below remain current compatibility authority. They do not
+claim that the successor atom store or runtime v2 already exists. CSH5 remains
+the current canonical archive, CSPACK01 remains a generated execution
+container, CSHARD01 remains experimental standby, and no existing bytes are
+silently reinterpreted. The successor planner may select among published
+artifact routes by complete measured cost; no format family becomes universal
+by charter.
+
+Within the current format layer, CellShard owns biological metadata, storage
+roles, sharding, packing, delivery, and inspection. Optimized matrix layouts
+and the fastest archive-to-pack conversions are caller-owned through the
+header-only C++ access adapter contract. Cellerator should consume
+execution-ready packs and run biological sparse compute. BioPrep owns
+conventional preprocessing workflow and QC policy; it may read from and publish
+through CellShard without moving those numerical decisions into the storage
+layer.
 
 ---
 

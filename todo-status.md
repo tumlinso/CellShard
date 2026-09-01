@@ -20,7 +20,7 @@ _No staleness review recorded yet._
 <!-- todo-orchestrator:v2-managed:start -->
 # Todo Status v2 Projection
 
-Project revision: `317`
+Project revision: `319`
 
 ## Workstreams
 - `CS-POST-REMAP-01` | status: done | execution: closed | next: Replace local_context and Cellerator::dist use with narrow neutral inputs, remove Cellerator::dist CMake synthesis/linkage, and validate CellShard independently with CUDA enabled.
@@ -63,7 +63,7 @@ Project revision: `317`
 - `CS-JBC-A20` | status: planned | execution: ready | next: Assemble the common atom envelope, builder, and nonowning view. Deliver this as one isolated, reviewable step in the CellShard biological execution atom core workstream.
 - `CS-JBC-B01` | status: done | execution: closed | next: Revalidate nested CellShard and Todo authority. Deliver this as one isolated, reviewable step in the CellShard baseline, successor charter, and compatibility map workstream.
 - `CS-JBC-B02` | status: done | execution: closed | next: Produce the source-backed CellShard transition map. Deliver this as one isolated, reviewable step in the CellShard baseline, successor charter, and compatibility map workstream.
-- `CS-JBC-B03` | status: planned | execution: ready | next: Freeze the biology-native compiler successor charter. Deliver this as one isolated, reviewable step in the CellShard baseline, successor charter, and compatibility map workstream.
+- `CS-JBC-B03` | status: done | execution: closed | next: Freeze the biology-native compiler successor charter. Deliver this as one isolated, reviewable step in the CellShard baseline, successor charter, and compatibility map workstream.
 - `CS-JBC-B04` | status: planned | execution: ready | next: Record the frozen CS-FOUND compatibility baseline. Deliver this as one isolated, reviewable step in the CellShard baseline, successor charter, and compatibility map workstream.
 - `CS-JBC-B05` | status: planned | execution: ready | next: Reserve CellShard provider, registry, and integration paths. Deliver this as one isolated, reviewable step in the CellShard baseline, successor charter, and compatibility map workstream.
 - `CS-JBC-B06` | status: planned | execution: ready | next: Reconcile the closed access-adapter lifecycle without reopening. Deliver this as one isolated, reviewable step in the CellShard baseline, successor charter, and compatibility map workstream.

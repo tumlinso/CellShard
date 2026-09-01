@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-01T06:09:47Z",
+  "generated_at": "2026-09-01T06:15:21Z",
   "project": {
     "configuration": {
       "busy_timeout_ms": 5000,
@@ -18,7 +18,7 @@
     "project_uuid": "a52537a5-20db-4aeb-a126-dd0128c71fda",
     "schema_version": 2
   },
-  "project_revision": 321,
+  "project_revision": 323,
   "schema_version": 2,
   "snapshot_version": 3,
   "tables": {
@@ -3640,6 +3640,26 @@
         "revision": 321,
         "seq": 321,
         "timestamp": "2026-09-01T06:09:47Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-JBC-L-BOOTSTRAP",
+        "entity_type": "workflow_dispatch",
+        "event_type": "workflow.next_task",
+        "payload_json": "{\"lane_id\": \"CS-JBC-L-BOOTSTRAP\", \"run_id\": \"CS-JBC-RUN-V1\", \"status\": \"claimed\", \"task_id\": \"CS-JBC-B05\"}",
+        "revision": 322,
+        "seq": 322,
+        "timestamp": "2026-09-01T06:10:20Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-JBC-B05",
+        "entity_type": "task",
+        "event_type": "task.completed",
+        "payload_json": "{\"completion_revision\": 323, \"disposition\": \"implemented\", \"reached_checkpoints\": []}",
+        "revision": 323,
+        "seq": 323,
+        "timestamp": "2026-09-01T06:15:21Z"
       }
     ],
     "evidence": [
@@ -5494,6 +5514,16 @@
         "payload_json": "{\"changed_owned_paths\": [], \"checkpoints\": [], \"completion_commit\": \"14f9d0020e875726bf5c8ac315b8d998901a33f7\", \"completion_gates\": [{\"evidence_id\": \"28486de2-790a-4746-a806-7a4a9012bf3e\", \"evidence_revision\": 220, \"id\": \"CS-FOUND-12-CPEXEC01\", \"input_fingerprint\": \"2ca3d1e1edfa2317f9e21b1efe758390339f26ac24798b9175a4d744b92dccc0\", \"status\": \"passed\", \"valid\": true, \"validation_git_head\": \"bd84bf0e3c0c2cbd5af1adcc8aabd4062a4e577b\"}, {\"evidence_id\": \"50d0c4c1-af4e-40fa-9990-98c0537e7391\", \"evidence_revision\": 218, \"id\": \"CS-FOUND-12-LEGACY\", \"input_fingerprint\": \"f3c32b67fc58ef6dce66776b33b207baf4ce853dced4fa757089872d4baa1b72\", \"status\": \"passed\", \"valid\": true, \"validation_git_head\": \"bd84bf0e3c0c2cbd5af1adcc8aabd4062a4e577b\"}], \"completion_revision\": 223, \"finalized_checkpoints\": [], \"gates\": [{\"id\": \"CS-FOUND-12-CPEXEC01\", \"input_fingerprint\": \"2ca3d1e1edfa2317f9e21b1efe758390339f26ac24798b9175a4d744b92dccc0\", \"last_run_at\": \"2026-08-27T09:07:09Z\", \"revision\": 220, \"status\": \"passed\", \"valid\": 1}, {\"id\": \"CS-FOUND-12-LEGACY\", \"input_fingerprint\": \"f3c32b67fc58ef6dce66776b33b207baf4ce853dced4fa757089872d4baa1b72\", \"last_run_at\": \"2026-08-27T09:07:08Z\", \"revision\": 218, \"status\": \"passed\", \"valid\": 1}], \"git_diffstat\": \".todo-orchestrator/state.snapshot.json | 248 ++++++++++++++++++++++++++++++---\\n todo-status.md                         |   4 +-\\n todos.md                               |   4 +-\\n todos/cs-found-12.md                   |   6 +-\\n 4 files changed, 239 insertions(+), 23 deletions(-)\", \"git_head\": \"14f9d0020e875726bf5c8ac315b8d998901a33f7\", \"interfaces\": [], \"note\": \"Added explicit-context CPEXEC01 image and row-partition adapters without deriving foundational IDs from legacy counters. Legacy CUDA gate, adapter gate, and CPU CPEXEC01 test passed.\", \"resources\": [{\"acquired_at\": \"2026-08-27T09:07:08Z\", \"instance_id\": \"gpu:0\", \"released_at\": \"2026-08-27T09:07:09Z\", \"state\": \"released\"}], \"task_id\": \"CS-FOUND-12\"}",
         "revision": 223,
         "task_id": "CS-FOUND-12"
+      },
+      {
+        "claim_id": null,
+        "created_at": "2026-09-01T06:15:21Z",
+        "id": "f5123950-e1a9-44f3-9340-38bc96ac938c",
+        "kind": "complete",
+        "note": "Reserved 23 source-linked CellShard provider lane path families and integration-only ownership in docs/JBC/CS_JBC_B05_PROVIDER_REGISTRY_PATH_RESERVATIONS.md with machine-readable planning/jbc/cellshard_provider_path_reservations_v1.csv. Validated the full preledger manifest, exact B05 compact sorted JSON SHA-256 3c0a48049fc7b344e794ad6025aa94463e9db98b7b4de1479f054596bf69f40a, all 75 scoped proposed code/build paths, exact JBC-I12 through JBC-I20 locations, registry owner assignments, non-registration rules, reserved-path non-creation, two separately timestamped Project Control authority observations, zero provider skew, no downstream activation, no whitespace errors, git diff --check, and read-only Todo doctor integrity/schema. No headers, sources, CMake, registries, exports, runtime behavior, parent gitlink, B06, recovery state, or closed adapter-refactor work were changed.",
+        "payload_json": "{\"changed_owned_paths\": [\"docs/JBC/CS_JBC_B05_PROVIDER_REGISTRY_PATH_RESERVATIONS.md\", \"planning/jbc/cellshard_provider_path_reservations_v1.csv\"], \"checkpoints\": [], \"completion_commit\": \"790379b30cb4bef82e660fa2ee866ab14e413330\", \"completion_gates\": [], \"completion_revision\": 323, \"finalized_checkpoints\": [], \"gates\": [], \"git_diffstat\": \".todo-orchestrator/state.snapshot.json | 34 ++++++++++++++++++++++------------\\n todo-status.md                         |  4 ++--\\n todos.md                               |  4 ++--\\n todos/cs-jbc-b05.md                    |  6 +++---\\n 4 files changed, 29 insertions(+), 19 deletions(-)\", \"git_head\": \"790379b30cb4bef82e660fa2ee866ab14e413330\", \"interfaces\": [], \"note\": \"Reserved 23 source-linked CellShard provider lane path families and integration-only ownership in docs/JBC/CS_JBC_B05_PROVIDER_REGISTRY_PATH_RESERVATIONS.md with machine-readable planning/jbc/cellshard_provider_path_reservations_v1.csv. Validated the full preledger manifest, exact B05 compact sorted JSON SHA-256 3c0a48049fc7b344e794ad6025aa94463e9db98b7b4de1479f054596bf69f40a, all 75 scoped proposed code/build paths, exact JBC-I12 through JBC-I20 locations, registry owner assignments, non-registration rules, reserved-path non-creation, two separately timestamped Project Control authority observations, zero provider skew, no downstream activation, no whitespace errors, git diff --check, and read-only Todo doctor integrity/schema. No headers, sources, CMake, registries, exports, runtime behavior, parent gitlink, B06, recovery state, or closed adapter-refactor work were changed.\", \"resources\": [], \"task_id\": \"CS-JBC-B05\"}",
+        "revision": 323,
+        "task_id": "CS-JBC-B05"
       }
     ],
     "interface_consumers": [
@@ -20938,9 +20968,9 @@
       },
       {
         "attention_reason": null,
-        "completion_commit": null,
-        "completion_git_head": null,
-        "completion_revision": null,
+        "completion_commit": "790379b30cb4bef82e660fa2ee866ab14e413330",
+        "completion_git_head": "790379b30cb4bef82e660fa2ee866ab14e413330",
+        "completion_revision": 323,
         "created_at": "2026-08-31T19:43:27Z",
         "id": "CS-JBC-B05",
         "kind": "task",
@@ -20952,14 +20982,14 @@
         "parallel_policy": "serial",
         "parent_id": null,
         "priority": 0,
-        "result": null,
+        "result": "implemented",
         "result_policy_json": "{}",
-        "revision": 313,
-        "status": "planned",
+        "revision": 323,
+        "status": "done",
         "tags_json": "[]",
         "title": "Reserve CellShard provider, registry, and integration paths",
-        "updated_at": "2026-09-01T05:43:38Z",
-        "version": 2
+        "updated_at": "2026-09-01T06:15:21Z",
+        "version": 4
       },
       {
         "attention_reason": null,
@@ -34200,13 +34230,13 @@
         "task_id": "CS-JBC-B04"
       },
       {
-        "activated_at": null,
-        "completed_at": null,
+        "activated_at": "2026-09-01T06:10:20Z",
+        "completed_at": "2026-09-01T06:15:21Z",
         "enqueued_at": "2026-09-01T05:43:38Z",
         "lane_id": "CS-JBC-L-BOOTSTRAP",
         "position": 4,
-        "revision": 313,
-        "state": "queued",
+        "revision": 323,
+        "state": "completed",
         "task_id": "CS-JBC-B05"
       },
       {
@@ -36970,11 +37000,11 @@
         "created_at": "2026-09-01T05:43:38Z",
         "id": "CS-JBC-L-BOOTSTRAP",
         "parent_lane_id": null,
-        "revision": 321,
+        "revision": 323,
         "role": "coordinator",
         "run_id": "CS-JBC-RUN-V1",
         "state": "ready",
-        "updated_at": "2026-09-01T06:09:47Z",
+        "updated_at": "2026-09-01T06:15:21Z",
         "workspace_mode": "exclusive"
       },
       {

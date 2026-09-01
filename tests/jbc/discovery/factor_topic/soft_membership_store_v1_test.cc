@@ -45,10 +45,14 @@ int main() {
            == factor_topic::soft_membership_store_code_v1::
                evidence_identity_mismatch);
 
-    auto invalid_members[] = {evidence::approximate_member_v1{{7, 1}, 2, 1}};
+    const evidence::approximate_member_v1 invalid_members[] = {
+        {{7, 1}, 2, 1},
+    };
+    const evidence::approximate_membership_view_v1 invalid_view{
+        invalid_members, 1, 1, external.evidence_identity};
     result = factor_topic::store_soft_membership_evidence_v1(
         external,
-        {invalid_members, 1, 1, external.evidence_identity},
+        invalid_view,
         storage,
         3,
         &stored);

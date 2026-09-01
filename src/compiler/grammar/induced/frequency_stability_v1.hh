@@ -1,0 +1,13 @@
+#pragma once
+#include <compiler/grammar/induced/canonical_production_v1.hh>
+#include <cstdint>
+
+namespace cellshard::compiler::grammar::induced {
+struct stratum_occurrence_v1{induced_identity_v1 candidate_identity{},stratum_identity{},dataset_identity{};std::uint64_t occurrence_count=0,observation_generation=0;};
+struct frequency_stability_v1{induced_identity_v1 candidate_identity{},evidence_identity{};std::uint64_t total_occurrences=0,observed_strata=0,stable_strata=0,stability_numerator=0,stability_denominator=0,observation_generation=0;};
+enum class frequency_stability_code_v1:std::uint32_t{computed,invalid_identity,empty,missing_occurrences,invalid_occurrence,unordered_or_duplicate_stratum,generation_mismatch,count_overflow};
+struct frequency_stability_result_v1{frequency_stability_code_v1 code=frequency_stability_code_v1::computed;frequency_stability_v1 evidence{};std::uint64_t index=0;[[nodiscard]]constexpr bool computed()const noexcept{return code==frequency_stability_code_v1::computed;}};
+[[nodiscard]]constexpr bool identity_less_v1(induced_identity_v1 a,induced_identity_v1 b)noexcept{return a.producer_namespace<b.producer_namespace||(a.producer_namespace==b.producer_namespace&&a.local_identity<b.local_identity);}
+[[nodiscard]]constexpr frequency_stability_result_v1 compute_frequency_stability_v1(induced_identity_v1 candidate,induced_identity_v1 evidence_identity,const stratum_occurrence_v1*x,std::uint64_t count,std::uint64_t minimum_stable_frequency,std::uint64_t generation)noexcept{if(!valid(candidate)||!valid(evidence_identity))return{frequency_stability_code_v1::invalid_identity};if(count==0||minimum_stable_frequency==0)return{frequency_stability_code_v1::empty};if(x==nullptr)return{frequency_stability_code_v1::missing_occurrences};std::uint64_t total=0,stable=0;for(std::uint64_t i=0;i<count;++i){if(!(x[i].candidate_identity==candidate)||!valid(x[i].stratum_identity)||!valid(x[i].dataset_identity)||x[i].occurrence_count==0)return{frequency_stability_code_v1::invalid_occurrence,{},i};if(x[i].observation_generation!=generation||generation==0)return{frequency_stability_code_v1::generation_mismatch,{},i};if(i&&!identity_less_v1(x[i-1].stratum_identity,x[i].stratum_identity))return{frequency_stability_code_v1::unordered_or_duplicate_stratum,{},i};if(total>UINT64_MAX-x[i].occurrence_count)return{frequency_stability_code_v1::count_overflow,{},i};total+=x[i].occurrence_count;if(x[i].occurrence_count>=minimum_stable_frequency)++stable;}return{frequency_stability_code_v1::computed,{candidate,evidence_identity,total,count,stable,stable,count,generation},count};}
+[[nodiscard]]constexpr bool authorizes_execution(frequency_stability_v1)noexcept{return false;}
+}

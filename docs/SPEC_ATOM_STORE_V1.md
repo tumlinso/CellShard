@@ -1,0 +1,64 @@
+# CSATOM v1 Atom-Store Specification
+
+## Frozen name and scope
+
+The collision-free format-family name is **CSATOM v1**, the file suffix is
+`.csatom`, and the eight-byte file magic is `CSATOM01`. These identifiers do
+not alias CSH5, CSPACK, CPE2, CPK1, or any execution-envelope family.
+
+CSATOM is CellShard's immutable, atom-native persistence and lowering artifact.
+It stores certified biological atom identity, exact coverage, dependencies,
+portable payload sections, and source-linked lowering metadata. It is not the
+canonical biological dataset, a mutable value store, a runtime-residency
+record, an execution planner, or a replacement for CSPACK caches.
+
+## Ownership and lifecycle
+
+- CellShard owns the container, integrity, storage extents, and delivery.
+- Proposal providers may contribute evidence but may not set certification.
+- Exact certification is independently recorded before an atom is promotable.
+- Cellerator owns numerical operation and physical projection semantics.
+- Structure epoch, value generation, evidence generation, and cost freshness
+  remain distinct identities.
+- Published bytes are immutable; every semantic change creates a new atom-store
+  identity and content digest.
+
+## Required top-level model
+
+Every v1 image has a fixed little-endian header followed by a bounded section
+directory and aligned, non-overlapping sections. The header identifies:
+
+1. schema, endian marker, header and total byte counts;
+2. atom-store, catalog, structure, and certification identities;
+3. section count and directory bounds;
+4. a checksum covering the complete image with the checksum field zeroed.
+
+Sections carry typed records for atoms, domains/orders, exact coverage,
+dependencies, payload descriptors and bytes, lowering artifacts, and
+provenance. Unknown required section types are rejected. Optional types may be
+skipped only when their directory flags explicitly permit it.
+
+All counts and byte offsets are unsigned 64-bit values. Stable records are
+pointer-free and trivially copyable. Runtime pointers, paths, GPU ordinals,
+streams, topology routes, and mutable source locations are forbidden in the
+portable image.
+
+## Validation contract
+
+A reader must reject an image before exposure when any identity is zero, the
+magic/schema/endian marker differs, arithmetic overflows, a section is
+misaligned/out of bounds/overlapping, a required section is absent or
+duplicated, a record references an unknown identity, exact coverage is
+incomplete, dependency closure is invalid, or the image checksum differs.
+
+No format-valid image is thereby executable. Runtime promotion additionally
+requires independent exact certification, compatible lowering, generation
+freshness, and the owning execution planner's capability checks.
+
+## Compatibility
+
+V1 bytes are never silently reinterpreted. Additive optional sections require
+explicit optional flags. Any incompatible header, identity, directory, record,
+checksum, or coverage change requires a new magic/schema and an explicit
+conversion route. CSATOM may be transported inside a CSPACK extent, but its
+inner identity and validation remain CSATOM-owned and distinct.

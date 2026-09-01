@@ -132,13 +132,6 @@ inline bool enumerate_depth_v1(
     enumeration_state_v1 *state,
     std::uint32_t depth) noexcept {
     if (depth == state->motif.node_count) {
-        ++state->result.assignments_examined;
-        if (state->result.assignments_examined
-            > state->limits.maximum_assignments_examined) {
-            state->result.code =
-                motif_occurrence_code_v1::truncated_assignment_limit;
-            return false;
-        }
         if (!partial_edges_match_v1(
                 state->motif, state->graph,
                 state->workspace.motif_to_graph, depth)) {
@@ -170,6 +163,13 @@ inline bool enumerate_depth_v1(
                    != state->motif.nodes[depth].node_type) {
             continue;
         }
+        if (state->result.assignments_examined
+            == state->limits.maximum_assignments_examined) {
+            state->result.code =
+                motif_occurrence_code_v1::truncated_assignment_limit;
+            return false;
+        }
+        ++state->result.assignments_examined;
         state->workspace.motif_to_graph[depth] = graph_node;
         state->workspace.graph_node_used[graph_node] = 1;
         if (partial_edges_match_v1(

@@ -87,6 +87,11 @@ bound to the exact source digest and structure epoch and has an explicit
 evidence-generation validity interval; transient delivery or resource failures
 are not eligible.
 
+Composition lineage records bind each result and source-linked action to an
+ordered parent span, operation kind, and lineage generation. Provenance records
+bind a subject to immutable source and evidence digests, provider identity,
+source epoch, and evidence generation; locators and mutable paths are excluded.
+
 All counts and byte offsets are unsigned 64-bit values. Stable records are
 pointer-free and trivially copyable. Runtime pointers, paths, GPU ordinals,
 streams, topology routes, and mutable source locations are forbidden in the

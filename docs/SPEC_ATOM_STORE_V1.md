@@ -29,6 +29,11 @@ the source-linked lowering operation. Materialization identity names one built
 artifact under that action. Replica identity names one delivered copy without
 changing the other four identities. These five types are not interchangeable.
 
+Each immutable root-generation manifest records the store identity, monotonic
+generation, structure epoch, root digest, prior root digest, and exact atom,
+dependency, materialization, and replica counts. Generation one has no parent;
+later generations must link a distinct strong parent digest.
+
 ## Required top-level model
 
 Every v1 image has a fixed little-endian header followed by a bounded section

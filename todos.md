@@ -53,7 +53,7 @@ _None recorded yet._
 <!-- todo-orchestrator:v2-managed:start -->
 # Todo Orchestrator v2 Projection
 
-Project revision: `323`
+Project revision: `325`
 
 ## Workstreams
 - `CS-POST-REMAP-01` | kind: integration_task | status: done | parent: - | objective: Refactor CellShard distributed and mask-group APIs so public/runtime code no longer includes Cellerator runtime or distributed headers, names Cellerator runtime types, links Cellerator::dist, or synthesizes that target; preserve compatibility-format headers separately and prove an independent CUDA-enabled CellShard build.
@@ -99,7 +99,7 @@ Project revision: `323`
 - `CS-JBC-B03` | kind: task | status: done | parent: - | objective: Freeze the biology-native compiler successor charter. Deliver this as one isolated, reviewable step in the CellShard baseline, successor charter, and compatibility map workstream.
 - `CS-JBC-B04` | kind: task | status: done | parent: - | objective: Record the frozen CS-FOUND compatibility baseline. Deliver this as one isolated, reviewable step in the CellShard baseline, successor charter, and compatibility map workstream.
 - `CS-JBC-B05` | kind: task | status: done | parent: - | objective: Reserve CellShard provider, registry, and integration paths. Deliver this as one isolated, reviewable step in the CellShard baseline, successor charter, and compatibility map workstream.
-- `CS-JBC-B06` | kind: task | status: planned | parent: - | objective: Reconcile the closed access-adapter lifecycle without reopening. Deliver this as one isolated, reviewable step in the CellShard baseline, successor charter, and compatibility map workstream.
+- `CS-JBC-B06` | kind: task | status: done | parent: - | objective: Reconcile the closed access-adapter lifecycle without reopening. Deliver this as one isolated, reviewable step in the CellShard baseline, successor charter, and compatibility map workstream.
 - `CS-JBC-BC01` | kind: task | status: planned | parent: - | objective: Define the biclustering proposal-provider interface. Deliver this as one isolated, reviewable step in the Biclustering and co-clustering atom discovery workstream.
 - `CS-JBC-BC02` | kind: task | status: planned | parent: - | objective: Generate deterministic bicluster seed rectangles. Deliver this as one isolated, reviewable step in the Biclustering and co-clustering atom discovery workstream.
 - `CS-JBC-BC03` | kind: task | status: planned | parent: - | objective: Implement alternating source and destination expansion. Deliver this as one isolated, reviewable step in the Biclustering and co-clustering atom discovery workstream.

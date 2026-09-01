@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-01T06:15:21Z",
+  "generated_at": "2026-09-01T06:21:15Z",
   "project": {
     "configuration": {
       "busy_timeout_ms": 5000,
@@ -18,7 +18,7 @@
     "project_uuid": "a52537a5-20db-4aeb-a126-dd0128c71fda",
     "schema_version": 2
   },
-  "project_revision": 323,
+  "project_revision": 325,
   "schema_version": 2,
   "snapshot_version": 3,
   "tables": {
@@ -3660,6 +3660,26 @@
         "revision": 323,
         "seq": 323,
         "timestamp": "2026-09-01T06:15:21Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-JBC-L-BOOTSTRAP",
+        "entity_type": "workflow_dispatch",
+        "event_type": "workflow.next_task",
+        "payload_json": "{\"lane_id\": \"CS-JBC-L-BOOTSTRAP\", \"run_id\": \"CS-JBC-RUN-V1\", \"status\": \"claimed\", \"task_id\": \"CS-JBC-B06\"}",
+        "revision": 324,
+        "seq": 324,
+        "timestamp": "2026-09-01T06:16:12Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-JBC-B06",
+        "entity_type": "task",
+        "event_type": "task.completed",
+        "payload_json": "{\"completion_revision\": 325, \"disposition\": \"implemented\", \"reached_checkpoints\": []}",
+        "revision": 325,
+        "seq": 325,
+        "timestamp": "2026-09-01T06:21:15Z"
       }
     ],
     "evidence": [
@@ -5464,6 +5484,16 @@
         "payload_json": "{\"changed_owned_paths\": [\".todo-orchestrator/state.snapshot.json\", \"CMakeLists.txt\", \"README.md\", \"SUPPORT.md\", \"cellshard-cellerator-cycle-plan.json\", \"include/CellShard/runtime/device_bindings.cuh\", \"include/CellShard/runtime/distributed/distributed.cuh\", \"include/CellShard/runtime/mask_groups.cuh\", \"src/runtime/mask_groups.cu\", \"tests/distributed_binding_compile_test.cu\", \"todo-status.md\", \"todos.md\"], \"checkpoints\": [], \"completion_commit\": \"a7fbae5981b4e4325c095f814caf3aa3c0b0fde4\", \"completion_gates\": [], \"completion_revision\": 305, \"finalized_checkpoints\": [], \"gates\": [], \"git_diffstat\": \".todo-orchestrator/state.snapshot.json             | 273 ++++++++++++++++++++-\\n CMakeLists.txt                                     | 187 ++++----------\\n README.md                                          |   4 +-\\n SUPPORT.md                                         |   4 +\\n .../CellShard/runtime/distributed/distributed.cuh  |  37 +--\\n include/CellShard/runtime/mask_groups.cuh          |  18 +-\\n src/runtime/mask_groups.cu                         | 117 ++++-----\\n todo-status.md                                     |   3 +-\\n todos.md                                           |   3 +-\\n 9 files changed, 396 insertions(+), 250 deletions(-)\", \"git_head\": \"a7fbae5981b4e4325c095f814caf3aa3c0b0fde4\", \"interfaces\": [], \"note\": \"Removed Cellerator::dist and Cellerator::runtime synthesis/linkage from CellShard, replaced runtime/distributed coupling with neutral device_binding_view, removed unused CellShard NCCL ownership, narrowed installed compatibility headers, added a compile test, and passed fresh CUDA build plus focused residency/payload/access/package validation. cellShardMaskGroupsRuntimeTest retains its pre-existing exit-14 numerical assertion; no affected kernel path changed.\", \"resources\": [], \"task_id\": \"CS-POST-REMAP-01\"}",
         "revision": 305,
         "task_id": "CS-POST-REMAP-01"
+      },
+      {
+        "claim_id": null,
+        "created_at": "2026-09-01T06:21:15Z",
+        "id": "852618fe-290f-4b4b-88f2-4963c80da13e",
+        "kind": "complete",
+        "note": "Reconciled cellshard-cpp-access-adapter-refactor strictly as historically closed evidence in docs/JBC/CS_JBC_B06_ACCESS_ADAPTER_CLOSED_LIFECYCLE_RECEIPT.md and planning/jbc/cellshard_access_adapter_closed_lifecycle_receipt_v1.json. Recorded exact preledger hash b6b05cc5d90d247680d6d0130226f08181555eb3ed928a06eafd4da1c35717fa, authority observations, closed/closed versus managed closed/idle effective-ready anomaly, four ancestor implementation commits, current source hashes, durable historical access gate, and an inert unsubmitted maintenance proposal. Did not reopen, claim, recover, duplicate, or mutate the historical task or adapter code. Validation: complete preledger manifest passed; receipt JSON/source/ancestry/lifecycle/proposal checks passed; embedded cellshardAccessAdapterCompileTest build/run passed; fresh standalone CPU-only configure passed while its historical adapter test build reproduced the current GNU 13.3/CUDA ambiguous __half integer-constructor compatibility limitation, recorded without repair; read-only Todo doctor integrity/schema passed; whitespace and git diff checks passed. No adapter, CMake, registry, export, package, wire, runtime, recovery, or post-G0 provider lane was changed.",
+        "payload_json": "{\"changed_owned_paths\": [\"docs/JBC/CS_JBC_B06_ACCESS_ADAPTER_CLOSED_LIFECYCLE_RECEIPT.md\", \"planning/jbc/cellshard_access_adapter_closed_lifecycle_receipt_v1.json\"], \"checkpoints\": [], \"completion_commit\": \"5655b23ab9120bd23d59dc744aa2564f1951a052\", \"completion_gates\": [], \"completion_revision\": 325, \"finalized_checkpoints\": [], \"gates\": [], \"git_diffstat\": \".todo-orchestrator/state.snapshot.json | 34 ++++++++++++++++++++++------------\\n todo-status.md                         |  4 ++--\\n todos.md                               |  4 ++--\\n todos/cs-jbc-b06.md                    |  6 +++---\\n 4 files changed, 29 insertions(+), 19 deletions(-)\", \"git_head\": \"5655b23ab9120bd23d59dc744aa2564f1951a052\", \"interfaces\": [], \"note\": \"Reconciled cellshard-cpp-access-adapter-refactor strictly as historically closed evidence in docs/JBC/CS_JBC_B06_ACCESS_ADAPTER_CLOSED_LIFECYCLE_RECEIPT.md and planning/jbc/cellshard_access_adapter_closed_lifecycle_receipt_v1.json. Recorded exact preledger hash b6b05cc5d90d247680d6d0130226f08181555eb3ed928a06eafd4da1c35717fa, authority observations, closed/closed versus managed closed/idle effective-ready anomaly, four ancestor implementation commits, current source hashes, durable historical access gate, and an inert unsubmitted maintenance proposal. Did not reopen, claim, recover, duplicate, or mutate the historical task or adapter code. Validation: complete preledger manifest passed; receipt JSON/source/ancestry/lifecycle/proposal checks passed; embedded cellshardAccessAdapterCompileTest build/run passed; fresh standalone CPU-only configure passed while its historical adapter test build reproduced the current GNU 13.3/CUDA ambiguous __half integer-constructor compatibility limitation, recorded without repair; read-only Todo doctor integrity/schema passed; whitespace and git diff checks passed. No adapter, CMake, registry, export, package, wire, runtime, recovery, or post-G0 provider lane was changed.\", \"resources\": [], \"task_id\": \"CS-JBC-B06\"}",
+        "revision": 325,
+        "task_id": "CS-JBC-B06"
       },
       {
         "claim_id": null,
@@ -20993,9 +21023,9 @@
       },
       {
         "attention_reason": null,
-        "completion_commit": null,
-        "completion_git_head": null,
-        "completion_revision": null,
+        "completion_commit": "5655b23ab9120bd23d59dc744aa2564f1951a052",
+        "completion_git_head": "5655b23ab9120bd23d59dc744aa2564f1951a052",
+        "completion_revision": 325,
         "created_at": "2026-08-31T19:43:27Z",
         "id": "CS-JBC-B06",
         "kind": "task",
@@ -21007,14 +21037,14 @@
         "parallel_policy": "serial",
         "parent_id": null,
         "priority": 0,
-        "result": null,
+        "result": "implemented",
         "result_policy_json": "{}",
-        "revision": 313,
-        "status": "planned",
+        "revision": 325,
+        "status": "done",
         "tags_json": "[]",
         "title": "Reconcile the closed access-adapter lifecycle without reopening",
-        "updated_at": "2026-09-01T05:43:38Z",
-        "version": 2
+        "updated_at": "2026-09-01T06:21:15Z",
+        "version": 4
       },
       {
         "attention_reason": null,
@@ -34240,13 +34270,13 @@
         "task_id": "CS-JBC-B05"
       },
       {
-        "activated_at": null,
-        "completed_at": null,
+        "activated_at": "2026-09-01T06:16:12Z",
+        "completed_at": "2026-09-01T06:21:15Z",
         "enqueued_at": "2026-09-01T05:43:38Z",
         "lane_id": "CS-JBC-L-BOOTSTRAP",
         "position": 5,
-        "revision": 313,
-        "state": "queued",
+        "revision": 325,
+        "state": "completed",
         "task_id": "CS-JBC-B06"
       },
       {
@@ -37000,11 +37030,11 @@
         "created_at": "2026-09-01T05:43:38Z",
         "id": "CS-JBC-L-BOOTSTRAP",
         "parent_lane_id": null,
-        "revision": 323,
+        "revision": 325,
         "role": "coordinator",
         "run_id": "CS-JBC-RUN-V1",
-        "state": "ready",
-        "updated_at": "2026-09-01T06:15:21Z",
+        "state": "closed",
+        "updated_at": "2026-09-01T06:21:15Z",
         "workspace_mode": "exclusive"
       },
       {

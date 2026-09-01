@@ -139,6 +139,11 @@ identity. V1 supplies a byte-preserving raw baseline and a portable monotonic
 u64 index-delta baseline; providers declare separate encode and decode entry
 points, duplicates are rejected, and no codec is selected by file suffix.
 
+The initial CPU block candidate set compares raw bytes with deterministic
+byte-run encoding in caller-owned scratch. Run encoding is selected only when
+its measured encoded block is smaller; otherwise raw remains the baseline.
+Decode rejects malformed zero runs and output-capacity overruns.
+
 All counts and byte offsets are unsigned 64-bit values. Stable records are
 pointer-free and trivially copyable. Runtime pointers, paths, GPU ordinals,
 streams, topology routes, and mutable source locations are forbidden in the

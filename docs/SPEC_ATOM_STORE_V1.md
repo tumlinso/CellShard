@@ -63,6 +63,12 @@ materialization to an exact content digest, logical and encoded byte counts,
 codec, alignment, and payload offset. Raw frames require identical logical and
 encoded sizes; the frame bounds are validated before its payload is exposed.
 
+An atom may span multiple ordered frames, and each frame may span multiple
+storage extents. Frame-map records bind frame ordinal and logical range to an
+extent-slice span. Extent slices bind atom, frame, storage object, extent, and
+both extent-local and frame-local ranges. Serialized slices must exactly cover
+the frame from byte zero without gaps or overlaps.
+
 All counts and byte offsets are unsigned 64-bit values. Stable records are
 pointer-free and trivially copyable. Runtime pointers, paths, GPU ordinals,
 streams, topology routes, and mutable source locations are forbidden in the

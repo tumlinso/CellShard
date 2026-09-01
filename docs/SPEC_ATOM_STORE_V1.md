@@ -123,6 +123,11 @@ produces an aligned source-to-target copy plan and exact output size. The
 result is published as a new generation; consolidation never mutates extents
 or changes semantic identities in place.
 
+Reachability garbage collection marks the complete parent chains of the active
+root and every unexpired snapshot pin. Only validated generations left
+unmarked are collectible. Pins bind a snapshot identity and root digest to an
+explicit generation interval; missing ancestors and cycles fail closed.
+
 All counts and byte offsets are unsigned 64-bit values. Stable records are
 pointer-free and trivially copyable. Runtime pointers, paths, GPU ordinals,
 streams, topology routes, and mutable source locations are forbidden in the

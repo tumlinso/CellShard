@@ -31,7 +31,9 @@ directory and aligned, non-overlapping sections. The header identifies:
 1. schema, endian marker, header and total byte counts;
 2. atom-store, catalog, structure, and certification identities;
 3. section count and directory bounds;
-4. a checksum covering the complete image with the checksum field zeroed.
+4. a SHA-256 content digest, tagged by algorithm, covering the complete image
+   with the digest field zeroed. Legacy FNV checksums are not valid CSATOM
+   content identities.
 
 Sections carry typed records for atoms, domains/orders, exact coverage,
 dependencies, payload descriptors and bytes, lowering artifacts, and

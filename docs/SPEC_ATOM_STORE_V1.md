@@ -75,6 +75,12 @@ byte counts, encoding, storage object, object range, and extent-slice span.
 Identity encoding requires equal sizes and equal digest bytes; compressed or
 provider-defined encodings retain independent encoded and decoded identities.
 
+The positive action cache contains certified successes only. Its exact key is
+the source-linked action identity, source content digest, and structure epoch;
+a hit returns the immutable materialization, output digest, and evidence
+generation. Negative results are never cached. A conflicting successful result
+for an existing exact key is rejected rather than silently replaced.
+
 All counts and byte offsets are unsigned 64-bit values. Stable records are
 pointer-free and trivially copyable. Runtime pointers, paths, GPU ordinals,
 streams, topology routes, and mutable source locations are forbidden in the

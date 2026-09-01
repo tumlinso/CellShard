@@ -128,6 +128,12 @@ root and every unexpired snapshot pin. Only validated generations left
 unmarked are collectible. Pins bind a snapshot identity and root digest to an
 explicit generation interval; missing ancestors and cycles fail closed.
 
+Compatibility import recognizes CSH5, CSPACK01, CPEXEC01, and CPEXEC02 as
+distinct source families and binds the exact source bytes to a SHA-256 digest,
+semantic atom, and import action. CSH5 requires independent confirmation of
+its CellShard dataset attribute so arbitrary HDF5 files are not accepted.
+Legacy bytes remain opaque and are never reinterpreted as native CSATOM records.
+
 All counts and byte offsets are unsigned 64-bit values. Stable records are
 pointer-free and trivially copyable. Runtime pointers, paths, GPU ordinals,
 streams, topology routes, and mutable source locations are forbidden in the

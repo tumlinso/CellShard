@@ -23,6 +23,12 @@ record, an execution planner, or a replacement for CSPACK caches.
 - Published bytes are immutable; every semantic change creates a new atom-store
   identity and content digest.
 
+Semantic identity names the biological meaning independent of bytes. Content
+identity is the tagged SHA-256 digest of immutable bytes. Action identity names
+the source-linked lowering operation. Materialization identity names one built
+artifact under that action. Replica identity names one delivered copy without
+changing the other four identities. These five types are not interchangeable.
+
 ## Required top-level model
 
 Every v1 image has a fixed little-endian header followed by a bounded section

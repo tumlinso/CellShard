@@ -17,7 +17,7 @@ struct promotion_evidence {
     promotion_value independently_verified_value{};
     bool composition_verified = false;
 };
-enum class transition_result : std::uint8_t { applied, invalid_identity, stale_structure, not_verified, not_profitable, wrong_state };
+enum class transition_result : std::uint8_t { applied, invalid_identity, stale_structure, not_verified, not_profitable, still_profitable, wrong_state, generation_exhausted };
 
 inline transition_result promote(superatom_record& record,
                                  const promotion_evidence& evidence) noexcept {
@@ -29,6 +29,23 @@ inline transition_result promote(superatom_record& record,
     record.state = lifecycle_state::promoted;
     record.generation = 1;
     record.lineage_id = record.identity.superatom_id;
+    return transition_result::applied;
+}
+
+struct demotion_evidence {
+    promotion_value independently_verified_value{};
+    bool invalidated = false;
+    bool independently_verified = false;
+};
+
+inline transition_result demote(superatom_record& record,
+                                const demotion_evidence& evidence) noexcept {
+    if (record.state != lifecycle_state::promoted) return transition_result::wrong_state;
+    if (!evidence.independently_verified) return transition_result::not_verified;
+    if (!evidence.invalidated && promotion_profitable(evidence.independently_verified_value)) return transition_result::still_profitable;
+    if (record.generation == UINT64_MAX) return transition_result::generation_exhausted;
+    ++record.generation;
+    record.state = lifecycle_state::demoted;
     return transition_result::applied;
 }
 

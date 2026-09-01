@@ -78,8 +78,14 @@ provider-defined encodings retain independent encoded and decoded identities.
 The positive action cache contains certified successes only. Its exact key is
 the source-linked action identity, source content digest, and structure epoch;
 a hit returns the immutable materialization, output digest, and evidence
-generation. Negative results are never cached. A conflicting successful result
-for an existing exact key is rejected rather than silently replaced.
+generation. A conflicting successful result for an existing exact key is
+rejected rather than silently replaced.
+
+The separate negative action cache accepts only durable capability,
+dependency-closure, or exact-certification failures. Each negative entry is
+bound to the exact source digest and structure epoch and has an explicit
+evidence-generation validity interval; transient delivery or resource failures
+are not eligible.
 
 All counts and byte offsets are unsigned 64-bit values. Stable records are
 pointer-free and trivially copyable. Runtime pointers, paths, GPU ordinals,

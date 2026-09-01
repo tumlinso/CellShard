@@ -60,7 +60,8 @@ void test_randomized_generation_fail_closed() {
     std::mt19937_64 generator(0xba7c9045f12c7f99ULL);
     for (std::uint32_t trial = 0; trial < 4096; ++trial) {
         auto candidate = partial(&gradient);
-        const std::uint32_t field = generator() % 5;
+        const std::uint32_t field = static_cast<std::uint32_t>(
+            generator() % std::uint64_t{5});
         if ((generator() & 7U) != 0) {
             if (field == 0) candidate.forward_structure_generation = 0;
             if (field == 1) candidate.forward_value_generation = 0;

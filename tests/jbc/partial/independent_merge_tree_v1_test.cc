@@ -97,11 +97,15 @@ void validate_numeric_merge_trees() {
             lse.push_back(l.state);
             const auto local_min = std::min_element(begin, begin + chunk.second);
             const auto local_max = std::max_element(begin, begin + chunk.second);
+            const auto local_min_offset =
+                static_cast<std::size_t>(local_min - begin);
+            const auto local_max_offset =
+                static_cast<std::size_t>(local_max - begin);
             extrema.push_back({
-                {*local_min, {2, chunk.first + (local_min - begin) + 1},
-                 chunk.first + static_cast<std::size_t>(local_min - begin)},
-                {*local_max, {2, chunk.first + (local_max - begin) + 1},
-                 chunk.first + static_cast<std::size_t>(local_max - begin)},
+                {*local_min, {2, chunk.first + local_min_offset + 1},
+                 chunk.first + local_min_offset},
+                {*local_max, {2, chunk.first + local_max_offset + 1},
+                 chunk.first + local_max_offset},
                 chunk.second, algebra, policy, order, 7, 1, 0});
         }
 

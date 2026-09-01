@@ -180,8 +180,12 @@ void test_randomized_subsets_and_mutations() {
         std::vector<atom_level_v1> duplicated = levels;
         const auto duplicate_index = next_random(&random_state)
             % duplicated.size();
-        duplicated.insert(duplicated.begin() + duplicate_index,
-                          duplicated[duplicate_index]);
+        using difference_type =
+            std::vector<atom_level_v1>::difference_type;
+        duplicated.insert(
+            duplicated.begin()
+                + static_cast<difference_type>(duplicate_index),
+            duplicated[duplicate_index]);
         assert(validate_atom_level_path_v1(
                    {duplicated.data(), duplicated.size()})
                    .code

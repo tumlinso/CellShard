@@ -315,16 +315,37 @@ set_target_properties(cellshard_inspect PROPERTIES
 cellshard_enable_perf(cellshard_inspect)
 cellshard_assert_no_torch_dependency(cellshard_inspect)
 
+# JBC cold compilation and host-runtime support is independently linkable so
+# standalone/package consumers do not acquire CUDA merely by inspecting atom
+# programs. Device transport remains in CellShard::runtime below.
+file(GLOB_RECURSE CELLSHARD_JBC_HOST_SOURCES CONFIGURE_DEPENDS
+    src/artifact/atom_store/*.cc
+    src/compiler/*.cc
+    src/runtime/v2/*.cc
+)
+add_library(cellshard_jbc_runtime_host STATIC ${CELLSHARD_JBC_HOST_SOURCES})
+add_library(CellShard::jbc_runtime_host ALIAS cellshard_jbc_runtime_host)
+set_target_properties(cellshard_jbc_runtime_host PROPERTIES
+    EXPORT_NAME jbc_runtime_host
+    CXX_STANDARD 17
+    CXX_STANDARD_REQUIRED YES
+)
+target_link_libraries(cellshard_jbc_runtime_host PUBLIC CellShard::headers)
+cellshard_assert_no_torch_dependency(cellshard_jbc_runtime_host)
+
 set(CELLSHARD_EXPORT_TARGETS
     cellshard_headers
     cellshard_inspect
+    cellshard_jbc_runtime_host
 )
 set(CELLSHARD_INSTALL_TARGETS
     cellshard_inspect
+    cellshard_jbc_runtime_host
 )
 set(CELLSHARD_PACKAGE_COMPONENTS
     headers
     inspect
+    jbc_runtime_host
 )
 if(TARGET cellshard_cellerator_compute_matrix_convert)
     list(APPEND CELLSHARD_EXPORT_TARGETS cellshard_cellerator_compute_matrix_convert)
@@ -332,9 +353,26 @@ if(TARGET cellshard_cellerator_compute_matrix_convert)
 endif()
 
 if(CELLSHARD_ENABLE_CUDA)
+    set(CELLSHARD_NCCL_ROOT "" CACHE PATH
+        "NCCL prefix used by the JBC collective runtime provider.")
+    set(cellshard_nccl_hints ${CELLSHARD_NCCL_ROOT})
+    if(EXISTS "/opt/nvidia/hpc_sdk/Linux_x86_64/26.1/comm_libs/12.9/nccl")
+        list(APPEND cellshard_nccl_hints
+            "/opt/nvidia/hpc_sdk/Linux_x86_64/26.1/comm_libs/12.9/nccl")
+    endif()
+    find_path(CELLSHARD_NCCL_INCLUDE_DIR NAMES nccl.h
+        HINTS ${cellshard_nccl_hints} PATH_SUFFIXES include REQUIRED)
+    find_library(CELLSHARD_NCCL_LIBRARY NAMES nccl
+        HINTS ${cellshard_nccl_hints} PATH_SUFFIXES lib REQUIRED)
     add_library(cellshard_runtime STATIC
+        src/artifact/atom_store/gpu_atom_link_v1.cu
         src/runtime/mask_groups.cu
         src/runtime/residency/device.cu
+        src/runtime/v2/cuda_pinned_staging_allocator.cu
+        src/runtime/v2/device_transport.cu
+        src/runtime/v2/host_staged_transport.cu
+        src/runtime/v2/nccl_collective_provider.cu
+        src/runtime/v2/worker_cuda_graph.cu
     )
     add_library(CellShard::runtime ALIAS cellshard_runtime)
     set_target_properties(cellshard_runtime PROPERTIES EXPORT_NAME runtime)
@@ -343,11 +381,14 @@ if(CELLSHARD_ENABLE_CUDA)
             ${CMAKE_CURRENT_SOURCE_DIR}
             ${CMAKE_CURRENT_SOURCE_DIR}/include
             ${CMAKE_CURRENT_SOURCE_DIR}/src
+            ${CELLSHARD_NCCL_INCLUDE_DIR}
     )
     target_link_libraries(cellshard_runtime PUBLIC
         cellshard_inspect
+        cellshard_jbc_runtime_host
         CUDA::cudart
         CUDA::cusparse
+        ${CELLSHARD_NCCL_LIBRARY}
     )
     target_compile_features(cellshard_runtime PUBLIC cxx_std_17)
     set_target_properties(cellshard_runtime PROPERTIES
@@ -975,6 +1016,97 @@ if(CELLSHARD_BUILD_TESTS AND CELLSHARD_BUILD_EXPORT)
         )
         cellshard_enable_perf(cellShardMtxSeriesIngestTest)
     endif()
+
+    # Every source-linked JBC test is independently executable. The aggregate
+    # target makes the complete compiler surface visible to ordinary builds,
+    # sanitizers, embedded consumers, and package validation.
+    file(GLOB_RECURSE CELLSHARD_JBC_TEST_SOURCES CONFIGURE_DEPENDS
+        tests/jbc/*.cc
+        tests/jbc/*.cu
+    )
+    add_custom_target(cellShardJbcTests)
+    foreach(cellshard_jbc_test_source IN LISTS CELLSHARD_JBC_TEST_SOURCES)
+        get_filename_component(cellshard_jbc_test_extension
+            "${cellshard_jbc_test_source}" EXT)
+        if(cellshard_jbc_test_extension STREQUAL ".cu"
+           AND NOT CELLSHARD_ENABLE_CUDA)
+            continue()
+        endif()
+        file(RELATIVE_PATH cellshard_jbc_test_relative
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/jbc"
+            "${cellshard_jbc_test_source}")
+        string(REPLACE "/" "_" cellshard_jbc_test_name
+            "${cellshard_jbc_test_relative}")
+        string(REGEX REPLACE "\\.(cc|cu)$" "" cellshard_jbc_test_name
+            "${cellshard_jbc_test_name}")
+        set(cellshard_jbc_test_target
+            "cellShardJbc_${cellshard_jbc_test_name}")
+        add_executable(${cellshard_jbc_test_target}
+            "${cellshard_jbc_test_source}")
+        target_link_libraries(${cellshard_jbc_test_target} PRIVATE
+            CellShard::jbc_runtime_host)
+        target_include_directories(${cellshard_jbc_test_target} PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/include/CellShard
+            ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        target_compile_features(${cellshard_jbc_test_target} PRIVATE cxx_std_17)
+        if(cellshard_jbc_test_relative STREQUAL
+           "validation/embedded_consumer/main.cc")
+            # This target deliberately imports the complete legacy umbrella,
+            # including pinned Cellerator compatibility headers outside the
+            # JBC ownership boundary. Keep their historical signed-mask
+            # warnings visible without making them integration failures.
+            target_compile_options(${cellshard_jbc_test_target} PRIVATE
+                $<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang>:-Wno-error=sign-conversion>)
+        endif()
+        if(cellshard_jbc_test_extension STREQUAL ".cu")
+            target_link_libraries(${cellshard_jbc_test_target} PRIVATE
+                CellShard::runtime CUDA::cudart)
+            set_target_properties(${cellshard_jbc_test_target} PROPERTIES
+                CUDA_STANDARD 17
+                CUDA_STANDARD_REQUIRED YES)
+        endif()
+        add_dependencies(cellShardJbcTests ${cellshard_jbc_test_target})
+    endforeach()
+
+    file(GLOB_RECURSE CELLSHARD_JBC_BENCH_SOURCES CONFIGURE_DEPENDS
+        bench/jbc/*.cc
+        bench/jbc/*.cu
+    )
+    add_custom_target(cellShardJbcBenchmarks)
+    foreach(cellshard_jbc_bench_source IN LISTS CELLSHARD_JBC_BENCH_SOURCES)
+        get_filename_component(cellshard_jbc_bench_extension
+            "${cellshard_jbc_bench_source}" EXT)
+        if(cellshard_jbc_bench_extension STREQUAL ".cu"
+           AND NOT CELLSHARD_ENABLE_CUDA)
+            continue()
+        endif()
+        file(RELATIVE_PATH cellshard_jbc_bench_relative
+            "${CMAKE_CURRENT_SOURCE_DIR}/bench/jbc"
+            "${cellshard_jbc_bench_source}")
+        string(REPLACE "/" "_" cellshard_jbc_bench_name
+            "${cellshard_jbc_bench_relative}")
+        string(REGEX REPLACE "\\.(cc|cu)$" "" cellshard_jbc_bench_name
+            "${cellshard_jbc_bench_name}")
+        set(cellshard_jbc_bench_target
+            "cellShardJbcBench_${cellshard_jbc_bench_name}")
+        add_executable(${cellshard_jbc_bench_target}
+            "${cellshard_jbc_bench_source}")
+        target_link_libraries(${cellshard_jbc_bench_target} PRIVATE
+            CellShard::jbc_runtime_host)
+        target_include_directories(${cellshard_jbc_bench_target} PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/include/CellShard
+            ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        target_compile_features(${cellshard_jbc_bench_target} PRIVATE cxx_std_17)
+        if(cellshard_jbc_bench_extension STREQUAL ".cu")
+            find_library(CELLSHARD_NUMA_LIBRARY NAMES numa REQUIRED)
+            target_link_libraries(${cellshard_jbc_bench_target} PRIVATE
+                CellShard::runtime CUDA::cudart ${CELLSHARD_NUMA_LIBRARY})
+            set_target_properties(${cellshard_jbc_bench_target} PROPERTIES
+                CUDA_STANDARD 17
+                CUDA_STANDARD_REQUIRED YES)
+        endif()
+        add_dependencies(cellShardJbcBenchmarks ${cellshard_jbc_bench_target})
+    endforeach()
 endif()
 
 if(CELLSHARD_BUILD_TESTS)

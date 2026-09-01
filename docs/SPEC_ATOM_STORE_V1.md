@@ -107,6 +107,11 @@ its ordered extent slices, issues one exact range read per slice into a
 caller-owned contiguous buffer, and verifies the reconstructed frame SHA-256.
 It performs no locator discovery, allocation, retry policy, or semantic lowering.
 
+Publication stages the content-addressed immutable image, durably synchronizes
+it, compare-exchanges the root from the exact parent digest to the new digest,
+and durably synchronizes the root. A failed stage or object sync never switches
+the root; a compare-exchange conflict never overwrites a concurrent publisher.
+
 All counts and byte offsets are unsigned 64-bit values. Stable records are
 pointer-free and trivially copyable. Runtime pointers, paths, GPU ordinals,
 streams, topology routes, and mutable source locations are forbidden in the

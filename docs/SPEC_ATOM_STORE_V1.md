@@ -69,6 +69,12 @@ extent-slice span. Extent slices bind atom, frame, storage object, extent, and
 both extent-local and frame-local ranges. Serialized slices must exactly cover
 the frame from byte zero without gaps or overlaps.
 
+Encoded-replica descriptors name a delivered replica separately from its atom
+and materialization. They bind both decoded and encoded SHA-256 identities,
+byte counts, encoding, storage object, object range, and extent-slice span.
+Identity encoding requires equal sizes and equal digest bytes; compressed or
+provider-defined encodings retain independent encoded and decoded identities.
+
 All counts and byte offsets are unsigned 64-bit values. Stable records are
 pointer-free and trivially copyable. Runtime pointers, paths, GPU ordinals,
 streams, topology routes, and mutable source locations are forbidden in the

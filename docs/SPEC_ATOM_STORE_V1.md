@@ -97,6 +97,11 @@ padding, and total capacity with checked 64-bit arithmetic; fill accepts only a
 buffer meeting that capacity, zeroes padding, copies sections, computes section
 digests, and finally computes the whole-image digest with its field zeroed.
 
+Metadata-only inspection reads only the fixed header and directory. It validates
+identities, directory bounds, ordering, overlap, duplicate kinds, flags, and
+unknown-required handling, but explicitly reports that payload and whole-image
+digest verification remain required before records are exposed.
+
 All counts and byte offsets are unsigned 64-bit values. Stable records are
 pointer-free and trivially copyable. Runtime pointers, paths, GPU ordinals,
 streams, topology routes, and mutable source locations are forbidden in the

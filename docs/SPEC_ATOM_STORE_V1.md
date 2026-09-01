@@ -92,6 +92,11 @@ ordered parent span, operation kind, and lineage generation. Provenance records
 bind a subject to immutable source and evidence digests, provider identity,
 source epoch, and evidence generation; locators and mutable paths are excluded.
 
+Writing is two-pass: requirements computes the exact directory, alignment
+padding, and total capacity with checked 64-bit arithmetic; fill accepts only a
+buffer meeting that capacity, zeroes padding, copies sections, computes section
+digests, and finally computes the whole-image digest with its field zeroed.
+
 All counts and byte offsets are unsigned 64-bit values. Stable records are
 pointer-free and trivially copyable. Runtime pointers, paths, GPU ordinals,
 streams, topology routes, and mutable source locations are forbidden in the

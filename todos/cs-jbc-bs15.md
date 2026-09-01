@@ -1,7 +1,9 @@
+
+
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-JBC-BS15: Implement redundant atoms and multi-basis membership
 
-Task revision: `312`; current project revision is in `todo-status.md`.
+Task revision: `313`; current project revision is in `todo-status.md`.
 
 ## Objective
 Implement redundant atoms and multi-basis membership. Deliver this as one isolated, reviewable step in the Biological execution basis selection workstream.

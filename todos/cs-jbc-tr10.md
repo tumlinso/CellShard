@@ -1,7 +1,9 @@
+
+
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-JBC-TR10: Implement incremental state-update overlays
 
-Task revision: `312`; current project revision is in `todo-status.md`.
+Task revision: `313`; current project revision is in `todo-status.md`.
 
 ## Objective
 Implement incremental state-update overlays. Deliver this as one isolated, reviewable step in the Trajectory and lineage atom discovery workstream.

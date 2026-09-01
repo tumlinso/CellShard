@@ -1,7 +1,9 @@
+
+
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-JBC-OT01: Define the stable atom-access event schema
 
-Task revision: `312`; current project revision is in `todo-status.md`.
+Task revision: `313`; current project revision is in `todo-status.md`.
 
 ## Objective
 Define the stable atom-access event schema. Deliver this as one isolated, reviewable step in the Operation-trace and graph-family atom discovery workstream.

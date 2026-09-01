@@ -1,7 +1,9 @@
+
+
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-JBC-C06: Build canonical-to-local and local-to-canonical maps
 
-Task revision: `312`; current project revision is in `todo-status.md`.
+Task revision: `313`; current project revision is in `todo-status.md`.
 
 ## Objective
 Build canonical-to-local and local-to-canonical maps. Deliver this as one isolated, reviewable step in the Independent exact atom certification workstream.

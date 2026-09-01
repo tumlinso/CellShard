@@ -1,7 +1,9 @@
+
+
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-JBC-BC01: Define the biclustering proposal-provider interface
 
-Task revision: `312`; current project revision is in `todo-status.md`.
+Task revision: `313`; current project revision is in `todo-status.md`.
 
 ## Objective
 Define the biclustering proposal-provider interface. Deliver this as one isolated, reviewable step in the Biclustering and co-clustering atom discovery workstream.

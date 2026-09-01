@@ -1,7 +1,9 @@
+
+
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-JBC-BS13: Implement an exact small-instance basis oracle
 
-Task revision: `312`; current project revision is in `todo-status.md`.
+Task revision: `313`; current project revision is in `todo-status.md`.
 
 ## Objective
 Implement an exact small-instance basis oracle. Deliver this as one isolated, reviewable step in the Biological execution basis selection workstream.

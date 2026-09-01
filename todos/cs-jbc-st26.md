@@ -1,7 +1,9 @@
+
+
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-JBC-ST26: Implement codec-provider registry and raw/index baselines
 
-Task revision: `312`; current project revision is in `todo-status.md`.
+Task revision: `313`; current project revision is in `todo-status.md`.
 
 ## Objective
 Implement codec-provider registry and raw/index baselines. Deliver this as one isolated, reviewable step in the Atom-native immutable persistence and lowering artifacts workstream.

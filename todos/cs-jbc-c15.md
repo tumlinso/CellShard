@@ -1,7 +1,9 @@
+
+
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-JBC-C15: Emit the exact atom certificate
 
-Task revision: `312`; current project revision is in `todo-status.md`.
+Task revision: `313`; current project revision is in `todo-status.md`.
 
 ## Objective
 Emit the exact atom certificate. Deliver this as one isolated, reviewable step in the Independent exact atom certification workstream.

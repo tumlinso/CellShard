@@ -1,7 +1,9 @@
+
+
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-JBC-A15: Define the physical-view plane
 
-Task revision: `312`; current project revision is in `todo-status.md`.
+Task revision: `313`; current project revision is in `todo-status.md`.
 
 ## Objective
 Define the physical-view plane. Deliver this as one isolated, reviewable step in the CellShard biological execution atom core workstream.

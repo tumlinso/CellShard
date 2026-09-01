@@ -1,7 +1,9 @@
+
+
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-JBC-CO08: Compute resampling and stratum stability
 
-Task revision: `312`; current project revision is in `todo-status.md`.
+Task revision: `313`; current project revision is in `todo-status.md`.
 
 ## Objective
 Compute resampling and stratum stability. Deliver this as one isolated, reviewable step in the Co-support and affinity atom discovery workstream.

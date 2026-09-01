@@ -1,7 +1,9 @@
+
+
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-JBC-BS08: Implement add/remove local refinement
 
-Task revision: `312`; current project revision is in `todo-status.md`.
+Task revision: `313`; current project revision is in `todo-status.md`.
 
 ## Objective
 Implement add/remove local refinement. Deliver this as one isolated, reviewable step in the Biological execution basis selection workstream.

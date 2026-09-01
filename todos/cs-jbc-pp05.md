@@ -1,7 +1,9 @@
+
+
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-JBC-PP05: Implement additive sufficient-state atoms
 
-Task revision: `312`; current project revision is in `todo-status.md`.
+Task revision: `313`; current project revision is in `todo-status.md`.
 
 ## Objective
 Implement additive sufficient-state atoms. Deliver this as one isolated, reviewable step in the Persistent partial computation atoms workstream.

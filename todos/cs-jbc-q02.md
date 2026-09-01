@@ -1,7 +1,9 @@
+
+
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-JBC-Q02: Define global operation nodes and typed ports
 
-Task revision: `312`; current project revision is in `todo-status.md`.
+Task revision: `313`; current project revision is in `todo-status.md`.
 
 ## Objective
 Define global operation nodes and typed ports. Deliver this as one isolated, reviewable step in the CellShard global operation graph and portable schedule compiler workstream.

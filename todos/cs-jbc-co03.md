@@ -1,7 +1,9 @@
+
+
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-JBC-CO03: Aggregate raw co-support counts
 
-Task revision: `312`; current project revision is in `todo-status.md`.
+Task revision: `313`; current project revision is in `todo-status.md`.
 
 ## Objective
 Aggregate raw co-support counts. Deliver this as one isolated, reviewable step in the Co-support and affinity atom discovery workstream.

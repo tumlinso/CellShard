@@ -1,7 +1,9 @@
+
+
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-JBC-MF05: Convert motif occurrences into exact atom candidates
 
-Task revision: `312`; current project revision is in `todo-status.md`.
+Task revision: `313`; current project revision is in `todo-status.md`.
 
 ## Objective
 Convert motif occurrences into exact atom candidates. Deliver this as one isolated, reviewable step in the Typed motif and frequent-fragment atom discovery workstream.

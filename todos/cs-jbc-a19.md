@@ -1,7 +1,9 @@
+
+
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-JBC-A19: Define proposal, replica, halo, and contribution-overlap roles
 
-Task revision: `312`; current project revision is in `todo-status.md`.
+Task revision: `313`; current project revision is in `todo-status.md`.
 
 ## Objective
 Define proposal, replica, halo, and contribution-overlap roles. Deliver this as one isolated, reviewable step in the CellShard biological execution atom core workstream.

@@ -1,7 +1,9 @@
+
+
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-JBC-TR08: Construct lineage-local working-set evidence
 
-Task revision: `312`; current project revision is in `todo-status.md`.
+Task revision: `313`; current project revision is in `todo-status.md`.
 
 ## Objective
 Construct lineage-local working-set evidence. Deliver this as one isolated, reviewable step in the Trajectory and lineage atom discovery workstream.

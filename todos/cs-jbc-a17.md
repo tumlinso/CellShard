@@ -1,7 +1,9 @@
+
+
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-JBC-A17: Define the evidence plane
 
-Task revision: `312`; current project revision is in `todo-status.md`.
+Task revision: `313`; current project revision is in `todo-status.md`.
 
 ## Objective
 Define the evidence plane. Deliver this as one isolated, reviewable step in the CellShard biological execution atom core workstream.

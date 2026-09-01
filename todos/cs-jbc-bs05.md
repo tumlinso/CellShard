@@ -1,7 +1,9 @@
+
+
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-JBC-BS05: Implement deterministic greedy marginal-benefit selection
 
-Task revision: `312`; current project revision is in `todo-status.md`.
+Task revision: `313`; current project revision is in `todo-status.md`.
 
 ## Objective
 Implement deterministic greedy marginal-benefit selection. Deliver this as one isolated, reviewable step in the Biological execution basis selection workstream.

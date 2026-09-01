@@ -1,7 +1,9 @@
+
+
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-JBC-V19: Perform the biological-novelty readiness audit
 
-Task revision: `312`; current project revision is in `todo-status.md`.
+Task revision: `313`; current project revision is in `todo-status.md`.
 
 ## Objective
 Perform the biological-novelty readiness audit. Deliver this as one isolated, reviewable step in the Exact validation, biological evidence, vertical slices, and final integration workstream.

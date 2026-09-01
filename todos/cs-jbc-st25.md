@@ -1,7 +1,9 @@
+
+
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-JBC-ST25: Implement CSH5, CSPACK, CPEXEC01/02 compatibility import
 
-Task revision: `312`; current project revision is in `todo-status.md`.
+Task revision: `313`; current project revision is in `todo-status.md`.
 
 ## Objective
 Implement CSH5, CSPACK, CPEXEC01/02 compatibility import. Deliver this as one isolated, reviewable step in the Atom-native immutable persistence and lowering artifacts workstream.

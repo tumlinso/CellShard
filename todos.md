@@ -53,7 +53,7 @@ _None recorded yet._
 <!-- todo-orchestrator:v2-managed:start -->
 # Todo Orchestrator v2 Projection
 
-Project revision: `312`
+Project revision: `313`
 
 ## Workstreams
 - `CS-POST-REMAP-01` | kind: integration_task | status: done | parent: - | objective: Refactor CellShard distributed and mask-group APIs so public/runtime code no longer includes Cellerator runtime or distributed headers, names Cellerator runtime types, links Cellerator::dist, or synthesizes that target; preserve compatibility-format headers separately and prove an independent CUDA-enabled CellShard build.
@@ -388,6 +388,6 @@ Project revision: `312`
 - `CS-JBC-V17` | kind: task | status: planned | parent: - | objective: Integrate the crash and recovery vertical slice. Deliver this as one isolated, reviewable step in the Exact validation, biological evidence, vertical slices, and final integration workstream.
 - `CS-JBC-V18` | kind: task | status: planned | parent: - | objective: Run the standalone, embedded, and package-consumer build matrix. Deliver this as one isolated, reviewable step in the Exact validation, biological evidence, vertical slices, and final integration workstream.
 - `CS-JBC-V19` | kind: task | status: planned | parent: - | objective: Perform the biological-novelty readiness audit. Deliver this as one isolated, reviewable step in the Exact validation, biological evidence, vertical slices, and final integration workstream.
-- `CS-JBC-V20` | kind: task | status: planned | parent: - | objective: Perform final dual-repository integration and acceptance. Deliver this as one isolated, reviewable step in the Exact validation, biological evidence, vertical slices, and final integration workstream.
+- `CS-JBC-V20` | kind: integration_task | status: planned | parent: - | objective: Perform final dual-repository integration and acceptance. Deliver this as one isolated, reviewable step in the Exact validation, biological evidence, vertical slices, and final integration workstream.
 - `cellshard-cpp-access-adapter-refactor` | kind: workstream | status: closed | parent: - | objective: Implement max-performance C++ access adapters so CellShard owns biological delivery and dense/compressed fallbacks while Cellerator owns optimized sparse bindings.
 <!-- todo-orchestrator:v2-managed:end -->

@@ -1,7 +1,9 @@
+
+
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-JBC-ST29: Implement experimental GPU-assisted atom linking
 
-Task revision: `312`; current project revision is in `todo-status.md`.
+Task revision: `313`; current project revision is in `todo-status.md`.
 
 ## Objective
 Implement experimental GPU-assisted atom linking. Deliver this as one isolated, reviewable step in the Atom-native immutable persistence and lowering artifacts workstream.

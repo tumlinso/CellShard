@@ -1,7 +1,9 @@
+
+
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-JBC-O01: Define stable composition-production identity and versioning
 
-Task revision: `312`; current project revision is in `todo-status.md`.
+Task revision: `313`; current project revision is in `todo-status.md`.
 
 ## Objective
 Define stable composition-production identity and versioning. Deliver this as one isolated, reviewable step in the Typed atom composition DAG workstream.

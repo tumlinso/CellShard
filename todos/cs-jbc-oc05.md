@@ -1,7 +1,9 @@
+
+
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-JBC-OC05: Convert overlapping proposals to exact certified candidates
 
-Task revision: `312`; current project revision is in `todo-status.md`.
+Task revision: `313`; current project revision is in `todo-status.md`.
 
 ## Objective
 Convert overlapping proposals to exact certified candidates. Deliver this as one isolated, reviewable step in the Bounded overlapping-community atom discovery workstream.

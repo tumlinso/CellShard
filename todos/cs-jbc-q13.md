@@ -1,7 +1,9 @@
+
+
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-JBC-Q13: Serialize global IR and emit profiler identities
 
-Task revision: `312`; current project revision is in `todo-status.md`.
+Task revision: `313`; current project revision is in `todo-status.md`.
 
 ## Objective
 Serialize global IR and emit profiler identities. Deliver this as one isolated, reviewable step in the CellShard global operation graph and portable schedule compiler workstream.

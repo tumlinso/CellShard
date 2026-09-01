@@ -1,7 +1,9 @@
+
+
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-JBC-E13: Implement evidence filtering and query
 
-Task revision: `312`; current project revision is in `todo-status.md`.
+Task revision: `313`; current project revision is in `todo-status.md`.
 
 ## Objective
 Implement evidence filtering and query. Deliver this as one isolated, reviewable step in the CellShard atom evidence atlas workstream.

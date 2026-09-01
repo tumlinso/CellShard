@@ -1,7 +1,9 @@
+
+
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-JBC-O17: Implement transpose-overlay composition
 
-Task revision: `312`; current project revision is in `todo-status.md`.
+Task revision: `313`; current project revision is in `todo-status.md`.
 
 ## Objective
 Implement transpose-overlay composition. Deliver this as one isolated, reviewable step in the Typed atom composition DAG workstream.

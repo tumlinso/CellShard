@@ -20,7 +20,7 @@ _No staleness review recorded yet._
 <!-- todo-orchestrator:v2-managed:start -->
 # Todo Status v2 Projection
 
-Project revision: `312`
+Project revision: `313`
 
 ## Workstreams
 - `CS-POST-REMAP-01` | status: done | execution: closed | next: Replace local_context and Cellerator::dist use with narrow neutral inputs, remove Cellerator::dist CMake synthesis/linkage, and validate CellShard independently with CUDA enabled.

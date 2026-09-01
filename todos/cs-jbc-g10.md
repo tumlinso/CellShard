@@ -1,7 +1,9 @@
+
+
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-JBC-G10: Integrate the flat-basis fallback
 
-Task revision: `312`; current project revision is in `todo-status.md`.
+Task revision: `313`; current project revision is in `todo-status.md`.
 
 ## Objective
 Integrate the flat-basis fallback. Deliver this as one isolated, reviewable step in the Explicit typed biological execution grammar workstream.

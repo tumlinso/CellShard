@@ -1,7 +1,9 @@
+
+
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-JBC-O24: Implement transform chaining and derivation-DAG integration
 
-Task revision: `312`; current project revision is in `todo-status.md`.
+Task revision: `313`; current project revision is in `todo-status.md`.
 
 ## Objective
 Implement transform chaining and derivation-DAG integration. Deliver this as one isolated, reviewable step in the Typed atom composition DAG workstream.

@@ -1,7 +1,9 @@
+
+
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-JBC-OC01: Define bounded overlapping-membership representation
 
-Task revision: `312`; current project revision is in `todo-status.md`.
+Task revision: `313`; current project revision is in `todo-status.md`.
 
 ## Objective
 Define bounded overlapping-membership representation. Deliver this as one isolated, reviewable step in the Bounded overlapping-community atom discovery workstream.

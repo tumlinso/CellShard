@@ -1,7 +1,9 @@
+
+
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-JBC-ST24: Implement reachability garbage collection and snapshot pins
 
-Task revision: `312`; current project revision is in `todo-status.md`.
+Task revision: `313`; current project revision is in `todo-status.md`.
 
 ## Objective
 Implement reachability garbage collection and snapshot pins. Deliver this as one isolated, reviewable step in the Atom-native immutable persistence and lowering artifacts workstream.

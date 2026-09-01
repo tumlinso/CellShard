@@ -1,0 +1,5 @@
+#include <CellShard/compiler/grammar/grammar_simplification_v1.hh>
+#include <array>
+#include <cassert>
+namespace g=cellshard::compiler::grammar;
+int main(){g::typed_grammar_symbol_v1 s[4]{};for(std::uint64_t i=0;i<4;++i)s[i]={{1,i+1},{2,1},{2,2},{2,3},{2,4},1,1,i?g::grammar_symbol_kind_v1::nonterminal:g::grammar_symbol_kind_v1::terminal_atom,g::grammar_value_kind_v1::partial_result};g::typed_symbol_table_v1 st{s,4,4,{3,1},4};g::grammar_identity_v1 r1[]={{1,1}},r2[]={{1,2}},r3[]={{1,1}};g::explicit_production_v1 p[]={{{4,1},{1,2},r1,1,1,5,g::production_algebra_v1::ordered_composition},{{4,2},{1,3},r2,1,1,5,g::production_algebra_v1::ordered_composition},{{4,3},{1,2},r3,1,1,5,g::production_algebra_v1::ordered_composition}};g::explicit_production_registry_v1 pr{p,3,3,{5,1},{3,1},6,4};std::array<g::explicit_production_v1,3>po{};std::array<g::grammar_identity_v1,3>ro{};std::array<std::uint8_t,4>live{};auto r=g::simplify_explicit_grammar_v1({st,pr,{6,1},7},{1,3},{po.data(),3,ro.data(),3,live.data(),4});assert(r.simplified()&&r.view.production_count==2&&!g::authorizes_execution(r.view));}

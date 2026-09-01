@@ -1,0 +1,45 @@
+{
+  "schema": "CS-JBC-RUNTIME-CAMPAIGN-RESULT/1",
+  "date_utc": "2026-09-01",
+  "scope": "logical-node and process-model correctness; no throughput claim",
+  "hardware": {
+    "cpu_count": 80,
+    "numa_nodes": 2,
+    "numa_node_0_cpus": "0-19,40-59",
+    "numa_node_1_cpus": "20-39,60-79",
+    "gpus": "4 x Tesla V100-SXM2-16GB",
+    "compute_capability": "7.0",
+    "driver": "580.173.02"
+  },
+  "build": {
+    "compiler": "/opt/nvidia/hpc_sdk/Linux_x86_64/26.1/cuda/12.9/bin/nvcc",
+    "language": "C++17/CUDA 17",
+    "architecture": "sm_70",
+    "command": "/opt/nvidia/hpc_sdk/Linux_x86_64/26.1/cuda/12.9/bin/nvcc -std=c++17 -arch=sm_70 -Xcompiler=-Wall,-Wextra,-Werror -Iinclude bench/jbc/runtime/dual_numa_process_campaign.cu -lnuma -o /tmp/cs-jbc-runtime-tests/dual_numa_process_campaign"
+  },
+  "resource_protocol": {
+    "controller": "cuda_controller.py run",
+    "gpus_reserved": 4,
+    "quiescence_samples": 2,
+    "benchmark_mutex": true
+  },
+  "process_model": "one-worker-process-per-numa-node using fork-plus-exec; each worker initializes its own CUDA runtime",
+  "observed": {
+    "gpu_ownership": [
+      {"device": 0, "pci": "0000:02:00.0", "numa_node": 0},
+      {"device": 1, "pci": "0000:03:00.0", "numa_node": 0},
+      {"device": 2, "pci": "0000:83:00.0", "numa_node": 1},
+      {"device": 3, "pci": "0000:84:00.0", "numa_node": 1}
+    ],
+    "workers": [
+      {"requested_node": 0, "observed_cpu": 0, "observed_node": 0, "selected_device": 0},
+      {"requested_node": 1, "observed_cpu": 20, "observed_node": 1, "selected_device": 2}
+    ]
+  },
+  "evidence": {
+    "accepted": "80eb7f8b-2004-45fa-b88f-91c901e03ed3",
+    "accepted_stdout_sha256": "17377ab14c76d78737e66570b74648d150f619937525b7b718353db7be64eda4",
+    "corrected_process_model_finding": "dc90fe94-ae4b-40a2-a403-797afa7d1a24"
+  },
+  "valid": true
+}

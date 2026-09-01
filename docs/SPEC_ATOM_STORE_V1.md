@@ -1,0 +1,182 @@
+# CSATOM v1 Atom-Store Specification
+
+## Frozen name and scope
+
+The collision-free format-family name is **CSATOM v1**, the file suffix is
+`.csatom`, and the eight-byte file magic is `CSATOM01`. These identifiers do
+not alias CSH5, CSPACK, CPE2, CPK1, or any execution-envelope family.
+
+CSATOM is CellShard's immutable, atom-native persistence and lowering artifact.
+It stores certified biological atom identity, exact coverage, dependencies,
+portable payload sections, and source-linked lowering metadata. It is not the
+canonical biological dataset, a mutable value store, a runtime-residency
+record, an execution planner, or a replacement for CSPACK caches.
+
+## Ownership and lifecycle
+
+- CellShard owns the container, integrity, storage extents, and delivery.
+- Proposal providers may contribute evidence but may not set certification.
+- Exact certification is independently recorded before an atom is promotable.
+- Cellerator owns numerical operation and physical projection semantics.
+- Structure epoch, value generation, evidence generation, and cost freshness
+  remain distinct identities.
+- Published bytes are immutable; every semantic change creates a new atom-store
+  identity and content digest.
+
+Semantic identity names the biological meaning independent of bytes. Content
+identity is the tagged SHA-256 digest of immutable bytes. Action identity names
+the source-linked lowering operation. Materialization identity names one built
+artifact under that action. Replica identity names one delivered copy without
+changing the other four identities. These five types are not interchangeable.
+
+Each immutable root-generation manifest records the store identity, monotonic
+generation, structure epoch, root digest, prior root digest, and exact atom,
+dependency, materialization, and replica counts. Generation one has no parent;
+later generations must link a distinct strong parent digest.
+
+## Required top-level model
+
+Every v1 image has a fixed little-endian header followed by a bounded section
+directory and aligned, non-overlapping sections. The header identifies:
+
+1. schema, endian marker, header and total byte counts;
+2. atom-store, catalog, structure, and certification identities;
+3. section count and directory bounds;
+4. a SHA-256 content digest, tagged by algorithm, covering the complete image
+   with the digest field zeroed. Legacy FNV checksums are not valid CSATOM
+   content identities.
+
+Sections carry typed records for atoms, domains/orders, exact coverage,
+dependencies, payload descriptors and bytes, lowering artifacts, and
+provenance. Unknown required section types are rejected. Optional types may be
+skipped only when their directory flags explicitly permit it.
+
+The v1 large-arena header is 256 bytes and its directory uses 96-byte entries.
+Both the directory and every section have at least 64-byte power-of-two
+alignment. Directory entries carry a section kind, exactly one of required or
+optional, 64-bit extent and record geometry, and an algorithm-tagged section
+digest. Record geometry must account for the entire section when nonzero.
+
+Atom payloads may also be fetched independently through a 128-byte atom-frame
+header with magic `CSATMFR1`. A frame binds one semantic atom and one
+materialization to an exact content digest, logical and encoded byte counts,
+codec, alignment, and payload offset. Raw frames require identical logical and
+encoded sizes; the frame bounds are validated before its payload is exposed.
+
+An atom may span multiple ordered frames, and each frame may span multiple
+storage extents. Frame-map records bind frame ordinal and logical range to an
+extent-slice span. Extent slices bind atom, frame, storage object, extent, and
+both extent-local and frame-local ranges. Serialized slices must exactly cover
+the frame from byte zero without gaps or overlaps.
+
+Encoded-replica descriptors name a delivered replica separately from its atom
+and materialization. They bind both decoded and encoded SHA-256 identities,
+byte counts, encoding, storage object, object range, and extent-slice span.
+Identity encoding requires equal sizes and equal digest bytes; compressed or
+provider-defined encodings retain independent encoded and decoded identities.
+
+The positive action cache contains certified successes only. Its exact key is
+the source-linked action identity, source content digest, and structure epoch;
+a hit returns the immutable materialization, output digest, and evidence
+generation. A conflicting successful result for an existing exact key is
+rejected rather than silently replaced.
+
+The separate negative action cache accepts only durable capability,
+dependency-closure, or exact-certification failures. Each negative entry is
+bound to the exact source digest and structure epoch and has an explicit
+evidence-generation validity interval; transient delivery or resource failures
+are not eligible.
+
+Composition lineage records bind each result and source-linked action to an
+ordered parent span, operation kind, and lineage generation. Provenance records
+bind a subject to immutable source and evidence digests, provider identity,
+source epoch, and evidence generation; locators and mutable paths are excluded.
+
+Writing is two-pass: requirements computes the exact directory, alignment
+padding, and total capacity with checked 64-bit arithmetic; fill accepts only a
+buffer meeting that capacity, zeroes padding, copies sections, computes section
+digests, and finally computes the whole-image digest with its field zeroed.
+
+Metadata-only inspection reads only the fixed header and directory. It validates
+identities, directory bounds, ordering, overlap, duplicate kinds, flags, and
+unknown-required handling, but explicitly reports that payload and whole-image
+digest verification remain required before records are exposed.
+
+The exact multi-range source adapter consumes an already validated frame and
+its ordered extent slices, issues one exact range read per slice into a
+caller-owned contiguous buffer, and verifies the reconstructed frame SHA-256.
+It performs no locator discovery, allocation, retry policy, or semantic lowering.
+
+Publication stages the content-addressed immutable image, durably synchronizes
+it, compare-exchanges the root from the exact parent digest to the new digest,
+and durably synchronizes the root. A failed stage or object sync never switches
+the root; a compare-exchange conflict never overwrites a concurrent publisher.
+
+Crash recovery classifies validated candidates against the durable root as the
+active root, a durable direct successor eligible for explicit recovery, an
+unreferenced orphan, an incomplete unsynchronized object, or corruption.
+Recovery never promotes an orphan or incomplete object implicitly.
+
+Consolidation is a checked planning pass over immutable extents. It omits only
+entries explicitly marked non-live, preserves each live content digest, and
+produces an aligned source-to-target copy plan and exact output size. The
+result is published as a new generation; consolidation never mutates extents
+or changes semantic identities in place.
+
+Reachability garbage collection marks the complete parent chains of the active
+root and every unexpired snapshot pin. Only validated generations left
+unmarked are collectible. Pins bind a snapshot identity and root digest to an
+explicit generation interval; missing ancestors and cycles fail closed.
+
+Compatibility import recognizes CSH5, CSPACK01, CPEXEC01, and CPEXEC02 as
+distinct source families and binds the exact source bytes to a SHA-256 digest,
+semantic atom, and import action. CSH5 requires independent confirmation of
+its CellShard dataset attribute so arbitrary HDF5 files are not accepted.
+Legacy bytes remain opaque and are never reinterpreted as native CSATOM records.
+
+Codec dispatch uses an explicit caller-owned registry keyed by stable codec
+identity. V1 supplies a byte-preserving raw baseline and a portable monotonic
+u64 index-delta baseline; providers declare separate encode and decode entry
+points, duplicates are rejected, and no codec is selected by file suffix.
+
+The initial CPU block candidate set compares raw bytes with deterministic
+byte-run encoding in caller-owned scratch. Run encoding is selected only when
+its measured encoded block is smaller; otherwise raw remains the baseline.
+Decode rejects malformed zero runs and output-capacity overruns.
+
+The v1 atom-aware experiment measures per-atom raw-versus-run choices including
+explicit per-atom metadata overhead and reports them against the raw aggregate
+(and a monolithic measurement when the source is contiguous). It is evidence
+only: a measured win does not silently change a published replica codec.
+
+Experimental GPU-assisted atom linking performs parallel exact lookup of atom
+identities in a preparation-validated sorted dictionary. The kernel is
+allocation-free, emits stable dictionary indices or an explicit missing value,
+and launches asynchronously on the caller stream. A strict CPU reference owns
+ordering validation and correctness comparison. This experiment does not
+promote GPU linking into the portable format or publication path.
+
+All counts and byte offsets are unsigned 64-bit values. Stable records are
+pointer-free and trivially copyable. Runtime pointers, paths, GPU ordinals,
+streams, topology routes, and mutable source locations are forbidden in the
+portable image.
+
+## Validation contract
+
+A reader must reject an image before exposure when any identity is zero, the
+magic/schema/endian marker differs, arithmetic overflows, a section is
+misaligned/out of bounds/overlapping, a required section is absent or
+duplicated, a record references an unknown identity, exact coverage is
+incomplete, dependency closure is invalid, or the image checksum differs.
+
+No format-valid image is thereby executable. Runtime promotion additionally
+requires independent exact certification, compatible lowering, generation
+freshness, and the owning execution planner's capability checks.
+
+## Compatibility
+
+V1 bytes are never silently reinterpreted. Additive optional sections require
+explicit optional flags. Any incompatible header, identity, directory, record,
+checksum, or coverage change requires a new magic/schema and an explicit
+conversion route. CSATOM may be transported inside a CSPACK extent, but its
+inner identity and validation remain CSATOM-owned and distinct.

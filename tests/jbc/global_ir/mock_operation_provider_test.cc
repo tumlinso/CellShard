@@ -1,0 +1,4 @@
+#include <CellShard/compiler/graph/mock_operation_provider.hh>
+#include <cassert>
+using namespace cellshard::compiler::graph;
+int main(){const auto provider=mock_non_cellerator_provider_descriptor();assert(valid_operation_provider_descriptor(provider));operation_node_descriptor node{operation_node_id{1},provider.provider,provider.operation,0,2,1};cellshard::target_capabilities target{};target.backend=cellshard::execution_backend::cpu;physical_node_binding binding{};cellshard::compiler::schedule::portable_schedule_command command{};assert(lower_mock_non_cellerator_operation(node,target,cellshard::image_id{3},&binding,&command)==mock_provider_status::success);assert(binding.logical_node==node.id&&command.kind==cellshard::compiler::schedule::portable_command_kind::launch);node.operation=cellshard::operator_class_id{9};assert(lower_mock_non_cellerator_operation(node,target,cellshard::image_id{3},&binding,&command)==mock_provider_status::invalid_node);}

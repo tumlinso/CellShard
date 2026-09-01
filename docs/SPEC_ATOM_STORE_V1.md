@@ -102,6 +102,11 @@ identities, directory bounds, ordering, overlap, duplicate kinds, flags, and
 unknown-required handling, but explicitly reports that payload and whole-image
 digest verification remain required before records are exposed.
 
+The exact multi-range source adapter consumes an already validated frame and
+its ordered extent slices, issues one exact range read per slice into a
+caller-owned contiguous buffer, and verifies the reconstructed frame SHA-256.
+It performs no locator discovery, allocation, retry policy, or semantic lowering.
+
 All counts and byte offsets are unsigned 64-bit values. Stable records are
 pointer-free and trivially copyable. Runtime pointers, paths, GPU ordinals,
 streams, topology routes, and mutable source locations are forbidden in the

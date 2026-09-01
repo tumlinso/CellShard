@@ -1,0 +1,5 @@
+#include <CellShard/compiler/grammar/portable_grammar_serialization_v1.hh>
+#include <array>
+#include <cassert>
+namespace g=cellshard::compiler::grammar;
+int main(){g::typed_grammar_symbol_v1 s[]={{{1,1},{2,1},{2,2},{2,3},{},1,0,g::grammar_symbol_kind_v1::terminal_atom,g::grammar_value_kind_v1::immutable_structure},{{1,2},{2,1},{2,2},{2,3},{2,4},1,1,g::grammar_symbol_kind_v1::nonterminal,g::grammar_value_kind_v1::partial_result}};g::typed_symbol_table_v1 st{s,2,2,{3,1},4};g::grammar_identity_v1 rhs[]={{1,1}};g::explicit_production_v1 p{{4,1},{1,2},rhs,1,1,5,g::production_algebra_v1::ordered_composition};g::explicit_production_registry_v1 pr{&p,1,1,{5,1},{3,1},6,4};g::explicit_grammar_v1 grammar{st,pr,{6,1},7};auto q=g::serialize_explicit_grammar_v1(grammar,nullptr,0);assert(q.code==g::grammar_serialization_code_v1::missing_output);std::array<std::uint8_t,512> bytes{};auto r=g::serialize_explicit_grammar_v1(grammar,bytes.data(),bytes.size());assert(r.written()&&r.bytes==408&&bytes[0]=='J'&&bytes[1]=='B'&&bytes[2]=='G'&&bytes[3]=='1');}

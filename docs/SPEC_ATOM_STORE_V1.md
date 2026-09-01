@@ -144,6 +144,11 @@ byte-run encoding in caller-owned scratch. Run encoding is selected only when
 its measured encoded block is smaller; otherwise raw remains the baseline.
 Decode rejects malformed zero runs and output-capacity overruns.
 
+The v1 atom-aware experiment measures per-atom raw-versus-run choices including
+explicit per-atom metadata overhead and reports them against the raw aggregate
+(and a monolithic measurement when the source is contiguous). It is evidence
+only: a measured win does not silently change a published replica codec.
+
 All counts and byte offsets are unsigned 64-bit values. Stable records are
 pointer-free and trivially copyable. Runtime pointers, paths, GPU ordinals,
 streams, topology routes, and mutable source locations are forbidden in the

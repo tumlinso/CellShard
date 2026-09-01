@@ -149,6 +149,13 @@ explicit per-atom metadata overhead and reports them against the raw aggregate
 (and a monolithic measurement when the source is contiguous). It is evidence
 only: a measured win does not silently change a published replica codec.
 
+Experimental GPU-assisted atom linking performs parallel exact lookup of atom
+identities in a preparation-validated sorted dictionary. The kernel is
+allocation-free, emits stable dictionary indices or an explicit missing value,
+and launches asynchronously on the caller stream. A strict CPU reference owns
+ordering validation and correctness comparison. This experiment does not
+promote GPU linking into the portable format or publication path.
+
 All counts and byte offsets are unsigned 64-bit values. Stable records are
 pointer-free and trivially copyable. Runtime pointers, paths, GPU ordinals,
 streams, topology routes, and mutable source locations are forbidden in the

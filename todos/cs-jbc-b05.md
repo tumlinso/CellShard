@@ -3,7 +3,7 @@
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-JBC-B05: Reserve CellShard provider, registry, and integration paths
 
-Task revision: `323`; current project revision is in `todo-status.md`.
+Task revision: `1041`; current project revision is in `todo-status.md`.
 
 ## Objective
 Reserve CellShard provider, registry, and integration paths. Deliver this as one isolated, reviewable step in the CellShard baseline, successor charter, and compatibility map workstream.

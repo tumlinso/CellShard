@@ -3,7 +3,7 @@
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-JBC-B04: Record the frozen CS-FOUND compatibility baseline
 
-Task revision: `321`; current project revision is in `todo-status.md`.
+Task revision: `1041`; current project revision is in `todo-status.md`.
 
 ## Objective
 Record the frozen CS-FOUND compatibility baseline. Deliver this as one isolated, reviewable step in the CellShard baseline, successor charter, and compatibility map workstream.

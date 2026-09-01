@@ -3,16 +3,16 @@
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-JBC-OT07: Persist negative trace evidence and bounded summaries
 
-Task revision: `313`; current project revision is in `todo-status.md`.
+Task revision: `1041`; current project revision is in `todo-status.md`.
 
 ## Objective
 Persist negative trace evidence and bounded summaries. Deliver this as one isolated, reviewable step in the Operation-trace and graph-family atom discovery workstream.
 
 ## State
-- Lifecycle: `planned`
-- Execution: `ready`
+- Lifecycle: `done`
+- Execution: `closed`
 - Parallel policy: `serial`
-- Result: `-`
+- Result: `implemented`
 
 ## Next Action
 _None._

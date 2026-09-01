@@ -3,16 +3,16 @@
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-JBC-SS05: Implement candidate-pair deduplication and fan-out caps
 
-Task revision: `313`; current project revision is in `todo-status.md`.
+Task revision: `1041`; current project revision is in `todo-status.md`.
 
 ## Objective
 Implement candidate-pair deduplication and fan-out caps. Deliver this as one isolated, reviewable step in the Support-signature atom discovery workstream.
 
 ## State
-- Lifecycle: `planned`
-- Execution: `ready`
+- Lifecycle: `done`
+- Execution: `closed`
 - Parallel policy: `serial`
-- Result: `-`
+- Result: `implemented`
 
 ## Next Action
 _None._

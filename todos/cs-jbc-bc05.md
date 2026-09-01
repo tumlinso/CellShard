@@ -3,16 +3,16 @@
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-JBC-BC05: Implement exact rectangle census and residual construction
 
-Task revision: `313`; current project revision is in `todo-status.md`.
+Task revision: `1041`; current project revision is in `todo-status.md`.
 
 ## Objective
 Implement exact rectangle census and residual construction. Deliver this as one isolated, reviewable step in the Biclustering and co-clustering atom discovery workstream.
 
 ## State
-- Lifecycle: `planned`
-- Execution: `ready`
+- Lifecycle: `done`
+- Execution: `closed`
 - Parallel policy: `serial`
-- Result: `-`
+- Result: `implemented`
 
 ## Next Action
 _None._

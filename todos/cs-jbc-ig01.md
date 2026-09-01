@@ -3,16 +3,16 @@
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-JBC-IG01: Define induced-grammar observation input
 
-Task revision: `313`; current project revision is in `todo-status.md`.
+Task revision: `1041`; current project revision is in `todo-status.md`.
 
 ## Objective
 Define induced-grammar observation input. Deliver this as one isolated, reviewable step in the Induced execution grammar and MDL experiment workstream.
 
 ## State
-- Lifecycle: `planned`
-- Execution: `ready`
+- Lifecycle: `done`
+- Execution: `closed`
 - Parallel policy: `serial`
-- Result: `-`
+- Result: `implemented`
 
 ## Next Action
 _None._

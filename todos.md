@@ -53,7 +53,7 @@ _None recorded yet._
 <!-- todo-orchestrator:v2-managed:start -->
 # Todo Orchestrator v2 Projection
 
-Project revision: `315`
+Project revision: `317`
 
 ## Workstreams
 - `CS-POST-REMAP-01` | kind: integration_task | status: done | parent: - | objective: Refactor CellShard distributed and mask-group APIs so public/runtime code no longer includes Cellerator runtime or distributed headers, names Cellerator runtime types, links Cellerator::dist, or synthesizes that target; preserve compatibility-format headers separately and prove an independent CUDA-enabled CellShard build.
@@ -95,7 +95,7 @@ Project revision: `315`
 - `CS-JBC-A19` | kind: task | status: planned | parent: - | objective: Define proposal, replica, halo, and contribution-overlap roles. Deliver this as one isolated, reviewable step in the CellShard biological execution atom core workstream.
 - `CS-JBC-A20` | kind: task | status: planned | parent: - | objective: Assemble the common atom envelope, builder, and nonowning view. Deliver this as one isolated, reviewable step in the CellShard biological execution atom core workstream.
 - `CS-JBC-B01` | kind: task | status: done | parent: - | objective: Revalidate nested CellShard and Todo authority. Deliver this as one isolated, reviewable step in the CellShard baseline, successor charter, and compatibility map workstream.
-- `CS-JBC-B02` | kind: task | status: planned | parent: - | objective: Produce the source-backed CellShard transition map. Deliver this as one isolated, reviewable step in the CellShard baseline, successor charter, and compatibility map workstream.
+- `CS-JBC-B02` | kind: task | status: done | parent: - | objective: Produce the source-backed CellShard transition map. Deliver this as one isolated, reviewable step in the CellShard baseline, successor charter, and compatibility map workstream.
 - `CS-JBC-B03` | kind: task | status: planned | parent: - | objective: Freeze the biology-native compiler successor charter. Deliver this as one isolated, reviewable step in the CellShard baseline, successor charter, and compatibility map workstream.
 - `CS-JBC-B04` | kind: task | status: planned | parent: - | objective: Record the frozen CS-FOUND compatibility baseline. Deliver this as one isolated, reviewable step in the CellShard baseline, successor charter, and compatibility map workstream.
 - `CS-JBC-B05` | kind: task | status: planned | parent: - | objective: Reserve CellShard provider, registry, and integration paths. Deliver this as one isolated, reviewable step in the CellShard baseline, successor charter, and compatibility map workstream.

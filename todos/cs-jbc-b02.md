@@ -3,16 +3,16 @@
 <!-- todo-orchestrator:v2-managed:start -->
 # CS-JBC-B02: Produce the source-backed CellShard transition map
 
-Task revision: `313`; current project revision is in `todo-status.md`.
+Task revision: `317`; current project revision is in `todo-status.md`.
 
 ## Objective
 Produce the source-backed CellShard transition map. Deliver this as one isolated, reviewable step in the CellShard baseline, successor charter, and compatibility map workstream.
 
 ## State
-- Lifecycle: `planned`
-- Execution: `ready`
+- Lifecycle: `done`
+- Execution: `closed`
 - Parallel policy: `serial`
-- Result: `-`
+- Result: `implemented`
 
 ## Next Action
 _None._

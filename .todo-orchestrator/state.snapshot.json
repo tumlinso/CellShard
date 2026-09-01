@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-01T05:50:19Z",
+  "generated_at": "2026-09-01T05:57:39Z",
   "project": {
     "configuration": {
       "busy_timeout_ms": 5000,
@@ -18,7 +18,7 @@
     "project_uuid": "a52537a5-20db-4aeb-a126-dd0128c71fda",
     "schema_version": 2
   },
-  "project_revision": 315,
+  "project_revision": 317,
   "schema_version": 2,
   "snapshot_version": 3,
   "tables": {
@@ -3580,6 +3580,26 @@
         "revision": 315,
         "seq": 315,
         "timestamp": "2026-09-01T05:50:19Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-JBC-L-BOOTSTRAP",
+        "entity_type": "workflow_dispatch",
+        "event_type": "workflow.next_task",
+        "payload_json": "{\"lane_id\": \"CS-JBC-L-BOOTSTRAP\", \"run_id\": \"CS-JBC-RUN-V1\", \"status\": \"claimed\", \"task_id\": \"CS-JBC-B02\"}",
+        "revision": 316,
+        "seq": 316,
+        "timestamp": "2026-09-01T05:51:29Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-JBC-B02",
+        "entity_type": "task",
+        "event_type": "task.completed",
+        "payload_json": "{\"completion_revision\": 317, \"disposition\": \"implemented\", \"reached_checkpoints\": []}",
+        "revision": 317,
+        "seq": 317,
+        "timestamp": "2026-09-01T05:57:39Z"
       }
     ],
     "evidence": [
@@ -5254,6 +5274,16 @@
         "payload_json": "{\"changed_owned_paths\": [], \"checkpoints\": [{\"id\": \"CS-FOUND-G6\", \"reached_at\": \"2026-08-27T09:17:56Z\", \"state\": \"reached\"}], \"completion_commit\": \"bd22109f9bb8b3ed0f1b70c370a74c3b9493db71\", \"completion_gates\": [{\"evidence_id\": \"57a657da-7a6e-4f35-9210-5dd3391cd5fc\", \"evidence_revision\": 257, \"id\": \"G6-CONTRACT-DOC\", \"input_fingerprint\": \"249b5ea022e0659564098e7488737c746557f5fa432db946494da993e83c8a1b\", \"status\": \"passed\", \"valid\": true, \"validation_git_head\": \"ad315b85490e94354c7be5c422969b15d2a58526\"}, {\"evidence_id\": \"46db370d-df98-45bf-bb20-2a8905a63cae\", \"evidence_revision\": 259, \"id\": \"G6-DOC-HONESTY\", \"input_fingerprint\": \"c3d90c0b1e65515482fc6ed878e6040ed8dc934ee0da7c32a19ee984105052ba\", \"status\": \"passed\", \"valid\": true, \"validation_git_head\": \"ad315b85490e94354c7be5c422969b15d2a58526\"}, {\"evidence_id\": \"9104f949-2c8f-4505-9e7f-0f750cebb819\", \"evidence_revision\": 281, \"id\": \"G6-PACKAGE\", \"input_fingerprint\": \"fe66729d11151531ef9e46c79249f5840e405fc138d0e1330836a43d01932fa5\", \"status\": \"passed\", \"valid\": true, \"validation_git_head\": \"ad315b85490e94354c7be5c422969b15d2a58526\"}], \"completion_revision\": 283, \"finalized_checkpoints\": [], \"gates\": [{\"id\": \"G6-CONTRACT-DOC\", \"input_fingerprint\": \"249b5ea022e0659564098e7488737c746557f5fa432db946494da993e83c8a1b\", \"last_run_at\": \"2026-08-27T09:11:11Z\", \"revision\": 263, \"status\": \"passed\", \"valid\": 1}, {\"id\": \"G6-DOC-HONESTY\", \"input_fingerprint\": \"c3d90c0b1e65515482fc6ed878e6040ed8dc934ee0da7c32a19ee984105052ba\", \"last_run_at\": \"2026-08-27T09:11:11Z\", \"revision\": 263, \"status\": \"passed\", \"valid\": 1}, {\"id\": \"G6-PACKAGE\", \"input_fingerprint\": \"fe66729d11151531ef9e46c79249f5840e405fc138d0e1330836a43d01932fa5\", \"last_run_at\": \"2026-08-27T09:17:56Z\", \"revision\": 281, \"status\": \"passed\", \"valid\": 1}], \"git_diffstat\": \"\", \"git_head\": \"bd22109f9bb8b3ed0f1b70c370a74c3b9493db71\", \"interfaces\": [], \"note\": \"Published CS-FOUND public API, package surface, and honest performance-first biology-informed contract; G6 gates passed including installed inspect package consumer.\", \"resources\": [], \"task_id\": \"CS-FOUND-14\"}",
         "revision": 283,
         "task_id": "CS-FOUND-14"
+      },
+      {
+        "claim_id": null,
+        "created_at": "2026-09-01T05:57:38Z",
+        "id": "1c0e9e23-cbd0-4764-be95-1ac93194d4ef",
+        "kind": "complete",
+        "note": "Produced the source-backed CS-JBC-B02 transition map and 21-row machine-readable classification manifest from the exact preledger task object. Classified identity, domains, partitions, images, extents, catalogs, snapshots, sources, residency, access adapters, sharded runtime, distributed placement, CSH5, CSPACK, CPEXEC, CSHARD, tests, and CMake as preserve/generalize/compatibility/retire; reserved additive compiler/runtime-v2 destinations without changing behavior, wires, central registries, or the closed adapter task. Validation: 18-file preledger manifest passed; exact task object hash recorded; CSV parsed with 21 unique complete rows and all four classifications; coverage terms present; git diff --check passed; read-only Todo doctor reports schema 10, integrity ok, zero foreign-key errors.",
+        "payload_json": "{\"changed_owned_paths\": [\"docs/JBC/CS_JBC_B02_SOURCE_TRANSITION_MAP.md\", \"planning/jbc/cellshard_source_transition_map_v1.csv\"], \"checkpoints\": [], \"completion_commit\": \"6ab8932704ac5988ac64853b3cf43e41e991ee98\", \"completion_gates\": [], \"completion_revision\": 317, \"finalized_checkpoints\": [], \"gates\": [], \"git_diffstat\": \".todo-orchestrator/state.snapshot.json | 34 ++++++++++++++++++++++------------\\n todo-status.md                         |  4 ++--\\n todos.md                               |  4 ++--\\n todos/cs-jbc-b02.md                    |  6 +++---\\n 4 files changed, 29 insertions(+), 19 deletions(-)\", \"git_head\": \"6ab8932704ac5988ac64853b3cf43e41e991ee98\", \"interfaces\": [], \"note\": \"Produced the source-backed CS-JBC-B02 transition map and 21-row machine-readable classification manifest from the exact preledger task object. Classified identity, domains, partitions, images, extents, catalogs, snapshots, sources, residency, access adapters, sharded runtime, distributed placement, CSH5, CSPACK, CPEXEC, CSHARD, tests, and CMake as preserve/generalize/compatibility/retire; reserved additive compiler/runtime-v2 destinations without changing behavior, wires, central registries, or the closed adapter task. Validation: 18-file preledger manifest passed; exact task object hash recorded; CSV parsed with 21 unique complete rows and all four classifications; coverage terms present; git diff --check passed; read-only Todo doctor reports schema 10, integrity ok, zero foreign-key errors.\", \"resources\": [], \"task_id\": \"CS-JBC-B02\"}",
+        "revision": 317,
+        "task_id": "CS-JBC-B02"
       },
       {
         "claim_id": null,
@@ -20773,9 +20803,9 @@
       },
       {
         "attention_reason": null,
-        "completion_commit": null,
-        "completion_git_head": null,
-        "completion_revision": null,
+        "completion_commit": "6ab8932704ac5988ac64853b3cf43e41e991ee98",
+        "completion_git_head": "6ab8932704ac5988ac64853b3cf43e41e991ee98",
+        "completion_revision": 317,
         "created_at": "2026-08-31T19:43:27Z",
         "id": "CS-JBC-B02",
         "kind": "task",
@@ -20787,14 +20817,14 @@
         "parallel_policy": "serial",
         "parent_id": null,
         "priority": 0,
-        "result": null,
+        "result": "implemented",
         "result_policy_json": "{}",
-        "revision": 313,
-        "status": "planned",
+        "revision": 317,
+        "status": "done",
         "tags_json": "[]",
         "title": "Produce the source-backed CellShard transition map",
-        "updated_at": "2026-09-01T05:43:38Z",
-        "version": 2
+        "updated_at": "2026-09-01T05:57:39Z",
+        "version": 4
       },
       {
         "attention_reason": null,
@@ -34080,13 +34110,13 @@
         "task_id": "CS-JBC-B01"
       },
       {
-        "activated_at": null,
-        "completed_at": null,
+        "activated_at": "2026-09-01T05:51:29Z",
+        "completed_at": "2026-09-01T05:57:39Z",
         "enqueued_at": "2026-09-01T05:43:38Z",
         "lane_id": "CS-JBC-L-BOOTSTRAP",
         "position": 1,
-        "revision": 313,
-        "state": "queued",
+        "revision": 317,
+        "state": "completed",
         "task_id": "CS-JBC-B02"
       },
       {
@@ -36880,11 +36910,11 @@
         "created_at": "2026-09-01T05:43:38Z",
         "id": "CS-JBC-L-BOOTSTRAP",
         "parent_lane_id": null,
-        "revision": 315,
+        "revision": 317,
         "role": "coordinator",
         "run_id": "CS-JBC-RUN-V1",
         "state": "ready",
-        "updated_at": "2026-09-01T05:50:19Z",
+        "updated_at": "2026-09-01T05:57:39Z",
         "workspace_mode": "exclusive"
       },
       {

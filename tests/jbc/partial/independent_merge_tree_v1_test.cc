@@ -6,6 +6,7 @@
 #include <CellShard/compiler/partial/moments_state_v1.hh>
 #include <CellShard/compiler/partial/parameterized_function_v1.hh>
 #include <CellShard/compiler/partial/partial_image_v1.hh>
+#include <CellShard/compiler/partial/promotion_v1.hh>
 #include <CellShard/compiler/partial/relation_contribution_v1.hh>
 #include <CellShard/compiler/partial/segment_summary_v1.hh>
 #include <CellShard/compiler/partial/static_transform_output_v1.hh>

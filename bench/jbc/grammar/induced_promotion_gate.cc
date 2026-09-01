@@ -1,0 +1,4 @@
+#include <compiler/grammar/induced/induced_promotion_gate_v1.hh>
+#include <iostream>
+namespace ig=cellshard::compiler::grammar::induced;
+int main(){ig::canonical_symbol_v1 symbols[2]{};ig::canonical_induced_production_v1 p{symbols,2,{1,1},{2,1},{3,1},7,1};std::uint64_t depths[]={1,1};ig::induced_production_shape_v1 shape{{1,1},depths,2,2,2,7};ig::grammar_promotion_evidence_v1 evidence{{4,1},{2,1},{5,1},{6,1},7,ig::grammar_evidence_disposition_v1::promote,ig::negative_grammar_reason_v1::none};auto r=ig::apply_induced_promotion_gate_v1({9,1},p,shape,{4,4},evidence,{{7,1},{8,1},{8,1},7,1000,2000,1200,ig::fixture_kind_v1::planted_repetition},{{7,2},{8,2},{8,2},7,1000,1000,1400,ig::fixture_kind_v1::adversarial_unique});std::cout<<"{\"promoted\":"<<(r.promoted()?"true":"false")<<",\"flat_fallback_required\":"<<(r.receipt.flat_fallback_required?"true":"false")<<"}\n";return r.promoted()?0:2;}

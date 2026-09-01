@@ -60,10 +60,8 @@ validate_exact_coverage_v1(const exact_coverage_view_v1 &coverage) noexcept {
     if (!coverage.order.valid()) {
         return {coverage_composition_code_v1::invalid_order};
     }
-    if (coverage.logical_item_count == 0) {
-        return {coverage_composition_code_v1::empty_input};
-    }
-    if (coverage.logical_item_ids == nullptr) {
+    if (coverage.logical_item_count != 0
+        && coverage.logical_item_ids == nullptr) {
         return {coverage_composition_code_v1::missing_input_items};
     }
     for (std::uint64_t index = 1;

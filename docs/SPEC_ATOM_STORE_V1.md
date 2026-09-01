@@ -134,6 +134,11 @@ semantic atom, and import action. CSH5 requires independent confirmation of
 its CellShard dataset attribute so arbitrary HDF5 files are not accepted.
 Legacy bytes remain opaque and are never reinterpreted as native CSATOM records.
 
+Codec dispatch uses an explicit caller-owned registry keyed by stable codec
+identity. V1 supplies a byte-preserving raw baseline and a portable monotonic
+u64 index-delta baseline; providers declare separate encode and decode entry
+points, duplicates are rejected, and no codec is selected by file suffix.
+
 All counts and byte offsets are unsigned 64-bit values. Stable records are
 pointer-free and trivially copyable. Runtime pointers, paths, GPU ordinals,
 streams, topology routes, and mutable source locations are forbidden in the

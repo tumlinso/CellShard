@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-01T05:43:38Z",
+  "generated_at": "2026-09-01T05:50:19Z",
   "project": {
     "configuration": {
       "busy_timeout_ms": 5000,
@@ -18,7 +18,7 @@
     "project_uuid": "a52537a5-20db-4aeb-a126-dd0128c71fda",
     "schema_version": 2
   },
-  "project_revision": 313,
+  "project_revision": 315,
   "schema_version": 2,
   "snapshot_version": 3,
   "tables": {
@@ -3560,6 +3560,26 @@
         "revision": 313,
         "seq": 313,
         "timestamp": "2026-09-01T05:43:38Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-JBC-L-BOOTSTRAP",
+        "entity_type": "workflow_dispatch",
+        "event_type": "workflow.next_task",
+        "payload_json": "{\"lane_id\": \"CS-JBC-L-BOOTSTRAP\", \"run_id\": \"CS-JBC-RUN-V1\", \"status\": \"claimed\", \"task_id\": \"CS-JBC-B01\"}",
+        "revision": 314,
+        "seq": 314,
+        "timestamp": "2026-09-01T05:44:51Z"
+      },
+      {
+        "actor_session_id": null,
+        "entity_id": "CS-JBC-B01",
+        "entity_type": "task",
+        "event_type": "task.completed",
+        "payload_json": "{\"completion_revision\": 315, \"disposition\": \"implemented\", \"reached_checkpoints\": []}",
+        "revision": 315,
+        "seq": 315,
+        "timestamp": "2026-09-01T05:50:19Z"
       }
     ],
     "evidence": [
@@ -5205,6 +5225,16 @@
       }
     ],
     "handoffs": [
+      {
+        "claim_id": null,
+        "created_at": "2026-09-01T05:50:19Z",
+        "id": "0006ac75-5ed3-43af-8281-fd6f15acd800",
+        "kind": "complete",
+        "note": "Recorded two separately timestamped Project Control and read-only Todo authority observations in docs/JBC/CS_JBC_B01_AUTHORITY_BASELINE.md; verified nested HEAD/origin/parent gitlink agreement, Todo UUID/revision/schema/integrity/fingerprint, active JBC lane, stale sessions without recovery, frozen CS-FOUND interfaces, closed access-adapter history, and standalone/embedded build entry points. Validation: git diff --check plus deterministic authority/file assertions. No behavior change and no successor claim.",
+        "payload_json": "{\"changed_owned_paths\": [\"docs/JBC/CS_JBC_B01_AUTHORITY_BASELINE.md\"], \"checkpoints\": [], \"completion_commit\": \"5f6a502b4355732c4ed3cc873a25b8aec66d8338\", \"completion_gates\": [], \"completion_revision\": 315, \"finalized_checkpoints\": [], \"gates\": [], \"git_diffstat\": \".todo-orchestrator/state.snapshot.json | 34 ++++++++++++++++++++++------------\\n todo-status.md                         |  4 ++--\\n todos.md                               |  4 ++--\\n todos/cs-jbc-b01.md                    |  6 +++---\\n 4 files changed, 29 insertions(+), 19 deletions(-)\", \"git_head\": \"5f6a502b4355732c4ed3cc873a25b8aec66d8338\", \"interfaces\": [], \"note\": \"Recorded two separately timestamped Project Control and read-only Todo authority observations in docs/JBC/CS_JBC_B01_AUTHORITY_BASELINE.md; verified nested HEAD/origin/parent gitlink agreement, Todo UUID/revision/schema/integrity/fingerprint, active JBC lane, stale sessions without recovery, frozen CS-FOUND interfaces, closed access-adapter history, and standalone/embedded build entry points. Validation: git diff --check plus deterministic authority/file assertions. No behavior change and no successor claim.\", \"resources\": [], \"task_id\": \"CS-JBC-B01\"}",
+        "revision": 315,
+        "task_id": "CS-JBC-B01"
+      },
       {
         "claim_id": null,
         "created_at": "2026-08-27T08:38:04Z",
@@ -20718,9 +20748,9 @@
       },
       {
         "attention_reason": null,
-        "completion_commit": null,
-        "completion_git_head": null,
-        "completion_revision": null,
+        "completion_commit": "5f6a502b4355732c4ed3cc873a25b8aec66d8338",
+        "completion_git_head": "5f6a502b4355732c4ed3cc873a25b8aec66d8338",
+        "completion_revision": 315,
         "created_at": "2026-08-31T19:43:27Z",
         "id": "CS-JBC-B01",
         "kind": "task",
@@ -20732,14 +20762,14 @@
         "parallel_policy": "serial",
         "parent_id": null,
         "priority": 0,
-        "result": null,
+        "result": "implemented",
         "result_policy_json": "{}",
-        "revision": 313,
-        "status": "planned",
+        "revision": 315,
+        "status": "done",
         "tags_json": "[]",
         "title": "Revalidate nested CellShard and Todo authority",
-        "updated_at": "2026-09-01T05:43:38Z",
-        "version": 2
+        "updated_at": "2026-09-01T05:50:19Z",
+        "version": 4
       },
       {
         "attention_reason": null,
@@ -34040,13 +34070,13 @@
         "task_id": "CS-JBC-BS18"
       },
       {
-        "activated_at": null,
-        "completed_at": null,
+        "activated_at": "2026-09-01T05:44:51Z",
+        "completed_at": "2026-09-01T05:50:19Z",
         "enqueued_at": "2026-09-01T05:43:38Z",
         "lane_id": "CS-JBC-L-BOOTSTRAP",
         "position": 0,
-        "revision": 313,
-        "state": "queued",
+        "revision": 315,
+        "state": "completed",
         "task_id": "CS-JBC-B01"
       },
       {
@@ -36850,11 +36880,11 @@
         "created_at": "2026-09-01T05:43:38Z",
         "id": "CS-JBC-L-BOOTSTRAP",
         "parent_lane_id": null,
-        "revision": 313,
+        "revision": 315,
         "role": "coordinator",
         "run_id": "CS-JBC-RUN-V1",
         "state": "ready",
-        "updated_at": "2026-09-01T05:43:38Z",
+        "updated_at": "2026-09-01T05:50:19Z",
         "workspace_mode": "exclusive"
       },
       {

@@ -14,5 +14,9 @@ int main() {
     const local_index bad_required[] = {0, 2};
     input.required_atoms = bad_required;
     assert(validate_input(input) == input_error::invalid_atom_reference);
+    assert(valid_weight({3, 7}));
+    assert(!valid_weight({1, 0}));
+    assert(compare_weight({UINT64_MAX, UINT64_MAX}, {1, 2}) > 0);
+    assert(compare_weight({2, 4}, {1, 2}) == 0);
     return 0;
 }

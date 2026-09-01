@@ -18,6 +18,37 @@ struct workload_family_input {
     local_index required_atom_count = 0;
 };
 
+struct workload_weight {
+    std::uint64_t numerator = 0;
+    std::uint64_t denominator = 1;
+};
+
+inline bool valid_weight(workload_weight weight) noexcept {
+    return weight.denominator != 0;
+}
+
+inline int compare_weight(workload_weight left, workload_weight right) noexcept {
+    // Exact comparison without multiplication overflow.
+    bool reverse = false;
+    for (;;) {
+        const std::uint64_t left_q = left.numerator / left.denominator;
+        const std::uint64_t right_q = right.numerator / right.denominator;
+        if (left_q != right_q) {
+            const int result = left_q < right_q ? -1 : 1;
+            return reverse ? -result : result;
+        }
+        const std::uint64_t left_r = left.numerator % left.denominator;
+        const std::uint64_t right_r = right.numerator % right.denominator;
+        if (left_r == 0 || right_r == 0) {
+            const int result = left_r == right_r ? 0 : (left_r == 0 ? -1 : 1);
+            return reverse ? -result : result;
+        }
+        left = {left.denominator, left_r};
+        right = {right.denominator, right_r};
+        reverse = !reverse;
+    }
+}
+
 struct atom_input {
     global_id atom_id = 0;
     std::uint64_t storage_bytes = 0;

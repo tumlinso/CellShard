@@ -57,6 +57,12 @@ alignment. Directory entries carry a section kind, exactly one of required or
 optional, 64-bit extent and record geometry, and an algorithm-tagged section
 digest. Record geometry must account for the entire section when nonzero.
 
+Atom payloads may also be fetched independently through a 128-byte atom-frame
+header with magic `CSATMFR1`. A frame binds one semantic atom and one
+materialization to an exact content digest, logical and encoded byte counts,
+codec, alignment, and payload offset. Raw frames require identical logical and
+encoded sizes; the frame bounds are validated before its payload is exposed.
+
 All counts and byte offsets are unsigned 64-bit values. Stable records are
 pointer-free and trivially copyable. Runtime pointers, paths, GPU ordinals,
 streams, topology routes, and mutable source locations are forbidden in the

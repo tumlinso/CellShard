@@ -1,0 +1,6 @@
+#include <CellShard/compiler/graph/global_ir_serialization.hh>
+#include <cassert>
+#include <cstring>
+#include <vector>
+using namespace cellshard::compiler::graph;
+int main(){operation_node_descriptor n{operation_node_id{1},cellshard::producer_abi_id{2},cellshard::operator_class_id{3},0,1,1};typed_port_descriptor p{};p.id=operation_port_id{1};p.node=n.id;p.domain=cellshard::domain_id{1};p.order=cellshard::order_id{1};p.encoding=cellshard::scalar_encoding_id{1};p.direction=port_direction::output;p.payload=port_payload_kind::value_plane;atom_dependency_edge e{graph_atom_id{1},operation_node_id{1},operation_port_id{1},operation_node_id{2},operation_port_id{2},1,0,dependency_kind::exact_atom,0};const auto bytes=global_ir_serialized_bytes(1,1,1);std::vector<std::byte>out(bytes);assert(serialize_global_ir(graph_family_id{1},&n,1,&p,1,&e,1,out.data(),out.size())==global_ir_serialize_status::success);global_ir_header h{};std::memcpy(&h,out.data(),sizeof(h));assert(h.total_bytes==bytes&&h.content.algorithm==cellshard::digest_algorithm::legacy_fnv1a64);auto a=emit_profiler_identity(graph_family_id{1},cellshard::compiler::schedule::portable_schedule_id{2},operation_node_id{3},4);auto b=emit_profiler_identity(graph_family_id{1},cellshard::compiler::schedule::portable_schedule_id{2},operation_node_id{3},5);assert(a.valid()&&b.valid()&&a.low!=b.low);}

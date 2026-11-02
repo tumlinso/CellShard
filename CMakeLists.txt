@@ -111,17 +111,17 @@ if(NOT HDF5_FOUND)
 endif()
 
 if(CELLSHARD_ENABLE_CELLERATOR_QUANTIZED)
-    if(EXISTS "${CMAKE_SOURCE_DIR}/include/Cellerator/matrix/quantized_blocked_ell.cuh")
+    if(EXISTS "${CMAKE_SOURCE_DIR}/include/Cellerator/interop/formats/affine_blocked_ell.hh")
         set(CELLSHARD_CELLERATOR_QUANTIZED_INCLUDE_ROOT "${CMAKE_SOURCE_DIR}/include")
-    elseif(NOT CELLSHARD_CELLERATOR_SOURCE_DIR AND EXISTS "${CMAKE_CURRENT_LIST_DIR}/../Cellerator/include/Cellerator/matrix/quantized_blocked_ell.cuh")
+    elseif(NOT CELLSHARD_CELLERATOR_SOURCE_DIR AND EXISTS "${CMAKE_CURRENT_LIST_DIR}/../Cellerator/include/Cellerator/interop/formats/affine_blocked_ell.hh")
         set(CELLSHARD_CELLERATOR_SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}/../Cellerator" CACHE PATH
             "Local Cellerator source checkout used for standalone Cellerator sparse layout headers." FORCE)
     endif()
     if(CELLSHARD_CELLERATOR_SOURCE_DIR)
-        if(NOT EXISTS "${CELLSHARD_CELLERATOR_SOURCE_DIR}/include/Cellerator/matrix/quantized_blocked_ell.cuh")
+        if(NOT EXISTS "${CELLSHARD_CELLERATOR_SOURCE_DIR}/include/Cellerator/interop/formats/affine_blocked_ell.hh")
             message(FATAL_ERROR
                 "CELLSHARD_CELLERATOR_SOURCE_DIR must point at a Cellerator checkout with "
-                "include/Cellerator/matrix/quantized_blocked_ell.cuh")
+                "include/Cellerator/interop/formats/affine_blocked_ell.hh")
         endif()
         set(CELLSHARD_CELLERATOR_QUANTIZED_INCLUDE_ROOT "${CELLSHARD_CELLERATOR_SOURCE_DIR}/include")
     elseif(NOT CELLSHARD_CELLERATOR_QUANTIZED_INCLUDE_ROOT)

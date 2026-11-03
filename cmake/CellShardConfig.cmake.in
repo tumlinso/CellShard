@@ -3,6 +3,13 @@
 include(CMakeFindDependencyMacro)
 
 find_dependency(HDF5 REQUIRED COMPONENTS C)
+set(_cellshard_package_prefix_dir "${PACKAGE_PREFIX_DIR}")
+find_dependency(anndata CONFIG REQUIRED)
+set(PACKAGE_PREFIX_DIR "${_cellshard_package_prefix_dir}")
+unset(_cellshard_package_prefix_dir)
+if(NOT DEFINED ANNDATA_HAS_HDF5 OR NOT ANNDATA_HAS_HDF5)
+    message(FATAL_ERROR "CellShard requires anndata installed with its HDF5 backend enabled.")
+endif()
 if(@CELLSHARD_ENABLE_CUDA@)
     find_dependency(CUDAToolkit REQUIRED)
 endif()
@@ -55,6 +62,7 @@ set(CellShard_KNOWN_COMPONENTS
     inspect
     runtime
     ingest
+    anndata_ingest
     export
     h5ad_python
 )

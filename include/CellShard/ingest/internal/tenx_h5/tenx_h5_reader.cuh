@@ -2,7 +2,7 @@
 
 #include "../common/barcode_table.cuh"
 #include "../common/feature_table.cuh"
-#include "../h5ad/h5ad_reader.cuh"
+#include "../common/hdf5.hh"
 #include "../mtx/mtx_reader.cuh"
 
 #include <CellShard/formats/compressed.cuh>
@@ -47,7 +47,7 @@ inline bool read_shape(hid_t matrix, std::uint64_t *features, std::uint64_t *bar
     if (features == nullptr || barcodes == nullptr) return false;
     *features = 0u;
     *barcodes = 0u;
-    if (!h5ad::read_dataset_u64_range(matrix, "shape", 0u, 2u, &shape) || shape.size() != 2u) {
+    if (!hdf5::read_dataset_u64_range(matrix, "shape", 0u, 2u, &shape) || shape.size() != 2u) {
         set_error(error, "10x h5 matrix is missing a two-entry shape dataset");
         return false;
     }
@@ -63,7 +63,7 @@ inline bool dataset_len(hid_t parent, const char *name, hsize_t *length) {
     *length = 0u;
     dset = H5Dopen2(parent, name, H5P_DEFAULT);
     if (dset < 0) goto done;
-    ok = h5ad::dataset_length(dset, length);
+    ok = hdf5::dataset_length(dset, length);
 done:
     if (dset >= 0) H5Dclose(dset);
     return ok;
@@ -93,7 +93,7 @@ inline bool validate_count_values(hid_t matrix, std::uint64_t nnz, std::string *
     std::vector<double> values;
     const std::uint64_t sample_count = std::min<std::uint64_t>(nnz, 1024u);
     if (sample_count == 0u) return true;
-    if (!h5ad::read_dataset_double_range(matrix, "data", 0u, sample_count, &values)) {
+    if (!hdf5::read_dataset_double_range(matrix, "data", 0u, sample_count, &values)) {
         set_error(error, "failed to sample 10x h5 matrix values");
         return false;
     }
@@ -124,7 +124,7 @@ inline bool probe_matrix(const char *path, matrix_info *out, std::string *error)
         set_error(error, "failed to open 10x h5 file");
         goto done;
     }
-    matrix = h5ad::open_optional_group(file, "/matrix");
+    matrix = hdf5::open_optional_group(file, "/matrix");
     if (matrix < 0) {
         set_error(error, "10x h5 file is missing /matrix");
         goto done;
@@ -147,7 +147,7 @@ inline bool probe_matrix(const char *path, matrix_info *out, std::string *error)
         set_error(error, "10x h5 sparse dataset lengths are inconsistent");
         goto done;
     }
-    if (!h5ad::read_dataset_u64_range(matrix, "indptr", 0u, barcode_count + 1u, &indptr)
+    if (!hdf5::read_dataset_u64_range(matrix, "indptr", 0u, barcode_count + 1u, &indptr)
         || !validate_indptr(indptr, (std::uint64_t) data_len, error)
         || !validate_count_values(matrix, (std::uint64_t) data_len, error)) {
         goto done;
@@ -194,7 +194,7 @@ inline bool scan_row_nnz(const char *path,
         set_error(error, "failed to reopen 10x h5 /matrix group");
         goto done;
     }
-    if (!h5ad::read_dataset_u64_range(matrix, "indptr", 0u, (std::uint64_t) info.rows + 1u, &indptr)
+    if (!hdf5::read_dataset_u64_range(matrix, "indptr", 0u, (std::uint64_t) info.rows + 1u, &indptr)
         || !validate_indptr(indptr, (std::uint64_t) info.nnz, error)) {
         goto done;
     }
@@ -209,8 +209,8 @@ inline bool scan_row_nnz(const char *path,
             if (cursor < chunk_begin || cursor >= chunk_end) {
                 chunk_begin = cursor;
                 chunk_end = std::min<std::uint64_t>(chunk_begin + chunk_elems, indptr.back());
-                if (!h5ad::read_dataset_u64_range(matrix, "indices", chunk_begin, chunk_end - chunk_begin, &indices)
-                    || !h5ad::read_dataset_double_range(matrix, "data", chunk_begin, chunk_end - chunk_begin, &values)
+                if (!hdf5::read_dataset_u64_range(matrix, "indices", chunk_begin, chunk_end - chunk_begin, &indices)
+                    || !hdf5::read_dataset_double_range(matrix, "data", chunk_begin, chunk_end - chunk_begin, &values)
                     || indices.size() != values.size()) {
                     set_error(error, "failed to read 10x h5 sparse payload");
                     goto done;
@@ -261,7 +261,7 @@ inline bool load_barcodes(const char *path, common::barcode_table *barcodes, std
         goto done;
     }
     matrix = H5Gopen2(file, "/matrix", H5P_DEFAULT);
-    if (matrix < 0 || !h5ad::read_dataset_string_column(matrix, "barcodes", &values)) {
+    if (matrix < 0 || !hdf5::read_dataset_string_column(matrix, "barcodes", &values)) {
         set_error(error, "failed to read 10x h5 barcodes");
         goto done;
     }
@@ -303,9 +303,9 @@ inline bool load_feature_table(const char *path, common::feature_table *features
     }
     group = H5Gopen2(file, "/matrix/features", H5P_DEFAULT);
     if (group < 0
-        || !h5ad::read_dataset_string_column(group, "id", &ids)
-        || !h5ad::read_dataset_string_column(group, "name", &names)
-        || !h5ad::read_dataset_string_column(group, "feature_type", &types)
+        || !hdf5::read_dataset_string_column(group, "id", &ids)
+        || !hdf5::read_dataset_string_column(group, "name", &names)
+        || !hdf5::read_dataset_string_column(group, "feature_type", &types)
         || ids.count != names.count
         || ids.count != types.count) {
         set_error(error, "failed to read 10x h5 feature id, name, and feature_type columns");
@@ -412,7 +412,7 @@ inline bool load_part_window_compressed(const char *path,
     {
         const unsigned long row_begin = row_offsets[part_begin];
         const unsigned long row_end = row_offsets[part_end];
-        if (!h5ad::read_dataset_u64_range(matrix, "indptr", (std::uint64_t) row_begin, (std::uint64_t) (row_end - row_begin + 1ul), &indptr)
+        if (!hdf5::read_dataset_u64_range(matrix, "indptr", (std::uint64_t) row_begin, (std::uint64_t) (row_end - row_begin + 1ul), &indptr)
             || indptr.empty()) {
             set_error(error, "failed to read 10x h5 indptr window");
             goto done;
@@ -420,8 +420,8 @@ inline bool load_part_window_compressed(const char *path,
         const std::uint64_t nnz_begin = indptr.front();
         const std::uint64_t nnz_count = indptr.back() - indptr.front();
         for (std::uint64_t &ptr : indptr) ptr -= nnz_begin;
-        if (!h5ad::read_dataset_u64_range(matrix, "indices", nnz_begin, nnz_count, &indices)
-            || !h5ad::read_dataset_double_range(matrix, "data", nnz_begin, nnz_count, &values)
+        if (!hdf5::read_dataset_u64_range(matrix, "indices", nnz_begin, nnz_count, &indices)
+            || !hdf5::read_dataset_double_range(matrix, "data", nnz_begin, nnz_count, &values)
             || indices.size() != values.size()) {
             set_error(error, "failed to read 10x h5 sparse payload window");
             goto done;

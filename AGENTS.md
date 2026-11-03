@@ -129,7 +129,7 @@ Key areas:
 
 ## Coding Style
 
-Match the existing C++17/CUDA17 style:
+Match the C++20/CUDA20 style:
 
 - use 4-space indentation and same-line opening braces
 - prefer `snake_case` for files, functions, variables, structs, and CLI flags

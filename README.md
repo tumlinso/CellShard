@@ -57,7 +57,8 @@ dependency to CellShard core targets.
 - sparse row/feature masking and grouped row reductions for adapter-supplied
   runtime-ready views and compressed fallback views
 - owner-hosted runtime metadata and distributed shard/CSPACK delivery
-- optional bounded source ingest when configured with `CELLSHARD_BUILD_INGEST=ON`
+- host-only sparse H5AD reading through the always-built `CellShard::anndata_ingest` target
+- optional bounded source-to-`.csh5` ingest when configured with `CELLSHARD_BUILD_INGEST=ON`
 - optional export helpers and optional Python bindings
 
 CellShard does not own:
@@ -94,7 +95,8 @@ Main source areas:
   through `include/CellShard/access/`
 - `include/CellShard/runtime/`: public sharded layout, host fetch/drop, device staging, storage dispatch, and local multi-GPU headers
 - `include/CellShard/io/`: public `.cspack`, `.csh5`, and standby `.cshard` entry headers
-- `include/CellShard/ingest/`: optional source ingest headers, enabled with `CELLSHARD_BUILD_INGEST=ON`
+- `include/CellShard/ingest/anndata.hh`: host-only sparse H5AD source API, always installed
+- `include/CellShard/ingest/`: optional CUDA ingest headers, enabled with `CELLSHARD_BUILD_INGEST=ON`
 - `include/CellShard/export/`: public dataset export and metadata snapshot APIs
 - `src/io/pack/`: the per-partition packed payload codec used inside shard `.cspack` cache files
 - `src/io/csh5/`: the `.csh5` container backend plus runtime cache materialization and fetch
@@ -191,7 +193,7 @@ needs expanded floats.
 
 ## Ownership Boundary
 
-- CellShard owns optional bounded source ingest, metadata capture, local `.cspool` staging, and one-pass emission of an immutable canonical sparse matrix when `CELLSHARD_BUILD_INGEST=ON`.
+- CellShard owns a host-only sparse H5AD reader and optional bounded source ingest, metadata capture, local `.cspool` staging, and one-pass emission of an immutable canonical sparse matrix when `CELLSHARD_BUILD_INGEST=ON`.
 - BioPrep owns conventional preprocessing workflows, normalization decisions,
   and biological QC/marker policy.
 - Cellerator owns biomath, accelerator compute, ML/model workflows, Torch
@@ -227,7 +229,10 @@ When optional CellShard ingest is enabled, there is also a bounded local ingest 
 - ingest can spill intermediate `.cspool` partition artifacts to a machine-local SSD spool before the final `.csh5` is assembled
 - that spool is not an archive format and is not part of the steady-state runtime contract
 - its purpose is to avoid rereading expensive source matrices while preserving `.csh5` as the durable source of truth
-- manifest-driven ingest accepts Matrix Market (`mtx`, `tenx_mtx`), 10x feature-barcode HDF5 (`tenx_h5`), sparse H5AD (`h5ad`, including legacy h5sparse CSR/CSC groups), and dense count-like Loom matrices (`loom`); `binary` manifest rows remain unsupported
+- manifest-driven ingest accepts Matrix Market (`mtx`, `tenx_mtx`), 10x feature-barcode HDF5 (`tenx_h5`), sparse H5AD (`h5ad`, decoded by the native `anndata` module backend), and dense count-like Loom matrices (`loom`); `binary` manifest rows remain unsupported
+- H5AD feature metadata uses the `var` index as the canonical feature ID and looks up optional columns only by the exact names `feature_name` and `feature_type`. If `feature_name` is absent, the ID supplies the name; if `feature_type` is absent, the type is empty. Values are formatted as text, and nullable entries in the packed feature table become empty strings. The source API's `optional<string>` metadata reads preserve the distinction between null and empty. CellShard does not guess gene names or biological types.
+- The native H5AD reader follows the versioned sparse encoding contract implemented by the `anndata` C++ module. It rejects unversioned files, legacy h5sparse, unsupported compound encodings, dense matrices, and other unsupported encodings; it does not fall back to a legacy parser or convert inputs automatically. CellShard's matrix boundary accepts CSR and CSC.
+- `working_bytes` separately bounds the reader payload buffers and the `anndata` scratch area. Returned metadata/output storage and HDF5 internal buffers are outside those bounds. If an indivisible sparse major segment exceeds its bound, the read fails with a request to increase the explicit budget rather than loading the full matrix.
 - optimized MTX-series ingest accepts feature-by-cell Matrix Market sources and
   writes cells-by-features optimized bucketed Sliced-ELL payloads directly:
   `cellshard ingest mtx-series (--manifest series.tsv | --root series_dir) --out dataset.csh5`
@@ -430,16 +435,49 @@ CellShard can be built as a standalone project and exports component-scoped CMak
 
 - `headers`
 - `inspect`
+- `anndata_ingest` (always built; host-only sparse H5AD access)
 - `runtime`
+- `ingest` (optional CUDA-backed dataset ingest)
 - `export`
 - `h5ad_python`
+
+Native builds require CMake 3.28 or newer, Ninja 1.11 or newer, Clang 18 or
+newer with its matching `clang-scan-deps`, and C++20. CUDA-enabled builds also
+require CUDA C++20 or newer. Caller-selected higher language standards such as
+C++23 remain active. Host C++ extensions are disabled.
+
+The installed native `anndata` CMake package must have its HDF5 backend enabled,
+and HDF5 C must be available. Pass the prefix containing `anndataConfig.cmake`
+through `CMAKE_PREFIX_PATH` or `anndata_DIR`. The always-built H5AD target does
+not require CUDA or Python; the Python `anndata`, `h5py`, and `scipy` packages are
+only needed to generate the optional CMake test fixtures.
+
+Example standalone configure:
+
+```bash
+cmake -S . -B build -G Ninja \
+  -DCMAKE_CXX_COMPILER=clang++-18 \
+  -DCMAKE_CXX_COMPILER_CLANG_SCAN_DEPS=/usr/bin/clang-scan-deps-18 \
+  -DCMAKE_PREFIX_PATH=/path/to/anndata-install
+```
+
+CMake can locate a versioned scanner automatically; set
+`CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS` when it is installed outside the normal
+search path. When `CELLSHARD_BUILD_TESTS=ON`, the host H5AD test target is built
+even if export helpers are disabled. CTest registers its fixture-backed run
+only when the selected Python interpreter can import `anndata`, `h5py`, and
+`scipy`.
 
 Typical package use:
 
 ```cmake
-find_package(CellShard REQUIRED COMPONENTS inspect)
-target_link_libraries(my_tool PRIVATE CellShard::inspect)
+find_package(CellShard REQUIRED COMPONENTS anndata_ingest)
+target_link_libraries(my_tool PRIVATE CellShard::anndata_ingest)
 ```
+
+The public H5AD API is available from `<CellShard/ingest/anndata.hh>`. The
+package also provides `CellShard::inspect`, `CellShard::export`, and the CUDA
+runtime/ingest components when those features are enabled.
 
 Inspect-only include:
 
@@ -463,7 +501,7 @@ python -m pip install .
 python -m pip wheel . --no-deps
 ```
 
-The Python package currently targets Linux `x86_64`, Python `3.10`-`3.13`, and the same HDF5/CUDA posture as the standalone CMake build. Wheel builds intentionally skip the standalone `cellshardH5adExport` app and package only the Python extension plus Python-facing helpers. The Python surface now exposes both low-level file helpers and an owner/client bootstrap model built around serialized metadata snapshots; the client-facing retrieval path is still layered on the canonical container plus pack runtime model.
+The Python package currently targets Linux `x86_64` and Python `3.10`-`3.13`. Wheel builds use the native CMake toolchain requirements above and need the installed `anndata` CMake package with HDF5 enabled on `CMAKE_PREFIX_PATH` or `anndata_DIR`; Python package dependencies do not supply this compiled dependency. They intentionally skip the standalone `cellshardH5adExport` app and package the Python extension plus Python-facing helpers. The Python surface now exposes both low-level file helpers and an owner/client bootstrap model built around serialized metadata snapshots; the client-facing retrieval path is still layered on the canonical container plus pack runtime model.
 
 Hosted CI and portability notes live in `SUPPORT.md`.
 

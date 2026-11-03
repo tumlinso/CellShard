@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.24)
+cmake_minimum_required(VERSION 3.28)
 
 option(CELLSHARD_ENABLE_CUDA "Build the CellShard CUDA runtime and staging surfaces." ON)
 
@@ -27,13 +27,92 @@ if(CELLSHARD_ENABLE_CUDA)
         set(CMAKE_CUDA_ARCHITECTURES 70)
     endif()
 
-    project(CellShard LANGUAGES CXX CUDA)
+    project(CellShard LANGUAGES C CXX CUDA)
 else()
-    project(CellShard LANGUAGES CXX)
+    project(CellShard LANGUAGES C CXX)
     message(WARNING
         "Building CellShard without CUDA. "
         "This enables a slow host-only inspect/materialize mode for portability, not the normal GPU runtime path.")
 endif()
+
+if(NOT DEFINED CMAKE_CXX_STANDARD)
+    set(CMAKE_CXX_STANDARD 20)
+elseif(CMAKE_CXX_STANDARD LESS 20)
+    message(FATAL_ERROR "CellShard requires CMAKE_CXX_STANDARD >= 20.")
+endif()
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+if(NOT DEFINED CMAKE_CUDA_STANDARD)
+    set(CMAKE_CUDA_STANDARD 20)
+elseif(CELLSHARD_ENABLE_CUDA AND CMAKE_CUDA_STANDARD LESS 20)
+    message(FATAL_ERROR "CUDA-enabled CellShard requires CMAKE_CUDA_STANDARD >= 20.")
+endif()
+set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+set(CMAKE_CUDA_EXTENSIONS OFF)
+set(CMAKE_CXX_SCAN_FOR_MODULES ON)
+
+if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang"
+   OR CMAKE_CXX_COMPILER_VERSION VERSION_LESS 18)
+    message(FATAL_ERROR
+        "CellShard requires Clang 18 or newer for its C++20 module dependency. "
+        "Configure with -DCMAKE_CXX_COMPILER=clang++-18 or a matching newer Clang.")
+endif()
+
+if(NOT CMAKE_GENERATOR STREQUAL "Ninja")
+    message(FATAL_ERROR "CellShard requires Ninja 1.11 or newer for C++20 module dependency scanning.")
+endif()
+
+execute_process(
+    COMMAND "${CMAKE_MAKE_PROGRAM}" --version
+    RESULT_VARIABLE cellshard_ninja_status
+    OUTPUT_VARIABLE cellshard_ninja_version
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+if(NOT cellshard_ninja_status EQUAL 0
+   OR cellshard_ninja_version VERSION_LESS 1.11)
+    message(FATAL_ERROR
+        "CellShard requires Ninja 1.11 or newer; ${CMAKE_MAKE_PROGRAM} reported "
+        "'${cellshard_ninja_version}'.")
+endif()
+
+string(REGEX MATCH "^[0-9]+" cellshard_clang_major "${CMAKE_CXX_COMPILER_VERSION}")
+if(NOT CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS)
+    find_program(CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS
+        NAMES "clang-scan-deps-${cellshard_clang_major}" clang-scan-deps)
+endif()
+if(NOT CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS)
+    message(FATAL_ERROR
+        "CellShard requires clang-scan-deps matching Clang ${cellshard_clang_major}. "
+        "Install the matching LLVM tools package or set CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS.")
+endif()
+
+execute_process(
+    COMMAND "${CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS}" --version
+    RESULT_VARIABLE cellshard_scanner_status
+    OUTPUT_VARIABLE cellshard_scanner_version
+    ERROR_VARIABLE cellshard_scanner_error
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+if(NOT cellshard_scanner_status EQUAL 0)
+    message(FATAL_ERROR
+        "Unable to run the configured clang-scan-deps at "
+        "${CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS}: ${cellshard_scanner_error}")
+endif()
+set(cellshard_scanner_major "")
+if("${cellshard_scanner_version}\n${cellshard_scanner_error}" MATCHES
+   "[Vv]ersion[ \t]+([0-9]+)")
+    set(cellshard_scanner_major "${CMAKE_MATCH_1}")
+endif()
+if(NOT cellshard_scanner_major STREQUAL cellshard_clang_major)
+    message(FATAL_ERROR
+        "CellShard requires clang-scan-deps matching Clang ${cellshard_clang_major}; "
+        "${CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS} reports '${cellshard_scanner_version}'.")
+endif()
+
+message(STATUS
+    "CellShard C++ modules: Clang ${CMAKE_CXX_COMPILER_VERSION}, "
+    "${CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS}, CMake ${CMAKE_VERSION}, "
+    "Ninja ${cellshard_ninja_version}")
 
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
@@ -41,7 +120,7 @@ include(CMakePackageConfigHelpers)
 set(CELLSHARD_VERSION 0.1.0)
 
 option(CELLSHARD_BUILD_EXPORT "Build the CellShard export helpers." ON)
-option(CELLSHARD_BUILD_INGEST "Build the optional CellShard dataset ingest headers and checks." OFF)
+option(CELLSHARD_BUILD_INGEST "Build optional CUDA-backed CellShard dataset ingest and checks." OFF)
 option(CELLSHARD_ENABLE_PYTHON "Build the optional CellShard Python bindings and H5AD export app." OFF)
 option(CELLSHARD_BUILD_APPS "Build optional CellShard applications." ON)
 option(CELLSHARD_BUILD_TESTS "Build CellShard-local test targets." OFF)
@@ -106,8 +185,10 @@ if(CELLSHARD_BUILD_INGEST AND NOT CELLSHARD_ENABLE_CUDA)
     message(FATAL_ERROR "CELLSHARD_BUILD_INGEST requires CELLSHARD_ENABLE_CUDA=ON")
 endif()
 
-if(NOT HDF5_FOUND)
-    find_package(HDF5 REQUIRED COMPONENTS C)
+find_package(HDF5 REQUIRED COMPONENTS C)
+find_package(anndata CONFIG REQUIRED)
+if(NOT DEFINED ANNDATA_HAS_HDF5 OR NOT ANNDATA_HAS_HDF5)
+    message(FATAL_ERROR "CellShard requires anndata installed with its HDF5 backend enabled.")
 endif()
 
 if(CELLSHARD_ENABLE_CELLERATOR_QUANTIZED)
@@ -160,7 +241,7 @@ if(CELLSHARD_ENABLE_CUDA AND NOT TARGET cellshard_cellerator_compute_matrix_conv
         target_include_directories(cellshard_cellerator_compute_matrix_convert PUBLIC
             "$<BUILD_INTERFACE:${CELLSHARD_CELLERATOR_QUANTIZED_INCLUDE_ROOT}>"
         )
-        target_compile_features(cellshard_cellerator_compute_matrix_convert PUBLIC cxx_std_17)
+        target_compile_features(cellshard_cellerator_compute_matrix_convert PUBLIC cxx_std_20)
         target_link_libraries(cellshard_cellerator_compute_matrix_convert PUBLIC CUDA::cudart)
         if(TARGET CUDA::cudart)
             target_link_libraries(cellshard_cellerator_compute_matrix_convert PRIVATE CUDA::cudart)
@@ -169,9 +250,9 @@ if(CELLSHARD_ENABLE_CUDA AND NOT TARGET cellshard_cellerator_compute_matrix_conv
             target_link_libraries(cellshard_cellerator_compute_matrix_convert PRIVATE CUDA::cusparse)
         endif()
         set_target_properties(cellshard_cellerator_compute_matrix_convert PROPERTIES
-            CXX_STANDARD 17
+            CXX_STANDARD ${CMAKE_CXX_STANDARD}
             CXX_STANDARD_REQUIRED YES
-            CUDA_STANDARD 17
+            CUDA_STANDARD ${CMAKE_CUDA_STANDARD}
             CUDA_STANDARD_REQUIRED YES
         )
     else()
@@ -228,7 +309,7 @@ target_include_directories(cellshard_headers INTERFACE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
-target_compile_features(cellshard_headers INTERFACE cxx_std_17)
+target_compile_features(cellshard_headers INTERFACE cxx_std_20)
 if(CELLSHARD_ENABLE_CUDA)
     target_link_libraries(cellshard_headers INTERFACE $<BUILD_INTERFACE:cellshard_cellerator_compute_matrix_convert>)
 endif()
@@ -257,6 +338,24 @@ target_compile_definitions(cellshard_headers INTERFACE
     CELLSHARD_CUDA_MODE_NATIVE=${CELLSHARD_CUDA_MODE_NATIVE}
     CELLSHARD_CUDA_MODE_NATIVE_EXTREME=${CELLSHARD_CUDA_MODE_NATIVE_EXTREME}
 )
+
+add_library(cellshard_anndata_ingest STATIC
+    src/ingest/anndata.cc
+)
+add_library(CellShard::anndata_ingest ALIAS cellshard_anndata_ingest)
+set_target_properties(cellshard_anndata_ingest PROPERTIES EXPORT_NAME anndata_ingest)
+target_include_directories(cellshard_anndata_ingest PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+)
+target_compile_features(cellshard_anndata_ingest PUBLIC cxx_std_20)
+target_link_libraries(cellshard_anndata_ingest PRIVATE anndata::anndata)
+set_target_properties(cellshard_anndata_ingest PROPERTIES
+    CXX_STANDARD ${CMAKE_CXX_STANDARD}
+    CXX_STANDARD_REQUIRED YES
+    CXX_EXTENSIONS OFF
+)
+cellshard_assert_no_torch_dependency(cellshard_anndata_ingest)
 
 set(cellshard_inspect_sources
     src/io/pack/packfile.cu
@@ -309,7 +408,7 @@ if(CELLSHARD_ENABLE_CUDA)
     target_link_libraries(cellshard_inspect PUBLIC $<BUILD_INTERFACE:cellshard_cellerator_compute_matrix_convert> CUDA::cudart CUDA::cusparse)
 endif()
 set_target_properties(cellshard_inspect PROPERTIES
-    CXX_STANDARD 17
+    CXX_STANDARD ${CMAKE_CXX_STANDARD}
     CXX_STANDARD_REQUIRED YES
 )
 cellshard_enable_perf(cellshard_inspect)
@@ -327,7 +426,7 @@ add_library(cellshard_jbc_runtime_host STATIC ${CELLSHARD_JBC_HOST_SOURCES})
 add_library(CellShard::jbc_runtime_host ALIAS cellshard_jbc_runtime_host)
 set_target_properties(cellshard_jbc_runtime_host PROPERTIES
     EXPORT_NAME jbc_runtime_host
-    CXX_STANDARD 17
+    CXX_STANDARD ${CMAKE_CXX_STANDARD}
     CXX_STANDARD_REQUIRED YES
 )
 target_link_libraries(cellshard_jbc_runtime_host PUBLIC CellShard::headers)
@@ -337,15 +436,18 @@ set(CELLSHARD_EXPORT_TARGETS
     cellshard_headers
     cellshard_inspect
     cellshard_jbc_runtime_host
+    cellshard_anndata_ingest
 )
 set(CELLSHARD_INSTALL_TARGETS
     cellshard_inspect
     cellshard_jbc_runtime_host
+    cellshard_anndata_ingest
 )
 set(CELLSHARD_PACKAGE_COMPONENTS
     headers
     inspect
     jbc_runtime_host
+    anndata_ingest
 )
 if(TARGET cellshard_cellerator_compute_matrix_convert)
     list(APPEND CELLSHARD_EXPORT_TARGETS cellshard_cellerator_compute_matrix_convert)
@@ -390,11 +492,11 @@ if(CELLSHARD_ENABLE_CUDA)
         CUDA::cusparse
         ${CELLSHARD_NCCL_LIBRARY}
     )
-    target_compile_features(cellshard_runtime PUBLIC cxx_std_17)
+    target_compile_features(cellshard_runtime PUBLIC cxx_std_20)
     set_target_properties(cellshard_runtime PROPERTIES
-        CXX_STANDARD 17
+        CXX_STANDARD ${CMAKE_CXX_STANDARD}
         CXX_STANDARD_REQUIRED YES
-        CUDA_STANDARD 17
+        CUDA_STANDARD ${CMAKE_CUDA_STANDARD}
         CUDA_STANDARD_REQUIRED YES
     )
     cellshard_enable_perf(cellshard_runtime)
@@ -423,12 +525,13 @@ if(CELLSHARD_BUILD_INGEST)
     )
     target_link_libraries(cellshard_ingest PUBLIC
         cellshard_runtime
+        cellshard_anndata_ingest
         ${HDF5_LIBRARIES}
     )
     set_target_properties(cellshard_ingest PROPERTIES
-        CXX_STANDARD 17
+        CXX_STANDARD ${CMAKE_CXX_STANDARD}
         CXX_STANDARD_REQUIRED YES
-        CUDA_STANDARD 17
+        CUDA_STANDARD ${CMAKE_CUDA_STANDARD}
         CUDA_STANDARD_REQUIRED YES
     )
     cellshard_enable_perf(cellshard_ingest)
@@ -461,7 +564,7 @@ if(CELLSHARD_BUILD_EXPORT)
             ${HDF5_LIBRARIES}
     )
     set_target_properties(cellshard_export PROPERTIES
-        CXX_STANDARD 17
+        CXX_STANDARD ${CMAKE_CXX_STANDARD}
         CXX_STANDARD_REQUIRED YES
     )
     cellshard_assert_no_torch_dependency(cellshard_export)
@@ -522,7 +625,7 @@ if(CELLSHARD_ENABLE_PYTHON)
             Python3::Python
     )
     set_target_properties(cellshard_h5ad_python PROPERTIES
-        CXX_STANDARD 17
+        CXX_STANDARD ${CMAKE_CXX_STANDARD}
         CXX_STANDARD_REQUIRED YES
     )
     cellshard_assert_no_torch_dependency(cellshard_h5ad_python)
@@ -547,7 +650,7 @@ if(CELLSHARD_ENABLE_PYTHON)
     )
     set_target_properties(_cellshard PROPERTIES
         OUTPUT_NAME _cellshard
-        CXX_STANDARD 17
+        CXX_STANDARD ${CMAKE_CXX_STANDARD}
         CXX_STANDARD_REQUIRED YES
     )
     cellshard_assert_no_torch_dependency(_cellshard)
@@ -568,7 +671,7 @@ if(CELLSHARD_ENABLE_PYTHON)
             pybind11::embed
         )
         set_target_properties(cellshardH5adExport PROPERTIES
-            CXX_STANDARD 17
+            CXX_STANDARD ${CMAKE_CXX_STANDARD}
             CXX_STANDARD_REQUIRED YES
         )
         cellshard_assert_no_torch_dependency(cellshardH5adExport)
@@ -599,16 +702,88 @@ if(CELLSHARD_BUILD_APPS AND CELLSHARD_BUILD_EXPORT)
         target_compile_definitions(cellshard PRIVATE CELLSHARD_BUILD_INGEST_APP=0)
     endif()
     set_target_properties(cellshard PROPERTIES
-        CXX_STANDARD 17
+        CXX_STANDARD ${CMAKE_CXX_STANDARD}
         CXX_STANDARD_REQUIRED YES
     )
     if(CELLSHARD_BUILD_INGEST)
         set_target_properties(cellshard PROPERTIES
-            CUDA_STANDARD 17
+            CUDA_STANDARD ${CMAKE_CUDA_STANDARD}
             CUDA_STANDARD_REQUIRED YES
         )
     endif()
     cellshard_assert_no_torch_dependency(cellshard)
+endif()
+
+if(CELLSHARD_BUILD_TESTS)
+    set(cellshard_anndata_fixture_python_status "not-run")
+    add_executable(cellShardAnnDataIngestTest
+        tests/anndata_ingest_test.cc
+    )
+    target_link_libraries(cellShardAnnDataIngestTest PRIVATE CellShard::anndata_ingest)
+    set_target_properties(cellShardAnnDataIngestTest PROPERTIES
+        CXX_STANDARD ${CMAKE_CXX_STANDARD}
+        CXX_STANDARD_REQUIRED YES
+        CXX_EXTENSIONS OFF
+    )
+
+    find_package(Python3 QUIET COMPONENTS Interpreter)
+    if(Python3_Interpreter_FOUND)
+        execute_process(
+            COMMAND "${Python3_EXECUTABLE}" -c "import anndata, h5py, scipy"
+            RESULT_VARIABLE cellshard_anndata_fixture_python_status
+            ERROR_VARIABLE cellshard_anndata_fixture_python_error
+            OUTPUT_QUIET
+        )
+    endif()
+
+    if(Python3_Interpreter_FOUND AND cellshard_anndata_fixture_python_status STREQUAL "0")
+        set(cellshard_anndata_fixture_dir
+            "${CMAKE_CURRENT_BINARY_DIR}/tests/anndata_fixtures")
+        set(cellshard_anndata_fixture_stamp
+            "${cellshard_anndata_fixture_dir}/.generated")
+        set(cellshard_anndata_fixture_files
+            "${cellshard_anndata_fixture_dir}/csr_integer.h5ad"
+            "${cellshard_anndata_fixture_dir}/csc_float.h5ad"
+            "${cellshard_anndata_fixture_dir}/layers_raw.h5ad"
+            "${cellshard_anndata_fixture_dir}/empty.h5ad"
+            "${cellshard_anndata_fixture_dir}/dtype_branches.h5ad"
+            "${cellshard_anndata_fixture_dir}/dense.h5ad"
+            "${cellshard_anndata_fixture_dir}/unsupported_encoding.h5ad"
+            "${cellshard_anndata_fixture_dir}/legacy_unversioned.h5ad"
+            "${cellshard_anndata_fixture_dir}/modern_unversioned.h5ad"
+            "${cellshard_anndata_fixture_dir}/unsupported_version.h5ad"
+        )
+        add_custom_command(
+            OUTPUT "${cellshard_anndata_fixture_stamp}"
+            COMMAND ${CMAKE_COMMAND} -E make_directory "${cellshard_anndata_fixture_dir}"
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/tests/create_anndata_fixtures.py"
+                "${cellshard_anndata_fixture_dir}"
+            COMMAND ${CMAKE_COMMAND} -E touch "${cellshard_anndata_fixture_stamp}"
+            DEPENDS tests/create_anndata_fixtures.py
+            BYPRODUCTS ${cellshard_anndata_fixture_files}
+            COMMENT "Generating AnnData H5AD test fixtures"
+            VERBATIM
+        )
+        add_custom_target(cellShardAnnDataIngestFixtures
+            DEPENDS "${cellshard_anndata_fixture_stamp}")
+        add_dependencies(cellShardAnnDataIngestTest cellShardAnnDataIngestFixtures)
+
+        enable_testing()
+        add_test(NAME cellShardAnnDataIngest
+            COMMAND "$<TARGET_FILE:cellShardAnnDataIngestTest>"
+                "${cellshard_anndata_fixture_dir}")
+    elseif(Python3_Interpreter_FOUND)
+        message(WARNING
+            "Building cellShardAnnDataIngestTest without registering its fixture test: "
+            "${Python3_EXECUTABLE} cannot import anndata, h5py, and scipy. "
+            "Install those packages or set Python3_EXECUTABLE to a prepared interpreter.")
+    else()
+        message(WARNING
+            "Building cellShardAnnDataIngestTest without registering its fixture test: "
+            "Python3 Interpreter was not found. Install Python3 with anndata, h5py, and scipy "
+            "or set Python3_EXECUTABLE to a prepared interpreter.")
+    endif()
 endif()
 
 if(CELLSHARD_BUILD_TESTS AND CELLSHARD_BUILD_EXPORT)
@@ -631,12 +806,12 @@ if(CELLSHARD_BUILD_TESTS AND CELLSHARD_BUILD_EXPORT)
         ${HDF5_LIBRARIES}
     )
     set_target_properties(cellShardExportRuntimeTest PROPERTIES
-        CXX_STANDARD 17
+        CXX_STANDARD ${CMAKE_CXX_STANDARD}
         CXX_STANDARD_REQUIRED YES
     )
     if(CELLSHARD_ENABLE_CUDA)
         set_target_properties(cellShardExportRuntimeTest PROPERTIES
-            CUDA_STANDARD 17
+            CUDA_STANDARD ${CMAKE_CUDA_STANDARD}
             CUDA_STANDARD_REQUIRED YES
         )
     endif()
@@ -656,7 +831,7 @@ if(CELLSHARD_BUILD_TESTS AND CELLSHARD_BUILD_EXPORT)
         ${HDF5_LIBRARIES}
     )
     set_target_properties(cellShardH5adCsh5AxisValidationTest PROPERTIES
-        CXX_STANDARD 17
+        CXX_STANDARD ${CMAKE_CXX_STANDARD}
         CXX_STANDARD_REQUIRED YES
     )
 
@@ -672,7 +847,7 @@ if(CELLSHARD_BUILD_TESTS AND CELLSHARD_BUILD_EXPORT)
         CellShard::headers
     )
     set_target_properties(cellShardAccessAdapterTest PROPERTIES
-        CXX_STANDARD 17
+        CXX_STANDARD ${CMAKE_CXX_STANDARD}
         CXX_STANDARD_REQUIRED YES
     )
 
@@ -685,7 +860,7 @@ if(CELLSHARD_BUILD_TESTS AND CELLSHARD_BUILD_EXPORT)
         CellShard::headers
     )
     set_target_properties(cellShardFoundationIdentityTest PROPERTIES
-        CXX_STANDARD 17
+        CXX_STANDARD ${CMAKE_CXX_STANDARD}
         CXX_STANDARD_REQUIRED YES
     )
 
@@ -696,7 +871,7 @@ if(CELLSHARD_BUILD_TESTS AND CELLSHARD_BUILD_EXPORT)
         CellShard::headers
     )
     set_target_properties(cellShardFoundationDomainTest PROPERTIES
-        CXX_STANDARD 17
+        CXX_STANDARD ${CMAKE_CXX_STANDARD}
         CXX_STANDARD_REQUIRED YES
     )
 
@@ -707,7 +882,7 @@ if(CELLSHARD_BUILD_TESTS AND CELLSHARD_BUILD_EXPORT)
         CellShard::headers
     )
     set_target_properties(cellShardFoundationArtifactTest PROPERTIES
-        CXX_STANDARD 17
+        CXX_STANDARD ${CMAKE_CXX_STANDARD}
         CXX_STANDARD_REQUIRED YES
     )
 
@@ -718,7 +893,7 @@ if(CELLSHARD_BUILD_TESTS AND CELLSHARD_BUILD_EXPORT)
         CellShard::headers
     )
     set_target_properties(cellShardPayloadSourceTest PROPERTIES
-        CXX_STANDARD 17
+        CXX_STANDARD ${CMAKE_CXX_STANDARD}
         CXX_STANDARD_REQUIRED YES
     )
 
@@ -729,7 +904,7 @@ if(CELLSHARD_BUILD_TESTS AND CELLSHARD_BUILD_EXPORT)
         CellShard::headers
     )
     set_target_properties(cellShardFoundationSnapshotTest PROPERTIES
-        CXX_STANDARD 17
+        CXX_STANDARD ${CMAKE_CXX_STANDARD}
         CXX_STANDARD_REQUIRED YES
     )
 
@@ -741,7 +916,7 @@ if(CELLSHARD_BUILD_TESTS AND CELLSHARD_BUILD_EXPORT)
         CellShard::headers
     )
     set_target_properties(cellShardImageEnvelopeTest PROPERTIES
-        CXX_STANDARD 17
+        CXX_STANDARD ${CMAKE_CXX_STANDARD}
         CXX_STANDARD_REQUIRED YES
     )
 
@@ -754,7 +929,7 @@ if(CELLSHARD_BUILD_TESTS AND CELLSHARD_BUILD_EXPORT)
         CellShard::headers
     )
     set_target_properties(cellShardHostResidencyTest PROPERTIES
-        CXX_STANDARD 17
+        CXX_STANDARD ${CMAKE_CXX_STANDARD}
         CXX_STANDARD_REQUIRED YES
     )
 
@@ -770,7 +945,7 @@ if(CELLSHARD_BUILD_TESTS AND CELLSHARD_BUILD_EXPORT)
         src/runtime/residency/host.cc
     )
     target_link_libraries(cellShardOpaqueImagePipelineTest PRIVATE CellShard::headers)
-    set_target_properties(cellShardOpaqueImagePipelineTest PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED YES)
+    set_target_properties(cellShardOpaqueImagePipelineTest PROPERTIES CXX_STANDARD ${CMAKE_CXX_STANDARD} CXX_STANDARD_REQUIRED YES)
     target_include_directories(cellShardFoundationLegacyAdapterTest PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -780,7 +955,7 @@ if(CELLSHARD_BUILD_TESTS AND CELLSHARD_BUILD_EXPORT)
         CellShard::headers
     )
     set_target_properties(cellShardFoundationLegacyAdapterTest PROPERTIES
-        CXX_STANDARD 17
+        CXX_STANDARD ${CMAKE_CXX_STANDARD}
         CXX_STANDARD_REQUIRED YES
     )
 
@@ -799,7 +974,7 @@ if(CELLSHARD_BUILD_TESTS AND CELLSHARD_BUILD_EXPORT)
         CELLSHARD_ENABLE_CUDA=0
     )
     set_target_properties(cellShardExecutionPayloadCpuTest PROPERTIES
-        CXX_STANDARD 17
+        CXX_STANDARD ${CMAKE_CXX_STANDARD}
         CXX_STANDARD_REQUIRED YES
     )
 
@@ -809,7 +984,7 @@ if(CELLSHARD_BUILD_TESTS AND CELLSHARD_BUILD_EXPORT)
             src/runtime/residency/device.cu
         )
         target_link_libraries(cellShardOpaqueImagePipelineCudaTest PRIVATE CellShard::headers CUDA::cudart)
-        set_target_properties(cellShardOpaqueImagePipelineCudaTest PROPERTIES CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED YES)
+        set_target_properties(cellShardOpaqueImagePipelineCudaTest PROPERTIES CUDA_STANDARD ${CMAKE_CUDA_STANDARD} CUDA_STANDARD_REQUIRED YES)
 
         add_executable(cellShardDeviceResidencyTest
             tests/device_residency_test.cu
@@ -820,7 +995,7 @@ if(CELLSHARD_BUILD_TESTS AND CELLSHARD_BUILD_EXPORT)
             CUDA::cudart
         )
         set_target_properties(cellShardDeviceResidencyTest PROPERTIES
-            CUDA_STANDARD 17
+            CUDA_STANDARD ${CMAKE_CUDA_STANDARD}
             CUDA_STANDARD_REQUIRED YES
         )
 
@@ -837,9 +1012,9 @@ if(CELLSHARD_BUILD_TESTS AND CELLSHARD_BUILD_EXPORT)
             CellShard::inspect
         )
         set_target_properties(cellShardExecutionPayloadTest PROPERTIES
-            CXX_STANDARD 17
+            CXX_STANDARD ${CMAKE_CXX_STANDARD}
             CXX_STANDARD_REQUIRED YES
-            CUDA_STANDARD 17
+            CUDA_STANDARD ${CMAKE_CUDA_STANDARD}
             CUDA_STANDARD_REQUIRED YES
         )
         cellshard_enable_perf(cellShardExecutionPayloadTest)
@@ -856,9 +1031,9 @@ if(CELLSHARD_BUILD_TESTS AND CELLSHARD_BUILD_EXPORT)
             CellShard::runtime
         )
         set_target_properties(cellShardMaskGroupsRuntimeTest PROPERTIES
-            CXX_STANDARD 17
+            CXX_STANDARD ${CMAKE_CXX_STANDARD}
             CXX_STANDARD_REQUIRED YES
-            CUDA_STANDARD 17
+            CUDA_STANDARD ${CMAKE_CUDA_STANDARD}
             CUDA_STANDARD_REQUIRED YES
         )
         cellshard_enable_perf(cellShardMaskGroupsRuntimeTest)
@@ -870,9 +1045,9 @@ if(CELLSHARD_BUILD_TESTS AND CELLSHARD_BUILD_EXPORT)
             CellShard::runtime
         )
         set_target_properties(cellShardDistributedBindingCompileTest PROPERTIES
-            CXX_STANDARD 17
+            CXX_STANDARD ${CMAKE_CXX_STANDARD}
             CXX_STANDARD_REQUIRED YES
-            CUDA_STANDARD 17
+            CUDA_STANDARD ${CMAKE_CUDA_STANDARD}
             CUDA_STANDARD_REQUIRED YES
         )
 
@@ -889,9 +1064,9 @@ if(CELLSHARD_BUILD_TESTS AND CELLSHARD_BUILD_EXPORT)
             ${HDF5_LIBRARIES}
         )
         set_target_properties(cellShardDenseRuntimeTest PROPERTIES
-            CXX_STANDARD 17
+            CXX_STANDARD ${CMAKE_CXX_STANDARD}
             CXX_STANDARD_REQUIRED YES
-            CUDA_STANDARD 17
+            CUDA_STANDARD ${CMAKE_CUDA_STANDARD}
             CUDA_STANDARD_REQUIRED YES
         )
         cellshard_enable_perf(cellShardDenseRuntimeTest)
@@ -908,9 +1083,9 @@ if(CELLSHARD_BUILD_TESTS AND CELLSHARD_BUILD_EXPORT)
             CellShard::runtime
         )
         set_target_properties(cellShardOptimizedSlicedExecutionTest PROPERTIES
-            CXX_STANDARD 17
+            CXX_STANDARD ${CMAKE_CXX_STANDARD}
             CXX_STANDARD_REQUIRED YES
-            CUDA_STANDARD 17
+            CUDA_STANDARD ${CMAKE_CUDA_STANDARD}
             CUDA_STANDARD_REQUIRED YES
         )
         cellshard_enable_perf(cellShardOptimizedSlicedExecutionTest)
@@ -929,9 +1104,9 @@ if(CELLSHARD_BUILD_TESTS AND CELLSHARD_BUILD_EXPORT)
             CUDA::cusparse
         )
         set_target_properties(cellShardCudaLibraryComparisonBench PROPERTIES
-            CXX_STANDARD 17
+            CXX_STANDARD ${CMAKE_CXX_STANDARD}
             CXX_STANDARD_REQUIRED YES
-            CUDA_STANDARD 17
+            CUDA_STANDARD ${CMAKE_CUDA_STANDARD}
             CUDA_STANDARD_REQUIRED YES
         )
         cellshard_enable_perf(cellShardCudaLibraryComparisonBench)
@@ -951,7 +1126,7 @@ if(CELLSHARD_BUILD_TESTS AND CELLSHARD_BUILD_EXPORT)
         ${HDF5_LIBRARIES}
     )
     set_target_properties(cellShardCshardTest PROPERTIES
-        CXX_STANDARD 17
+        CXX_STANDARD ${CMAKE_CXX_STANDARD}
         CXX_STANDARD_REQUIRED YES
     )
 
@@ -967,9 +1142,9 @@ if(CELLSHARD_BUILD_TESTS AND CELLSHARD_BUILD_EXPORT)
             ${HDF5_INCLUDE_DIRS}
         )
         set_target_properties(cellShardDatasetIngestCompileTest PROPERTIES
-            CXX_STANDARD 17
+            CXX_STANDARD ${CMAKE_CXX_STANDARD}
             CXX_STANDARD_REQUIRED YES
-            CUDA_STANDARD 17
+            CUDA_STANDARD ${CMAKE_CUDA_STANDARD}
             CUDA_STANDARD_REQUIRED YES
         )
         cellshard_enable_perf(cellShardDatasetIngestCompileTest)
@@ -988,12 +1163,18 @@ if(CELLSHARD_BUILD_TESTS AND CELLSHARD_BUILD_EXPORT)
             ${HDF5_INCLUDE_DIRS}
         )
         set_target_properties(cellShardHdf5SourceIngestTest PROPERTIES
-            CXX_STANDARD 17
+            CXX_STANDARD ${CMAKE_CXX_STANDARD}
             CXX_STANDARD_REQUIRED YES
-            CUDA_STANDARD 17
+            CUDA_STANDARD ${CMAKE_CUDA_STANDARD}
             CUDA_STANDARD_REQUIRED YES
         )
         cellshard_enable_perf(cellShardHdf5SourceIngestTest)
+        if(TARGET cellShardAnnDataIngestFixtures)
+            add_dependencies(cellShardHdf5SourceIngestTest cellShardAnnDataIngestFixtures)
+            add_test(NAME cellShardHdf5SourceIngest
+                COMMAND "$<TARGET_FILE:cellShardHdf5SourceIngestTest>"
+                    "${cellshard_anndata_fixture_dir}")
+        endif()
 
         add_executable(cellShardMtxSeriesIngestTest
             tests/mtx_series_ingest_test.cu
@@ -1009,9 +1190,9 @@ if(CELLSHARD_BUILD_TESTS AND CELLSHARD_BUILD_EXPORT)
             ${HDF5_INCLUDE_DIRS}
         )
         set_target_properties(cellShardMtxSeriesIngestTest PROPERTIES
-            CXX_STANDARD 17
+            CXX_STANDARD ${CMAKE_CXX_STANDARD}
             CXX_STANDARD_REQUIRED YES
-            CUDA_STANDARD 17
+            CUDA_STANDARD ${CMAKE_CUDA_STANDARD}
             CUDA_STANDARD_REQUIRED YES
         )
         cellshard_enable_perf(cellShardMtxSeriesIngestTest)
@@ -1048,7 +1229,7 @@ if(CELLSHARD_BUILD_TESTS AND CELLSHARD_BUILD_EXPORT)
         target_include_directories(${cellshard_jbc_test_target} PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/include/CellShard
             ${CMAKE_CURRENT_SOURCE_DIR}/src)
-        target_compile_features(${cellshard_jbc_test_target} PRIVATE cxx_std_17)
+        target_compile_features(${cellshard_jbc_test_target} PRIVATE cxx_std_20)
         if(cellshard_jbc_test_relative STREQUAL
            "validation/embedded_consumer/main.cc")
             # This target deliberately imports the complete legacy umbrella,
@@ -1062,7 +1243,7 @@ if(CELLSHARD_BUILD_TESTS AND CELLSHARD_BUILD_EXPORT)
             target_link_libraries(${cellshard_jbc_test_target} PRIVATE
                 CellShard::runtime CUDA::cudart)
             set_target_properties(${cellshard_jbc_test_target} PROPERTIES
-                CUDA_STANDARD 17
+                CUDA_STANDARD ${CMAKE_CUDA_STANDARD}
                 CUDA_STANDARD_REQUIRED YES)
         endif()
         add_dependencies(cellShardJbcTests ${cellshard_jbc_test_target})
@@ -1096,13 +1277,13 @@ if(CELLSHARD_BUILD_TESTS AND CELLSHARD_BUILD_EXPORT)
         target_include_directories(${cellshard_jbc_bench_target} PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/include/CellShard
             ${CMAKE_CURRENT_SOURCE_DIR}/src)
-        target_compile_features(${cellshard_jbc_bench_target} PRIVATE cxx_std_17)
+        target_compile_features(${cellshard_jbc_bench_target} PRIVATE cxx_std_20)
         if(cellshard_jbc_bench_extension STREQUAL ".cu")
             find_library(CELLSHARD_NUMA_LIBRARY NAMES numa REQUIRED)
             target_link_libraries(${cellshard_jbc_bench_target} PRIVATE
                 CellShard::runtime CUDA::cudart ${CELLSHARD_NUMA_LIBRARY})
             set_target_properties(${cellshard_jbc_bench_target} PROPERTIES
-                CUDA_STANDARD 17
+                CUDA_STANDARD ${CMAKE_CUDA_STANDARD}
                 CUDA_STANDARD_REQUIRED YES)
         endif()
         add_dependencies(cellShardJbcBenchmarks ${cellshard_jbc_bench_target})
@@ -1136,6 +1317,14 @@ if(CELLSHARD_BUILD_TESTS)
     else()
         set(cellshard_package_test_expect_ingest OFF)
     endif()
+    set(cellshard_package_test_cuda_config_args)
+    if(CELLSHARD_ENABLE_CUDA)
+        list(APPEND cellshard_package_test_cuda_config_args
+            -DCMAKE_CUDA_COMPILER=${CMAKE_CUDA_COMPILER}
+            -DCMAKE_CUDA_HOST_COMPILER=${CMAKE_CUDA_HOST_COMPILER}
+            -DCMAKE_CUDA_ARCHITECTURES=${CMAKE_CUDA_ARCHITECTURES}
+        )
+    endif()
 
     add_custom_target(cellShardInspectPackageTest
         DEPENDS
@@ -1146,12 +1335,21 @@ if(CELLSHARD_BUILD_TESTS)
         COMMAND ${CMAKE_COMMAND}
             -S ${CMAKE_CURRENT_SOURCE_DIR}/tests/package_consumer
             -B ${cellshard_package_test_build}
+            -G ${CMAKE_GENERATOR}
             -DCMAKE_PREFIX_PATH=${cellshard_package_test_stage}
+            -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+            -DCMAKE_CXX_COMPILER_CLANG_SCAN_DEPS=${CMAKE_CXX_COMPILER_CLANG_SCAN_DEPS}
+            -DCMAKE_CXX_SCAN_FOR_MODULES=ON
+            -DCMAKE_CXX_STANDARD=${CMAKE_CXX_STANDARD}
+            -DCMAKE_CXX_STANDARD_REQUIRED=ON
+            -DCMAKE_CXX_EXTENSIONS=OFF
+            -DCMAKE_CUDA_STANDARD=${CMAKE_CUDA_STANDARD}
+            -DCMAKE_CUDA_STANDARD_REQUIRED=ON
+            -DCMAKE_CUDA_EXTENSIONS=OFF
+            -Danndata_DIR=${anndata_DIR}
             -DCELLSHARD_EXPECT_RUNTIME=${cellshard_package_test_expect_runtime}
             -DCELLSHARD_EXPECT_INGEST=${cellshard_package_test_expect_ingest}
-            -DCMAKE_CUDA_COMPILER=${CMAKE_CUDA_COMPILER}
-            -DCMAKE_CUDA_HOST_COMPILER=${CMAKE_CUDA_HOST_COMPILER}
-            -DCMAKE_CUDA_ARCHITECTURES=${CMAKE_CUDA_ARCHITECTURES}
+            ${cellshard_package_test_cuda_config_args}
         COMMAND ${CMAKE_COMMAND} --build ${cellshard_package_test_build} -j 1
         USES_TERMINAL
     )
@@ -1199,12 +1397,17 @@ install(DIRECTORY include/
         PATTERN "*.cuh"
 )
 
+install(FILES include/CellShard/ingest/anndata.hh
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/CellShard/ingest
+)
+
 if(CELLSHARD_BUILD_INGEST)
     install(DIRECTORY include/CellShard/ingest
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/CellShard
         FILES_MATCHING
             PATTERN "*.hh"
             PATTERN "*.cuh"
+            PATTERN "anndata.hh" EXCLUDE
     )
 
     install(DIRECTORY src/
@@ -1215,30 +1418,34 @@ if(CELLSHARD_BUILD_INGEST)
     )
 endif()
 
-if(CELLSHARD_ENABLE_CELLERATOR_QUANTIZED)
-    if(NOT CELLSHARD_CELLERATOR_QUANTIZED_INCLUDE_ROOT)
-        message(FATAL_ERROR "Unable to locate Cellerator sparse layout headers for install")
-    endif()
-    foreach(cellshard_cellerator_public_dir matrix quantized)
-        install(DIRECTORY "${CELLSHARD_CELLERATOR_QUANTIZED_INCLUDE_ROOT}/Cellerator/${cellshard_cellerator_public_dir}"
-            DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/Cellerator
-            FILES_MATCHING
-                PATTERN "*.cuh"
-        )
-    endforeach()
-    install(FILES
-        "${CELLSHARD_CELLERATOR_QUANTIZED_INCLUDE_ROOT}/Cellerator/matrix.cuh"
-        "${CELLSHARD_CELLERATOR_QUANTIZED_INCLUDE_ROOT}/Cellerator/types.cuh"
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/Cellerator
+if(NOT CELLSHARD_CELLERATOR_QUANTIZED_INCLUDE_ROOT)
+    message(FATAL_ERROR "Unable to locate Cellerator sparse layout headers for install")
+endif()
+install(DIRECTORY "${CELLSHARD_CELLERATOR_QUANTIZED_INCLUDE_ROOT}/Cellerator/interop/formats/"
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/Cellerator/interop/formats
+    FILES_MATCHING
+        PATTERN "*.hh"
+        PATTERN "*.cuh"
+)
+install(FILES
+    "${CELLSHARD_CELLERATOR_QUANTIZED_INCLUDE_ROOT}/Cellerator/types.cuh"
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/Cellerator
+)
+install(FILES
+    "${CELLSHARD_CELLERATOR_QUANTIZED_INCLUDE_ROOT}/Cellerator/interop/cellshard_access.cuh"
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/Cellerator/interop
+)
+install(FILES
+    "${CELLSHARD_CELLERATOR_QUANTIZED_INCLUDE_ROOT}/Cellerator/interop/cellshard/access.cuh"
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/Cellerator/interop/cellshard
+)
+if(CELLSHARD_CELLERATOR_SOURCE_DIR
+   AND EXISTS "${CELLSHARD_CELLERATOR_SOURCE_DIR}/include/Cellerator/compute/matrix/convert/compressed.cuh")
+    install(DIRECTORY "${CELLSHARD_CELLERATOR_SOURCE_DIR}/include/Cellerator/compute/matrix"
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/Cellerator/compute
+        FILES_MATCHING
+            PATTERN "*.cuh"
     )
-    if(CELLSHARD_CELLERATOR_SOURCE_DIR
-       AND EXISTS "${CELLSHARD_CELLERATOR_SOURCE_DIR}/include/Cellerator/compute/matrix/convert/compressed.cuh")
-        install(DIRECTORY "${CELLSHARD_CELLERATOR_SOURCE_DIR}/include/Cellerator/compute/matrix"
-            DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/Cellerator/compute
-            FILES_MATCHING
-                PATTERN "*.cuh"
-        )
-    endif()
 endif()
 
 install(EXPORT CellShardTargets

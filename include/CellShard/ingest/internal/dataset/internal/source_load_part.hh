@@ -1,5 +1,7 @@
 #pragma once
 
+#include "anndata_parts.hh"
+
 static inline int scan_source_row_nnz(const manifest *m,
                                       unsigned int idx,
                                       mtx::header *header,
@@ -12,10 +14,7 @@ static inline int scan_source_row_nnz(const manifest *m,
         return mtx::scan_row_nnz_cached(matrix_path_at(m, idx), cache_root.c_str(), header, row_nnz_out, reader_bytes);
     }
     if (format == source_h5ad) {
-        h5ad::selected_matrix_info info;
-        if (!h5ad::probe_selected_matrix(matrix_path_at(m, idx), matrix_source_at(m, idx), &info, &error)) return 0;
-        if (info.processed_like && !allow_processed_at(m, idx)) return 0;
-        return h5ad::scan_row_nnz(matrix_path_at(m, idx), matrix_source_at(m, idx), header, row_nnz_out, &error);
+        return scan_anndata_rows(m, idx, header, row_nnz_out, reader_bytes);
     }
     if (format == source_tenx_h5) {
         return tenx_h5::scan_row_nnz(matrix_path_at(m, idx), header, row_nnz_out, &error);
@@ -41,7 +40,7 @@ static inline int load_source_barcodes(const manifest *m,
             && common::load_lines(barcode_path_at(m, idx), barcodes);
     }
     if (format == source_h5ad) {
-        return h5ad::load_barcodes(matrix_path_at(m, idx), barcodes, &error);
+        return load_anndata_barcodes(m, idx, barcodes);
     }
     if (format == source_tenx_h5) {
         return tenx_h5::load_barcodes(matrix_path_at(m, idx), barcodes, &error);
@@ -62,7 +61,7 @@ static inline int load_source_features(const manifest *m,
             && common::load_tsv(feature_path_at(m, idx), features, 0);
     }
     if (format == source_h5ad) {
-        return h5ad::load_feature_table(matrix_path_at(m, idx), matrix_source_at(m, idx), features, &error);
+        return load_anndata_features(m, idx, features);
     }
     if (format == source_tenx_h5) {
         return tenx_h5::load_feature_table(matrix_path_at(m, idx), features, &error);
@@ -97,16 +96,8 @@ static inline int load_source_part_window_coo(const manifest *m,
                                          reader_bytes);
     }
     if (format == source_h5ad) {
-        return h5ad::load_part_window_coo(matrix_path_at(m, idx),
-                                          matrix_source_at(m, idx),
-                                          header,
-                                          row_offsets,
-                                          part_nnz,
-                                          num_parts,
-                                          part_begin,
-                                          part_end,
-                                          out,
-                                          &error);
+        return load_anndata_coo(m, idx, header, row_offsets, part_nnz,
+                                 num_parts, part_begin, part_end, out, reader_bytes);
     }
     if (format == source_tenx_h5) {
         return tenx_h5::load_part_window_coo(matrix_path_at(m, idx),
@@ -147,18 +138,9 @@ static inline int load_source_part_window_compressed(const manifest *m,
                                                      std::size_t reader_bytes) {
     std::string error;
     const unsigned int format = format_at(m, idx);
-    (void) reader_bytes;
     if (format == source_h5ad) {
-        return h5ad::load_part_window_compressed(matrix_path_at(m, idx),
-                                                 matrix_source_at(m, idx),
-                                                 header,
-                                                 row_offsets,
-                                                 part_nnz,
-                                                 num_parts,
-                                                 part_begin,
-                                                 part_end,
-                                                 out,
-                                                 &error);
+        return load_anndata_compressed(m, idx, header, row_offsets, part_nnz,
+                                        num_parts, part_begin, part_end, out, reader_bytes);
     }
     if (format == source_tenx_h5) {
         return tenx_h5::load_part_window_compressed(matrix_path_at(m, idx),

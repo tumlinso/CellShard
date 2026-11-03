@@ -17,7 +17,8 @@
 #include "../common/barcode_table.cuh"
 #include "../common/feature_table.cuh"
 #include "../common/metadata_table.cuh"
-#include "../h5ad/h5ad_reader.cuh"
+#include <CellShard/ingest/anndata.hh>
+#include <stdexcept>
 #include "../loom/loom_reader.cuh"
 #include "../mtx/mtx_reader.cuh"
 #include "../tenx_h5/tenx_h5_reader.cuh"

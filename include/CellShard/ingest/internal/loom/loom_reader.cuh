@@ -2,7 +2,7 @@
 
 #include "../common/barcode_table.cuh"
 #include "../common/feature_table.cuh"
-#include "../h5ad/h5ad_reader.cuh"
+#include "../common/hdf5.hh"
 #include "../mtx/mtx_reader.cuh"
 
 #include <CellShard/formats/triplet.cuh>
@@ -43,7 +43,7 @@ inline void set_error(std::string *error, const char *message) {
 }
 
 inline bool build_matrix_path(const char *matrix_source, std::string *matrix_path, std::string *error) {
-    const std::string source = h5ad::trim_copy(matrix_source != nullptr ? matrix_source : "");
+    const std::string source = hdf5::trim_copy(matrix_source != nullptr ? matrix_source : "");
     if (matrix_path == nullptr) return false;
     if (source.empty() || source == "matrix") {
         *matrix_path = "/matrix";
@@ -304,7 +304,7 @@ inline bool read_text_attr(hid_t group,
                            const char *name,
                            unsigned long expected_rows,
                            common::text_column *out) {
-    if (!h5ad::read_dataset_string_column(group, name, out)) return false;
+    if (!hdf5::read_dataset_string_column(group, name, out)) return false;
     return out->count == expected_rows;
 }
 
@@ -323,7 +323,7 @@ inline bool select_first_text_attr(hid_t group,
                                    unsigned long expected_rows,
                                    common::text_column *out) {
     std::vector<std::string> names;
-    if (!h5ad::list_child_names(group, &names)) return false;
+    if (!hdf5::list_child_names(group, &names)) return false;
     for (const std::string &name : names) {
         if (read_text_attr(group, name.c_str(), expected_rows, out)) return true;
     }

@@ -14,7 +14,9 @@ CellShard `0.1.x` is intentionally narrow.
 - Installed CMake package components:
   - `CellShard::headers`
   - `CellShard::inspect`
+  - `CellShard::anndata_ingest` (always installed; host-only sparse H5AD access)
   - `CellShard::runtime` when CUDA is enabled
+  - `CellShard::ingest` when CUDA ingest is enabled
   - `CellShard::export`
   - `CellShard::h5ad_python` when Python is enabled
 - Header-only C++ access adapters:
@@ -55,9 +57,13 @@ CellShard `0.1.x` is intentionally narrow.
 ## Supported Environment
 
 - OS / arch: Linux `x86_64`
-- CMake: `3.24+`
+- CMake: `3.28+`
+- C++ compiler: Clang 18+ with matching `clang-scan-deps`
+- Generator: Ninja 1.11+
+- C++: C++20 or newer, with extensions disabled
+- CUDA: CUDA C++20 or newer when enabled
 - Python: `3.10` through `3.13`
-- HDF5: C library available at build time
+- HDF5: C library and native `anndata` CMake package with HDF5 backend enabled
 - CUDA: optional, but the main runtime/staging path assumes the repo's current CUDA toolchain posture
 - CellShard runtime and distributed headers use neutral device IDs and optional
   stream handles. They do not require Cellerator runtime/distributed types or
@@ -68,6 +74,11 @@ CellShard `0.1.x` is intentionally narrow.
 
 - CPU-only builds are supported for inspect/materialize portability and packaging smoke checks, not for the normal high-throughput runtime path.
 - CUDA-enabled release validation should use the same host/toolchain class as the main CellShard development environment.
+- `CellShard::anndata_ingest` is a compiled host API and builds without CUDA. Its sparse reader exposes CSR/CSC chunks and metadata from backed H5AD sources through the required native `anndata` module dependency.
+- The reader accepts versioned CSR/CSC H5AD encodings and rejects unversioned files, legacy h5sparse, unsupported compound encodings, dense matrices, and unsupported encodings without legacy fallback or automatic conversion.
+- `working_bytes` independently caps reader payload buffers and `anndata` scratch. Returned metadata/output storage and HDF5 internal buffering are outside those bounds; an indivisible oversized sparse segment fails with a request to raise the explicit budget.
+- H5AD feature IDs come from the `var` index. Only exact `feature_name` and `feature_type` columns are selected. A missing name column falls back to the index; a missing type column stays empty. Packed feature-table values are formatted as text and nullable entries become empty strings, while source API optional-string reads distinguish null from empty.
+- Building CMake tests does not require Python. Fixture-backed H5AD test runs are registered only when the selected interpreter imports `anndata`, `h5py`, and `scipy`; otherwise CMake reports the skipped run and still builds the host test executable.
 - Binary wheels are Linux-only.
 - The standalone `cellshardH5adExport` app is part of CMake builds, but wheel builds package the Python extension only.
 - Python `.csh5` access is native-first: `Dataset.matrix()`, `Dataset.rows(...)`,
@@ -90,7 +101,7 @@ CellShard `0.1.x` is intentionally narrow.
   compatibility. CellShard does not interpret caller-owned inner layouts.
 - The normal runtime path is therefore `bind .csh5` -> `materialize cspack` -> `fetch from .cspack` -> `stage to GPU`, not repeated direct HDF5 payload reads as the final execution substrate.
 - Optional CellShard ingest may use bounded local `.cspool` part files, generally sliced-ELL but also blocked-ELL when appropriate, to avoid rereading expensive source matrices before `.csh5` assembly. That spool is an implementation detail, not a supported archival surface.
-- Optional manifest-driven ingest supports `mtx`, `tenx_mtx`, `tenx_h5`, sparse `h5ad` including legacy h5sparse CSR/CSC groups, and dense count-like `loom` sources. Loom graph ingestion and `binary` manifest rows are not supported.
+- Optional manifest-driven ingest supports `mtx`, `tenx_mtx`, `tenx_h5`, sparse `h5ad` through the native `anndata` module backend, and dense count-like `loom` sources. Loom graph ingestion and `binary` manifest rows are not supported.
 - When `CELLSHARD_BUILD_INGEST=ON`, `cellshard ingest mtx-series` is the supported high-throughput path for feature-by-cell Matrix Market series that should be emitted as cells-by-features optimized bucketed Sliced-ELL `.csh5`.
 - MTX-series ingest can prewarm cached row counts, preserve selected observation and feature metadata columns, and auto-use available CPU workers plus visible CUDA devices while keeping HDF5 writes serialized.
 - Persisted parts and shards remain row-aligned. One cell is not split across parts or shards.

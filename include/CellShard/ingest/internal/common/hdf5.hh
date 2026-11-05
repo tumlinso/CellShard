@@ -10,7 +10,7 @@
 #include <vector>
 
 // Raw HDF5 utilities shared by the 10x and Loom format readers. AnnData/H5AD
-// decoding is exclusively provided by the compiled anndata module dependency.
+// decoding is exclusively provided by the compiled anndatapp module dependency.
 namespace cellshard::ingest::hdf5 {
 inline hid_t open_optional_group(hid_t parent, const char *path) {
     hid_t group = (hid_t) -1;

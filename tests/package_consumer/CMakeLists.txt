@@ -58,16 +58,16 @@ set_target_properties(cellshard_anndata_ingest_consumer PROPERTIES
     CXX_EXTENSIONS OFF
 )
 
-set(cellshard_anndata_importer_source
-    "${CMAKE_CURRENT_BINARY_DIR}/anndata_module_importer.cc")
-file(WRITE "${cellshard_anndata_importer_source}"
-    "import anndata.h5ad;\nint main() { return 0; }\n")
+set(cellshard_anndatapp_importer_source
+    "${CMAKE_CURRENT_BINARY_DIR}/anndatapp_module_importer.cc")
+file(WRITE "${cellshard_anndatapp_importer_source}"
+    "import anndatapp.h5ad;\nint main() { return 0; }\n")
 foreach(cellshard_importer IN ITEMS one two)
-    add_executable(cellshard_anndata_module_importer_${cellshard_importer}
-        "${cellshard_anndata_importer_source}")
-    target_link_libraries(cellshard_anndata_module_importer_${cellshard_importer}
-        PRIVATE anndata::anndata)
-    set_target_properties(cellshard_anndata_module_importer_${cellshard_importer}
+    add_executable(cellshard_anndatapp_module_importer_${cellshard_importer}
+        "${cellshard_anndatapp_importer_source}")
+    target_link_libraries(cellshard_anndatapp_module_importer_${cellshard_importer}
+        PRIVATE anndatapp::anndatapp)
+    set_target_properties(cellshard_anndatapp_module_importer_${cellshard_importer}
         PROPERTIES CXX_STANDARD ${CMAKE_CXX_STANDARD} CXX_STANDARD_REQUIRED YES CXX_EXTENSIONS OFF)
 endforeach()
 

@@ -186,9 +186,9 @@ if(CELLSHARD_BUILD_INGEST AND NOT CELLSHARD_ENABLE_CUDA)
 endif()
 
 find_package(HDF5 REQUIRED COMPONENTS C)
-find_package(anndata CONFIG REQUIRED)
-if(NOT DEFINED ANNDATA_HAS_HDF5 OR NOT ANNDATA_HAS_HDF5)
-    message(FATAL_ERROR "CellShard requires anndata installed with its HDF5 backend enabled.")
+find_package(anndatapp CONFIG REQUIRED)
+if(NOT DEFINED ANNDATAPP_HAS_HDF5 OR NOT ANNDATAPP_HAS_HDF5)
+    message(FATAL_ERROR "CellShard requires anndatapp installed with its HDF5 backend enabled.")
 endif()
 
 if(CELLSHARD_ENABLE_CELLERATOR_QUANTIZED)
@@ -349,7 +349,7 @@ target_include_directories(cellshard_anndata_ingest PUBLIC
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 target_compile_features(cellshard_anndata_ingest PUBLIC cxx_std_20)
-target_link_libraries(cellshard_anndata_ingest PRIVATE anndata::anndata)
+target_link_libraries(cellshard_anndata_ingest PRIVATE anndatapp::anndatapp)
 set_target_properties(cellshard_anndata_ingest PROPERTIES
     CXX_STANDARD ${CMAKE_CXX_STANDARD}
     CXX_STANDARD_REQUIRED YES
@@ -1346,7 +1346,7 @@ if(CELLSHARD_BUILD_TESTS)
             -DCMAKE_CUDA_STANDARD=${CMAKE_CUDA_STANDARD}
             -DCMAKE_CUDA_STANDARD_REQUIRED=ON
             -DCMAKE_CUDA_EXTENSIONS=OFF
-            -Danndata_DIR=${anndata_DIR}
+            -Danndatapp_DIR=${anndatapp_DIR}
             -DCELLSHARD_EXPECT_RUNTIME=${cellshard_package_test_expect_runtime}
             -DCELLSHARD_EXPECT_INGEST=${cellshard_package_test_expect_ingest}
             ${cellshard_package_test_cuda_config_args}

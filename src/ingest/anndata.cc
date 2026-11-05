@@ -10,11 +10,11 @@
 #include <type_traits>
 #include <utility>
 
-import anndata.h5ad;
+import anndatapp.h5ad;
 
 namespace cellshard::ingest::anndata_io {
 namespace {
-using ::anndata::DType;
+using ::anndatapp::DType;
 
 const char* dtype_name(DType t) {
     switch (t) {
@@ -67,10 +67,10 @@ template<class U> void convert(DType t, const std::byte* p, std::span<U> out) {
     throw std::runtime_error("AnnData sparse index/offset must be an integer");
 }
 
-std::optional<std::string> text(const ::anndata::ColumnView& c, std::size_t row) {
+std::optional<std::string> text(const ::anndatapp::ColumnView& c, std::size_t row) {
     if (!c.valid(row)) return std::nullopt;
-    if (c.kind() == ::anndata::ColumnKind::string) return std::string(c.string(row));
-    if (c.kind() == ::anndata::ColumnKind::categorical) {
+    if (c.kind() == ::anndatapp::ColumnKind::string) return std::string(c.string(row));
+    if (c.kind() == ::anndatapp::ColumnKind::categorical) {
         const auto k = c.code(row);
         return k < 0 ? std::nullopt : text(c.categories(), std::size_t(k));
     }
@@ -95,23 +95,23 @@ std::optional<std::string> text(const ::anndata::ColumnView& c, std::size_t row)
     return out.str();
 }
 
-std::optional<std::string> table_text(const ::anndata::BackedTable& t,
+std::optional<std::string> table_text(const ::anndatapp::BackedTable& t,
                                     std::string_view name, std::size_t row) {
     if (row >= t.size()) throw std::out_of_range("AnnData metadata row out of bounds");
-    const auto c = t.column(name).select(::anndata::range{std::ptrdiff_t(row), std::ptrdiff_t(row + 1)}).read();
+    const auto c = t.column(name).select(::anndatapp::range{std::ptrdiff_t(row), std::ptrdiff_t(row + 1)}).read();
     return text(c.view(), 0);
 }
 }
 
 struct source::impl {
-    ::anndata::BackedAnnData owner;
-    ::anndata::BackedArray array;
-    ::anndata::BackedTable features;
+    ::anndatapp::BackedAnnData owner;
+    ::anndatapp::BackedArray array;
+    ::anndatapp::BackedTable features;
     std::size_t budget;
     bool csr;
 
     impl(std::string_view path, const matrix_selection& selection, std::size_t bytes)
-        : owner(::anndata::open_h5ad(path, {.scratch_bytes = bytes})), budget(bytes) {
+        : owner(::anndatapp::open_h5ad(path, {.scratch_bytes = bytes})), budget(bytes) {
         if (bytes < 128) throw std::invalid_argument("AnnData working_bytes must be at least 128");
         switch (selection.slot) {
         case matrix_slot::x: array = owner.x(); features = owner.var(); break;
@@ -120,12 +120,12 @@ struct source::impl {
             array = owner.layer(selection.layer); features = owner.var(); break;
         case matrix_slot::raw: array = owner.raw_x(); features = owner.raw_var(); break;
         }
-        if (array.rank() != 2 || array.layout() == ::anndata::Layout::dense)
+        if (array.rank() != 2 || array.layout() == ::anndatapp::Layout::dense)
             throw std::invalid_argument("CellShard AnnData ingest requires a CSR or CSC matrix");
         if (array.extent(0) > std::size_t(std::numeric_limits<std::ptrdiff_t>::max())
             || array.extent(1) > std::size_t(std::numeric_limits<std::ptrdiff_t>::max()))
             throw std::overflow_error("AnnData dimensions exceed selection index range");
-        csr = array.layout() == ::anndata::Layout::csr;
+        csr = array.layout() == ::anndatapp::Layout::csr;
     }
 
     read_stats visit(std::size_t first, std::size_t last, chunk_visitor visitor, void* context) const {
@@ -139,14 +139,14 @@ struct source::impl {
             for (;;) {
                 const auto r0 = csr ? begin : first, r1 = csr ? end : last;
                 const auto c0 = csr ? 0 : begin, c1 = csr ? cols : end;
-                const auto block = array.select({::anndata::range{std::ptrdiff_t(r0), std::ptrdiff_t(r1)},
-                                                  ::anndata::range{std::ptrdiff_t(c0), std::ptrdiff_t(c1)}});
+                const auto block = array.select({::anndatapp::range{std::ptrdiff_t(r0), std::ptrdiff_t(r1)},
+                                                  ::anndatapp::range{std::ptrdiff_t(c0), std::ptrdiff_t(c1)}});
                 const auto prepared = block.prepare_read();
                 const auto req = prepared.requirements();
                 if (!req.nnz) { begin = end; break; }
                 const auto major = end - begin;
-                const auto vw = ::anndata::dtype_size(req.dtype), iw = ::anndata::dtype_size(req.index_dtype),
-                           ow = ::anndata::dtype_size(req.offset_dtype);
+                const auto vw = ::anndatapp::dtype_size(req.dtype), iw = ::anndatapp::dtype_size(req.index_dtype),
+                           ow = ::anndatapp::dtype_size(req.offset_dtype);
                 const auto per_value = vw + iw + sizeof(double) + sizeof(std::uint64_t);
                 const auto per_offset = ow + sizeof(std::uint64_t);
                 const bool fits = major < budget/per_offset
@@ -160,7 +160,7 @@ struct source::impl {
                 std::vector<std::byte> v(req.nnz*vw), i(req.nnz*iw), o((major + 1)*ow);
                 std::vector<double> values(req.nnz);
                 std::vector<std::uint64_t> indices(req.nnz), offsets(major + 1);
-                prepared.read_into(::anndata::SparseBuffer{v.data(), i.data(), o.data(),
+                prepared.read_into(::anndatapp::SparseBuffer{v.data(), i.data(), o.data(),
                     req.dtype, req.index_dtype, req.offset_dtype, req.nnz, req.nnz, major + 1});
                 convert(req.dtype, v.data(), std::span(values));
                 convert(req.index_dtype, i.data(), std::span(indices));
